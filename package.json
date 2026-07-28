@@ -1,0 +1,35 @@
+{
+  "name": "naveyo",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "expo:doctor": "npx --yes expo-doctor",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "expo": "~57.0.0",
+    "expo-constants": "~57.0.7",
+    "expo-dev-client": "~57.0.0",
+    "expo-linking": "~57.0.4",
+    "expo-router": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "~15.15.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "eslint": "^9.39.0",
+    "eslint-config-expo": "~57.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4"
+  }
+}
