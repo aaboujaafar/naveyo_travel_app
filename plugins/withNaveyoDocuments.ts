@@ -1,5 +1,8 @@
-import { createRunOncePlugin, type ConfigPlugin } from 'expo/config-plugins';
+import { createRunOncePlugin, type ConfigPlugin } from 'expo/config-plugins'
 
-const withNaveyoDocuments: ConfigPlugin = (config) => config;
+export const naveyoDocumentsPluginName = 'with-naveyo-documents'
+export const naveyoDocumentsPluginVersion = '0.1.0'
 
-export default createRunOncePlugin(withNaveyoDocuments, 'with-naveyo-documents', '0.1.0');
+const withNaveyoDocuments: ConfigPlugin = (config) => config
+
+export default createRunOncePlugin(withNaveyoDocuments, naveyoDocumentsPluginName, naveyoDocumentsPluginVersion)
