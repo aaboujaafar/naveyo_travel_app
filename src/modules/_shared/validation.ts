@@ -4,12 +4,13 @@ export const isUuid = (value: string): value is UUID =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
 export const isIsoDateTime = (value: string): value is ISODateTime =>
-  !Number.isNaN(Date.parse(value)) && /T/.test(value)
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+  !Number.isNaN(Date.parse(value))
 
 export const isIanaTimeZone = (value: string): value is IANATimeZone => {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: value }).format()
-    return value.includes('/')
+    return true
   } catch { return false }
 }
 
@@ -27,8 +28,19 @@ export const parseMoney = (value: unknown): Money => {
 export const parseCoordinates = (value: unknown): Coordinates => {
   if (!value || typeof value !== 'object') throw new Error('Coordinates must be an object')
   const candidate = value as Record<string, unknown>
-  if (typeof candidate.latitude !== 'number' || candidate.latitude < -90 || candidate.latitude > 90 || typeof candidate.longitude !== 'number' || candidate.longitude < -180 || candidate.longitude > 180) throw new Error('Invalid coordinates')
-  return { latitude: candidate.latitude, longitude: candidate.longitude }
+  const latitude = candidate.latitude
+  const longitude = candidate.longitude
+  if (
+    typeof latitude !== 'number' ||
+    !Number.isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    typeof longitude !== 'number' ||
+    !Number.isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180
+  ) throw new Error('Invalid coordinates')
+  return { latitude, longitude }
 }
 
 export const assertStableId = (id: string): UUID => {
