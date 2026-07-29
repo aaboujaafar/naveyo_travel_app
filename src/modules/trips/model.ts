@@ -1,1 +1,1 @@
-export type { Etape, TripMember, Voyage } from '../_shared/model'
+export type { Stop, Trip, TripMember } from '../_shared/model'

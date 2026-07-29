@@ -33,7 +33,7 @@ export interface TripMember {
   role: 'owner' | 'editor'
 }
 
-export interface Voyage {
+export interface Trip {
   id: UUID
   name: string
   referenceCurrency: ISO4217
@@ -43,7 +43,7 @@ export interface Voyage {
   createdAt: ISODateTime
 }
 
-export interface Etape {
+export interface Stop {
   id: UUID
   tripId: UUID
   name: string
@@ -154,8 +154,8 @@ export interface TripPackManifest {
 
 export interface TripPack {
   manifest: TripPackManifest
-  voyage: Voyage
-  stops: Etape[]
+  trip: Trip
+  stops: Stop[]
   places: PlaceCandidate[]
   itinerary: ItineraryItem[]
   reservations: Reservation[]

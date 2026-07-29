@@ -1,19 +1,19 @@
 import { uuid } from '../../src/modules/_shared/fake'
-import type { Etape, PlaceCandidate, TripPack, UUID, Voyage } from '../../src/modules/_shared/model'
+import type { PlaceCandidate, Stop, Trip, TripPack, UUID } from '../../src/modules/_shared/model'
 import type { PlaceSearchInput, PlacesProvider } from '../../src/modules/places'
 import type { OfflineTripPackModule } from '../../src/modules/offline-trip-pack'
 import type { TripsModule } from '../../src/modules/trips'
 
 export class FakeTrips implements TripsModule {
-  private stops: Etape[]
+  private stops: Stop[]
 
-  constructor(private readonly trip: Voyage, stops: Etape[]) {
+  constructor(private readonly trip: Trip, stops: Stop[]) {
     this.stops = [...stops]
   }
 
   async get(tripId: UUID) { return tripId === this.trip.id ? this.trip : null }
   async listStops(tripId: UUID) { return tripId === this.trip.id ? this.stops : [] }
-  async createStop(input: Omit<Etape, 'id'>) {
+  async createStop(input: Omit<Stop, 'id'>) {
     const id = uuid(`00000000-0000-4000-8000-${String(this.stops.length + 1).padStart(12, '0')}`)
     const stop = { ...input, id }
     this.stops = [...this.stops, stop]
