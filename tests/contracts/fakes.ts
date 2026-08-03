@@ -1,7 +1,7 @@
 import { uuid } from '../../src/modules/_shared/fake'
 import type { PlaceCandidate, Stop, TrackPoint, Trip, TripPack, UUID } from '../../src/modules/_shared/model'
 import type { PlaceSearchInput, PlacesProvider } from '../../src/modules/places'
-import type { OfflineTripPackModule } from '../../src/modules/offline-trip-pack'
+import type { OfflineTripPackLoad, OfflineTripPackModule } from '../../src/modules/offline-trip-pack'
 import type { TripsModule } from '../../src/modules/trips'
 import type { TripTrackingModule } from '../../src/modules/trip-tracking'
 
@@ -41,6 +41,12 @@ export class FakePlacesProvider implements PlacesProvider {
 export class FakeOfflineTripPack implements OfflineTripPackModule {
   private pack: TripPack | null = null
   async get(tripId: UUID) { return this.pack?.manifest.tripId === tripId ? this.pack : null }
+  async load(tripId: UUID): Promise<OfflineTripPackLoad> {
+    const pack = await this.get(tripId)
+    return pack === null
+      ? { state: 'empty', pack: null, manifest: null }
+      : { state: 'ready', pack, manifest: pack.manifest }
+  }
   async replace(pack: TripPack) { this.pack = structuredClone(pack) }
   async manifest(tripId: UUID) { return this.pack?.manifest.tripId === tripId ? this.pack.manifest : null }
 }
