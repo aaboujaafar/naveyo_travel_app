@@ -1,8 +1,9 @@
 import { uuid } from '../../src/modules/_shared/fake'
-import type { PlaceCandidate, Stop, Trip, TripPack, UUID } from '../../src/modules/_shared/model'
+import type { PlaceCandidate, Stop, TrackPoint, Trip, TripPack, UUID } from '../../src/modules/_shared/model'
 import type { PlaceSearchInput, PlacesProvider } from '../../src/modules/places'
 import type { OfflineTripPackModule } from '../../src/modules/offline-trip-pack'
 import type { TripsModule } from '../../src/modules/trips'
+import type { TripTrackingModule } from '../../src/modules/trip-tracking'
 
 export class FakeTrips implements TripsModule {
   private stops: Stop[]
@@ -42,4 +43,21 @@ export class FakeOfflineTripPack implements OfflineTripPackModule {
   async get(tripId: UUID) { return this.pack?.manifest.tripId === tripId ? this.pack : null }
   async replace(pack: TripPack) { this.pack = structuredClone(pack) }
   async manifest(tripId: UUID) { return this.pack?.manifest.tripId === tripId ? this.pack.manifest : null }
+}
+
+export class FakeTripTracking implements TripTrackingModule {
+  private points: TrackPoint[] = []
+
+  async append(point: TrackPoint) {
+    if (this.points.some((existing) => existing.idempotencyKey === point.idempotencyKey)) return
+    this.points = [...this.points, structuredClone(point)]
+  }
+
+  async list(_tripId: UUID) { return structuredClone(this.points) }
+
+  tracker = {
+    start: async (tripId: UUID) => ({ state: 'recording' as const, tripId }),
+    stop: async () => ({ state: 'stopped' as const }),
+    getStatus: async () => ({ state: 'stopped' as const }),
+  }
 }
