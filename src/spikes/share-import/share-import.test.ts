@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { createShareImportVault } from './vault'
+import { createShareImportVault, shareImportLimits } from './vault'
 
 const createTempDir = async () => mkdtemp(path.join(os.tmpdir(), 'naveyo-share-import-'))
 
@@ -90,5 +90,65 @@ describe('share import vault', () => {
 
     await unlink(staged.payloadUri)
     await expect(vault.resume(staged.id)).resolves.toBeNull()
+  })
+
+  it('accepts ICS as a bounded file payload and preserves its metadata', async () => {
+    const sourceRoot = await createTempDir()
+    const durableRoot = await createTempDir()
+    const tempFile = path.join(sourceRoot, 'booking.ics')
+    await writeFile(tempFile, 'BEGIN:VCALENDAR\nEND:VCALENDAR\n', 'utf8')
+
+    const staged = await createShareImportVault(durableRoot).stage({
+      sourceApp: 'travel-app',
+      receivedAt: '2026-07-29T09:04:00.000Z',
+      payload: { kind: 'ics', tempUri: tempFile, fileName: 'booking.ics', mimeType: 'text/calendar', pageCount: 1 },
+    })
+
+    expect(staged.payloadKind).toBe('ics')
+    expect(staged.metadata).toMatchObject({ fileName: 'booking.ics', mimeType: 'text/calendar', pageCount: 1 })
+    expect(await readFile(staged.payloadUri, 'utf8')).toContain('BEGIN:VCALENDAR')
+  })
+
+  it('rejects malformed inputs and payloads over their explicit limits', async () => {
+    const durableRoot = await createTempDir()
+    const vault = createShareImportVault(durableRoot)
+
+    await expect(vault.stage({
+      sourceApp: 'mail',
+      receivedAt: 'not-a-date',
+      payload: { kind: 'url', url: 'file:///private/booking.pdf' },
+    })).rejects.toThrow('receivedAt')
+
+    await expect(vault.stage({
+      sourceApp: 'mail',
+      receivedAt: '2026-07-29T09:05:00.000Z',
+      payload: { kind: 'url', url: 'javascript:alert(1)' },
+    })).rejects.toThrow('HTTP or HTTPS')
+
+    await expect(vault.stage({
+      sourceApp: 'mail',
+      receivedAt: '2026-07-29T09:05:00.000Z',
+      payload: { kind: 'text', text: 'x'.repeat(shareImportLimits.maxTextBytes + 1) },
+    })).rejects.toThrow('size limit')
+
+    await expect(vault.stage({
+      sourceApp: 'mail',
+      receivedAt: '2026-07-29T09:05:00.000Z',
+      payload: { kind: 'ics', tempUri: '/missing.ics', fileName: 'booking.ics', pageCount: shareImportLimits.maxPages + 1 },
+    })).rejects.toThrow('page count')
+  })
+
+  it('ignores a corrupted manifest instead of trusting JSON.parse output', async () => {
+    const durableRoot = await createTempDir()
+    const vault = createShareImportVault(durableRoot)
+    const staged = await vault.stage({
+      sourceApp: 'mail',
+      receivedAt: '2026-07-29T09:06:00.000Z',
+      payload: { kind: 'text', text: 'Confirmation' },
+    })
+    await writeFile(path.join(durableRoot, 'imports', staged.id, 'manifest.json'), '{"id":"wrong"}', 'utf8')
+
+    await expect(vault.resume(staged.id)).resolves.toBeNull()
+    await expect(vault.list()).resolves.toHaveLength(0)
   })
 })

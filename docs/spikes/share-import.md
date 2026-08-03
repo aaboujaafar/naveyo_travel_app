@@ -8,10 +8,18 @@ Objectif : vérifier jusqu’où on peut aller localement sur le parcours “Par
 
 - un petit vault de spike dans `src/spikes/share-import/` ;
 - copie durable d’un payload de fichier depuis une URI temporaire vers un stockage persistant ;
-- persistence de partages texte et URL sans dépendre d’une URI source durable ;
+- persistence de partages texte, URL et ICS sans dépendre d’une URI source durable ;
 - rechargement après “relance” via lecture du manifeste sur disque ;
 - traitement explicite d’un payload manquant ;
 - prise en compte d’une source `travel-app` en plus de Mail, Safari et Photos.
+
+## Garde-fous locaux
+
+Le vault valide à l’exécution les entrées reçues et les manifestes relus après `JSON.parse`. Un manifeste corrompu est ignoré et un chemin de payload qui sort du dossier de l’import est rejeté.
+
+Les limites appliquées avant la copie sont : 100 imports conservés, 25 MiB par PDF, 20 MiB par JPEG/PNG, 1 MiB par ICS, 256 KiB par texte ou URL, et 1 à 20 pages lorsque `pageCount` est fourni. Le nombre de pages d’un PDF n’est pas calculé par ce spike Node ; il sera contrôlé par le futur module PDFKit/OCR.
+
+Les types acceptés sont PDF, JPEG/PNG et ICS (`text/calendar` ou `application/ics`). Une URL est uniquement capturée si elle est HTTP(S) ; elle n’est jamais ouverte, téléchargée ou scrapée.
 
 ## Ce qui a été vérifié localement
 
@@ -19,6 +27,8 @@ Objectif : vérifier jusqu’où on peut aller localement sur le parcours “Par
 - le manifeste ne conserve pas l’URI temporaire ;
 - un partage texte reste lisible après réouverture du vault ;
 - un partage URL reste capturé sans tentative de scraping ;
+- un partage ICS est copié avec son type et ses limites ;
+- un payload trop volumineux, une date, une URL, un MIME, un nombre de pages ou un manifeste invalide est rejeté ;
 - un import rechargé retrouve bien son état durable ;
 - un import cassé retourne un échec explicite au lieu d’inventer une reprise.
 
@@ -26,8 +36,8 @@ Objectif : vérifier jusqu’où on peut aller localement sur le parcours “Par
 
 - la vraie Share Extension iOS ;
 - les entitlements App Group ;
-- le transport entre extension et app hôte sur iPhone réel ;
-- les partages réels depuis Mail, Safari, Photos et une application de voyage ;
+- la configuration et le transport App Group entre extension et app hôte sur iPhone réel ;
+- les partages réels depuis Mail, Safari, Photos et une application de voyage (Airbnb/Booking inclus si disponible) ;
 - la reprise après relance sur iOS 26 / iOS 27 ;
 - le fallback depuis Fichiers / Photos en environnement iOS natif ;
 - toute intégration avec `app.config.ts` ou les identifiants de provisioning.

@@ -6,7 +6,7 @@ declare module 'node:fs/promises' {
     options?: { withFileTypes?: boolean },
   ): Promise<{ isDirectory(): boolean; name: string }[]>
   export function readFile(path: string, encoding: string): Promise<string>
-  export function stat(path: string): Promise<{ isFile(): boolean }>
+  export function stat(path: string): Promise<{ isFile(): boolean; size: number }>
   export function unlink(path: string): Promise<void>
   export function writeFile(path: string, data: string, encoding: string): Promise<void>
   export function mkdtemp(prefix: string): Promise<string>

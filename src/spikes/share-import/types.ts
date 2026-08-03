@@ -1,14 +1,15 @@
 export type ShareSourceApp = 'mail' | 'safari' | 'photos' | 'travel-app'
 
-export type SharePayloadKind = 'pdf' | 'image' | 'text' | 'url'
+export type SharePayloadKind = 'pdf' | 'image' | 'text' | 'url' | 'ics'
 
 export type ShareImportState = 'staged' | 'restored' | 'missing'
 
 export interface ShareFilePayload {
-  kind: 'pdf' | 'image'
+  kind: 'pdf' | 'image' | 'ics'
   tempUri: string
   fileName: string
   mimeType?: string
+  pageCount?: number
 }
 
 export interface ShareTextPayload {
@@ -41,6 +42,7 @@ export interface ShareImportRecord {
   metadata: {
     fileName?: string
     mimeType?: string
+    pageCount?: number
     title?: string
     text?: string
     url?: string
@@ -58,6 +60,7 @@ export interface ShareImportManifest {
   metadata: {
     fileName?: string
     mimeType?: string
+    pageCount?: number
     title?: string
     text?: string
     url?: string
