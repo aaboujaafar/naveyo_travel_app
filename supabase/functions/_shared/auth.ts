@@ -1,3 +1,4 @@
+/* eslint-disable import/no-unresolved -- Supabase Edge Functions resolve Deno URL imports at runtime. */
 import { createClient, type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.54.0'
 
 export type AuthenticatedRequest = { client: SupabaseClient; user: User }
