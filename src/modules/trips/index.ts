@@ -1,2 +1,2 @@
 export type { TripsModule } from './interface'
-export type { Etape, TripMember, Voyage } from './model'
+export type { Stop, Trip, TripMember } from './model'

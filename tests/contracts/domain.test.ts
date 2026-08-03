@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expense, place, reservationDraft, stop, trackPoint, tripId, tripPack, voyage } from '../../src/modules/__fixtures__/domain'
+import { expense, place, reservationDraft, stop, trackPoint, trip, tripId, tripPack } from '../../src/modules/__fixtures__/domain'
 import { FakeOfflineTripPack, FakePlacesProvider, FakeTrips } from './fakes'
 import { assertStableId, isIanaTimeZone, isIsoDateTime, parseCoordinates, parseMoney } from '../../src/modules/_shared/validation'
 
@@ -26,15 +26,15 @@ describe('ARC-001 domain contracts', () => {
 
   it('requires stable ids and UTC instants when present', () => {
     expect(assertStableId(tripId)).toBe(tripId)
-    expect(isIsoDateTime(voyage.createdAt)).toBe(true)
+    expect(isIsoDateTime(trip.createdAt)).toBe(true)
     expect(() => assertStableId('temporary-id')).toThrow()
   })
 
   it('uses module interfaces through fakes', async () => {
-    const trips = new FakeTrips(voyage, [stop])
+    const trips = new FakeTrips(trip, [stop])
     const places = new FakePlacesProvider([place])
     const pack = new FakeOfflineTripPack()
-    expect(await trips.get(tripId)).toEqual(voyage)
+    expect(await trips.get(tripId)).toEqual(trip)
     expect(await places.getById(place.id)).toEqual(place)
     expect(await places.search({ query: 'belém', countryCode: 'PT' })).toEqual([place])
     expect(await pack.get(tripId)).toBeNull()
