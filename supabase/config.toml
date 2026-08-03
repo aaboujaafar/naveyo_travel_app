@@ -1,0 +1,8 @@
+# Minimal local Supabase configuration.
+project_id = "naveyo-local"
+
+[db]
+major_version = 15
+
+[storage]
+enabled = true
