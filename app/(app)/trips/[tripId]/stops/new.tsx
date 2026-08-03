@@ -1,0 +1,11 @@
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useState } from 'react'
+import { Button, Input, ShellFrame, StatusPanel } from '../../../../../src/ui'
+import { useTripsModule } from '../../../../../src/modules/trips'
+import type { Stop } from '../../../../../src/modules/_shared/model'
+
+export default function NewStopScreen() {
+  const router = useRouter(); const { tripId } = useLocalSearchParams<{ tripId: string }>(); const trips = useTripsModule(); const [name, setName] = useState(''); const [countryCode, setCountryCode] = useState(''); const [timeZone, setTimeZone] = useState('Europe/Paris'); const [startDate, setStartDate] = useState(''); const [endDate, setEndDate] = useState(''); const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false)
+  const submit = async () => { if (!trips || !tripId) return; setSaving(true); setError(null); try { await trips.createStop({ tripId: tripId as Stop['tripId'], name, countryCode: countryCode.toUpperCase(), timeZone: timeZone.trim() as Stop['timeZone'], startDate, endDate }); router.back() } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Impossible de créer l’Étape') } finally { setSaving(false) } }
+  return <ShellFrame title="Nouvelle Étape" subtitle="Les dates sont locales au fuseau IANA indiqué"><Input label="Nom" value={name} onChangeText={setName} placeholder="Lisbonne" /><Input label="Pays (ISO 3166-1 alpha-2)" value={countryCode} onChangeText={setCountryCode} placeholder="PT" autoCapitalize="characters" maxLength={2} /><Input label="Fuseau IANA" value={timeZone} onChangeText={setTimeZone} placeholder="Europe/Lisbon" /><Input label="Date de début (AAAA-MM-JJ)" value={startDate} onChangeText={setStartDate} placeholder="2026-09-04" /><Input label="Date de fin (AAAA-MM-JJ)" value={endDate} onChangeText={setEndDate} placeholder="2026-09-08" />{error ? <StatusPanel kind="error" title="Création impossible" message={error} /> : null}<Button fullWidth loading={saving} disabled={!trips || !name.trim()} onPress={() => void submit()}>Ajouter l’Étape</Button><Button fullWidth variant="secondary" onPress={() => router.back()}>Annuler</Button></ShellFrame>
+}
