@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, Input, ShellFrame, ScreenNote } from '../../src/ui';
+import { Button, Input, ShellFrame, ScreenNote, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { signInForShell } = useShellSession();
 
   return (
     <ShellFrame
@@ -15,7 +16,7 @@ export default function SignUpScreen() {
     >
       <View style={styles.branding}>
         <Text style={styles.brand}>Accès privé</Text>
-        <Text style={styles.tagline}>Le vrai branchement d’authentification viendra après le shell.</Text>
+        <Text style={styles.tagline}>Le vrai branchement d’authentification viendra après ce shell local.</Text>
       </View>
 
       <View style={styles.form}>
@@ -24,7 +25,7 @@ export default function SignUpScreen() {
         <Input label="Mot de passe" placeholder="••••••••" secureTextEntry />
       </View>
 
-      <Button onPress={() => router.replace('/(app)')} fullWidth>
+      <Button onPress={signInForShell} fullWidth>
         Créer le compte
       </Button>
       <Button variant="secondary" onPress={() => router.back()} fullWidth>

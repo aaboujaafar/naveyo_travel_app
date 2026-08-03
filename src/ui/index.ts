@@ -50,5 +50,7 @@ export {
   describeConnectivity,
   formatLastSyncLabel,
   resolveEntryRoute,
+  resolveShellRedirect,
 } from './shell-helpers';
-export type { EntryRoute, ShellConnectivityState } from './shell-helpers';
+export type { EntryRoute, ShellConnectivityState, ShellRouteGroup } from './shell-helpers';
+export { ShellNavigationGate, ShellSessionProvider, useShellSession } from './ShellSession';

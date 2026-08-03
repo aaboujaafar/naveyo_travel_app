@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, CardHorizontal, Chip, EmptyState, ScreenNote, ShellFrame, ShellListPlaceholder, StatusPanel } from '../../src/ui';
+import { Badge, Button, Card, CardHorizontal, Chip, EmptyState, ScreenNote, ShellFrame, ShellListPlaceholder, StatusPanel, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 
 export default function AppHomeScreen() {
   const router = useRouter();
+  const { signOut } = useShellSession();
 
   return (
     <ShellFrame
@@ -39,8 +40,6 @@ export default function AppHomeScreen() {
         kind="empty"
         title="Aucune étape pour le moment"
         message="L’écran vide reste lisible et actionnable avant l’arrivée des données réelles."
-        actionLabel="Créer un voyage"
-        onAction={() => router.replace('/(auth)/sign-up')}
       />
 
       <Card style={styles.card}>
@@ -71,12 +70,12 @@ export default function AppHomeScreen() {
       <EmptyState
         title="Shell vide"
         message="L’espace est prêt pour les modules futurs."
-        actionLabel="Retour à la connexion"
-        onAction={() => router.replace('/(auth)/sign-in')}
+        actionLabel="Se déconnecter"
+        onAction={signOut}
       />
 
-      <Button variant="secondary" onPress={() => router.replace('/(auth)/sign-in')} fullWidth>
-        Retourner à l’écran authentifié
+      <Button variant="secondary" onPress={signOut} fullWidth>
+        Se déconnecter
       </Button>
 
       <ScreenNote>

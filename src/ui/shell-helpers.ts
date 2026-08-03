@@ -1,4 +1,5 @@
 export type EntryRoute = '/(auth)/sign-in' | '/(app)';
+export type ShellRouteGroup = '(auth)' | '(app)' | 'unknown';
 
 export type ShellConnectivityState = {
   isOffline: boolean;
@@ -7,6 +8,15 @@ export type ShellConnectivityState = {
 
 export function resolveEntryRoute(isAuthenticated: boolean): EntryRoute {
   return isAuthenticated ? '/(app)' : '/(auth)/sign-in';
+}
+
+export function resolveShellRedirect(
+  isAuthenticated: boolean,
+  currentRouteGroup: ShellRouteGroup,
+): EntryRoute | null {
+  if (isAuthenticated && currentRouteGroup === '(auth)') return '/(app)';
+  if (!isAuthenticated && currentRouteGroup === '(app)') return '/(auth)/sign-in';
+  return null;
 }
 
 export function formatLastSyncLabel(lastSyncedAt?: string | null): string {
@@ -35,7 +45,7 @@ export function formatLastSyncLabel(lastSyncedAt?: string | null): string {
 export function describeConnectivity({ isOffline, lastSyncedAt }: ShellConnectivityState) {
   const statusLabel = isOffline ? 'Hors ligne' : 'En ligne';
   const helperLabel = isOffline
-    ? 'Les modifications attendront le retour du réseau.'
+    ? 'Les mutations ordinaires sont désactivées hors ligne.'
     : 'La synchronisation privée est prête.';
 
   return {

@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Button, Input, ShellFrame, ScreenNote, StatusPanel } from '../../src/ui';
+import { Button, Input, ShellFrame, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 
 export default function SignInScreen() {
   const router = useRouter();
+  const { signInForShell } = useShellSession();
 
   return (
     <ShellFrame
@@ -29,7 +30,7 @@ export default function SignInScreen() {
         <Input label="Mot de passe" placeholder="••••••••" secureTextEntry />
       </View>
 
-      <Button onPress={() => router.replace('/(app)')} fullWidth>
+      <Button onPress={signInForShell} fullWidth>
         Se connecter
       </Button>
 
@@ -48,7 +49,7 @@ export default function SignInScreen() {
       </View>
 
       <ScreenNote>
-        Les données métier seront branchées plus tard ; pour l’instant, seule la navigation du shell est active.
+        Ce bouton ouvre uniquement le shell authentifié local ; aucun compte réel n’est créé avant le branchement de l’identité.
       </ScreenNote>
     </ShellFrame>
   );
