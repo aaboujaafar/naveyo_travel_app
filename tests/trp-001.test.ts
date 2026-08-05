@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OfflineMutationError } from '../src/modules/trips'
 import { createSupabaseTripsModule } from '../src/adapters/supabase/trips'
+import { createSupabaseIdentityModule } from '../src/adapters/supabase/identity'
 import type { SupabaseClientLike, SupabaseQuery, SupabaseResponse } from '../src/adapters/supabase/identity'
 import type { Stop, Trip } from '../src/modules/_shared/model'
 
@@ -38,5 +39,23 @@ describe('TRP-001 Supabase trips adapter', () => {
     const client = { auth: {}, from: vi.fn(() => request({ data: null, error: { code: '42501', message: 'permission denied' } })) } as unknown as SupabaseClientLike
     const trips = createSupabaseTripsModule(client)
     await expect(trips.addMember('10000000-0000-4000-8000-000000000001' as Trip['id'], { accountId: '10000000-0000-4000-8000-000000000003' as Trip['id'] })).rejects.toThrow('not allowed')
+  })
+
+  it('validates local date ranges and IANA time zones before writing', async () => {
+    const from = vi.fn(() => request({ data: null, error: null }))
+    const client = { from, auth: { getUser: vi.fn(), signInWithPassword: vi.fn(), signUp: vi.fn(), signOut: vi.fn() } } as unknown as SupabaseClientLike
+    const trips = createSupabaseTripsModule(client)
+    await expect(trips.createStop({ tripId: '10000000-0000-4000-8000-000000000001' as Stop['tripId'], name: 'Lisbon', countryCode: 'PT', timeZone: 'Europe/Lisbon' as Stop['timeZone'], startDate: '2026-09-06', endDate: '2026-09-05' })).rejects.toThrow('Invalid stop')
+    expect(from).not.toHaveBeenCalled()
+  })
+})
+
+describe('TRP-001 Supabase identity adapter', () => {
+  it('maps authenticated accounts and forwards display name at sign-up', async () => {
+    const signUp = vi.fn(async () => ({ data: { user: { id: '10000000-0000-4000-8000-000000000003', email: 'second@example.test' } }, error: null }))
+    const client = { auth: { getUser: vi.fn(), signInWithPassword: vi.fn(), signUp, signOut: vi.fn() }, from: vi.fn() } as unknown as SupabaseClientLike
+    const identity = createSupabaseIdentityModule(client)
+    await expect(identity.signUp({ email: 'second@example.test', password: 'not-a-secret', displayName: 'Second adult' })).resolves.toEqual({ id: '10000000-0000-4000-8000-000000000003', email: 'second@example.test' })
+    expect(signUp).toHaveBeenCalledWith({ email: 'second@example.test', password: 'not-a-secret', options: { data: { display_name: 'Second adult' } } })
   })
 })
