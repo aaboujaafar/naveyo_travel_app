@@ -1,6 +1,4 @@
-export type {
-  SuggestPlacesInput,
-  TripAssistant,
-  TripAssistantModule,
-} from "./interface";
-export type { SuggestionDraft } from "./model";
+export type { SuggestPlacesInput, TripAssistant, TripAssistantModule, TripAssistantDependencies, TripAssistantOptions } from './interface'
+export type { SuggestionDraft, SuggestionDraftStore, SuggestionModel, SuggestionModelInput } from './model'
+export { InMemorySuggestionDraftStore, TripAssistantService } from './module'
+export { SuggestionError, SuggestionInvalidOutputError, SuggestionTimeoutError, SuggestionUsageLimitError } from './module'
