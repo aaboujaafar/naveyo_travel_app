@@ -486,6 +486,19 @@ export const parseTravelDocument = (value: unknown): TravelDocument => {
     candidate.fileName,
     "document fileName",
   );
+  result.mimeType = parseOptionalString(candidate.mimeType, "document mimeType");
+  result.storagePath = parseOptionalString(
+    candidate.storagePath,
+    "document storagePath",
+  );
+  if (
+    candidate.byteSize !== undefined &&
+    (typeof candidate.byteSize !== "number" ||
+      !Number.isSafeInteger(candidate.byteSize) ||
+      candidate.byteSize <= 0)
+  )
+    throw new Error("Invalid document byteSize");
+  if (typeof candidate.byteSize === "number") result.byteSize = candidate.byteSize;
   if (candidate.reservationId !== undefined)
     result.reservationId = uuidValue(
       candidate.reservationId,

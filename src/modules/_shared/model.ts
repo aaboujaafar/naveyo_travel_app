@@ -133,6 +133,9 @@ export interface TravelDocument {
   tripId: UUID;
   kind: DocumentKind;
   fileName?: string;
+  mimeType?: string;
+  byteSize?: number;
+  storagePath?: string;
   persistentUri: string;
   checksum: string;
   reservationId?: UUID;

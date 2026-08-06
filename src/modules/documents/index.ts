@@ -1,2 +1,10 @@
-export type { DocumentsModule } from "./interface";
+export type {
+  AddDocumentInput,
+  DocumentBody,
+  DocumentStorage,
+  DocumentsModule,
+  DocumentsStore,
+  DownloadedDocumentFile,
+  StoredDocumentFile,
+} from "./interface";
 export type { DocumentKind, TravelDocument } from "./model";
