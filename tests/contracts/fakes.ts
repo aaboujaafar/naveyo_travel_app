@@ -2,7 +2,7 @@ import { uuid } from '../../src/modules/_shared/fake'
 import type { PlaceCandidate, Stop, TrackPoint, Trip, TripPack, UUID } from '../../src/modules/_shared/model'
 import type { PlaceSearchInput, PlacesProvider } from '../../src/modules/places'
 import type { OfflineTripPackLoad, OfflineTripPackModule } from '../../src/modules/offline-trip-pack'
-import type { TripsModule } from '../../src/modules/trips'
+import type { AddTripMemberInput, CreateTripInput, TripsModule, UpdateTripInput } from '../../src/modules/trips'
 import type { TripTrackingModule } from '../../src/modules/trip-tracking'
 
 export class FakeTrips implements TripsModule {
@@ -13,6 +13,10 @@ export class FakeTrips implements TripsModule {
   }
 
   async get(tripId: UUID) { return tripId === this.trip.id ? this.trip : null }
+  async list() { return [this.trip] }
+  async create(_input: CreateTripInput) { return this.trip }
+  async update(_tripId: UUID, _input: UpdateTripInput) { return this.trip }
+  async addMember(_tripId: UUID, _input: AddTripMemberInput) { return undefined }
   async listStops(tripId: UUID) { return tripId === this.trip.id ? this.stops : [] }
   async createStop(input: Omit<Stop, 'id'>) {
     const id = uuid(`00000000-0000-4000-8000-${String(this.stops.length + 1).padStart(12, '0')}`)

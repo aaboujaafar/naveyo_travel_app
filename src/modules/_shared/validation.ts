@@ -105,6 +105,10 @@ const dateValue = (value: unknown, name: string): string => {
   return value
 }
 
+const dateRange = (start: string | undefined, end: string | undefined, name: string): void => {
+  if (start !== undefined && end !== undefined && start > end) throw new Error(`Invalid ${name} date range`)
+}
+
 const arrayValue = (value: unknown, name: string): unknown[] => {
   if (!Array.isArray(value)) throw new Error(`${name} must be an array`)
   return value
@@ -150,10 +154,15 @@ export const parseTrip = (value: unknown): Trip => {
     if (role !== 'owner' && role !== 'editor') throw new Error('Invalid trip member role')
     return { accountId: uuidValue(item.accountId, 'trip member accountId'), role: role as 'owner' | 'editor' }
   })
+  const startsOn = candidate.startsOn === undefined ? undefined : dateValue(candidate.startsOn, 'trip startsOn')
+  const endsOn = candidate.endsOn === undefined ? undefined : dateValue(candidate.endsOn, 'trip endsOn')
+  dateRange(startsOn, endsOn, 'trip')
   return {
     id: uuidValue(candidate.id, 'trip id'),
     name: stringValue(candidate.name, 'trip name'),
     referenceCurrency: typeof candidate.referenceCurrency === 'string' && isCurrency(candidate.referenceCurrency) ? candidate.referenceCurrency : (() => { throw new Error('Invalid trip reference currency') })(),
+    startsOn,
+    endsOn,
     travelers: arrayValue(candidate.travelers, 'trip travelers').map((id) => uuidValue(id, 'traveler id')),
     members,
     stopIds: arrayValue(candidate.stopIds, 'trip stop ids').map((id) => uuidValue(id, 'stop id')),
@@ -165,14 +174,17 @@ export const parseStop = (value: unknown): Stop => {
   const candidate = record(value, 'Stop')
   const timeZone = candidate.timeZone
   if (typeof timeZone !== 'string' || !isIanaTimeZone(timeZone)) throw new Error('Invalid stop timezone')
+  const startDate = dateValue(candidate.startDate, 'stop startDate')
+  const endDate = dateValue(candidate.endDate, 'stop endDate')
+  dateRange(startDate, endDate, 'stop')
   return {
     id: uuidValue(candidate.id, 'stop id'),
     tripId: uuidValue(candidate.tripId, 'stop tripId'),
     name: stringValue(candidate.name, 'stop name'),
     countryCode: stringValue(candidate.countryCode, 'stop countryCode'),
     timeZone,
-    startDate: dateValue(candidate.startDate, 'stop startDate'),
-    endDate: dateValue(candidate.endDate, 'stop endDate'),
+    startDate,
+    endDate,
   }
 }
 

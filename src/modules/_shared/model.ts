@@ -37,6 +37,8 @@ export interface Trip {
   id: UUID
   name: string
   referenceCurrency: ISO4217
+  startsOn?: string
+  endsOn?: string
   travelers: UUID[]
   members: TripMember[]
   stopIds: UUID[]

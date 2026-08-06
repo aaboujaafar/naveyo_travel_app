@@ -1,2 +1,3 @@
-export type { IdentityModule } from './interface'
+export type { IdentityCredentials, IdentityModule } from './interface'
 export type { Account } from './model'
+export { IdentityError } from './errors'
