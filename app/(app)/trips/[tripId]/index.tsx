@@ -14,5 +14,6 @@ export default function TripDetailScreen() {
     {stops.length === 0 ? <EmptyState title="Aucune Étape" message="Ajoutez les dates locales, le pays et le fuseau IANA de la prochaine Étape." actionLabel="Ajouter une Étape" onAction={() => router.push(`/(app)/trips/${tripId}/stops/new`)} /> : null}
     <View style={{ gap: 12 }}>{stops.map((stop) => <Card key={stop.id}><Text>{stop.name}</Text><Text>{stop.countryCode} · {stop.timeZone}</Text><Text>{stop.startDate} → {stop.endDate}</Text></Card>)}</View>
     {stops.length > 0 ? <Button fullWidth onPress={() => router.push(`/(app)/trips/${tripId}/stops/new`)}>Ajouter une Étape</Button> : null}
+    {trip ? <Button fullWidth variant="secondary" onPress={() => router.push(`/(app)/trips/${tripId}/tracking`)}>Trace de trajet</Button> : null}
   </ShellFrame>
 }

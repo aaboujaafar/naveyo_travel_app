@@ -15,7 +15,7 @@ describe('gps spike report', () => {
     expect(gpsSpikeReport.dependencyBlockers).toHaveLength(2);
     expect(gpsSpikeReport.deviceScenarios).toHaveLength(6);
     expect(formatGpsSpikeReport()).toContain('Decision: BLOCKED');
-    expect(formatGpsSpikeReport()).toContain('Transistorsoft SDK dependency');
+    expect(formatGpsSpikeReport()).toContain('Device-backed validation');
   });
 
   it('merges the iOS background location mode without dropping existing values', () => {

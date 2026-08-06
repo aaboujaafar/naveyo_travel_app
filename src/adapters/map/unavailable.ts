@@ -19,7 +19,7 @@ export class UnavailableMapAdapter implements MapAdapter {
 }
 
 export class PermissionDeniedMapAdapter extends UnavailableMapAdapter {
-  status(_model: MapModel): MapStatus {
+  override status(_model: MapModel): MapStatus {
     return 'permission-denied'
   }
 }

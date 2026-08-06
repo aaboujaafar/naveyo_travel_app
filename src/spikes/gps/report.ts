@@ -55,14 +55,14 @@ export const gpsSpikeReport: GpsSpikeReport = {
   ],
   dependencyBlockers: [
     {
-      label: 'Transistorsoft SDK dependency',
-      status: 'blocked',
-      note: 'package.json does not list any GPS tracking SDK, so no native spike can be built from the current dependency set.'
-    },
-    {
       label: 'Device-backed validation',
       status: 'blocked',
-      note: 'No real iPhone is connected to this environment, so screen-lock, airplane-mode, battery and force-quit behaviour cannot be verified here.'
+      note: 'The open-source Expo Location adapter is implemented, but no real iPhone build has validated background delivery, battery use or the force-quit limitation.'
+    },
+    {
+      label: 'Force-quit limitation',
+      status: 'blocked',
+      note: 'Expo documents that iOS background location can stop when the user terminates the app; acceptability for the alpha must be decided after device testing.'
     }
   ],
   deviceScenarios: [
@@ -98,7 +98,7 @@ export const gpsSpikeReport: GpsSpikeReport = {
     }
   ],
   nextStep:
-    'Request a device-backed build with the GPS SDK dependency added by the coordinator, then rerun the scenario matrix on both iPhones.'
+    'Install a development build with the open-source Expo Location adapter, then rerun the scenario matrix on both iPhones.'
 };
 
 export function formatGpsSpikeReport(report: GpsSpikeReport = gpsSpikeReport): string {
