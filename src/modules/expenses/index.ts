@@ -1,2 +1,16 @@
-export type { ExchangeRateProvider, ExpensesModule, MoneyConversion } from './interface'
-export type { Budget, Expense, Money } from './model'
+export { Expenses } from './module'
+export { InMemoryExpensesStore } from './store'
+export type {
+  AddExpenseInput,
+  Budget,
+  BudgetSummary,
+  Expense,
+  ExpenseCategory,
+  Money,
+} from './model'
+export type {
+  ExchangeRateProvider,
+  ExpensesModule,
+  ExpensesStore,
+  MoneyConversion,
+} from './interface'
