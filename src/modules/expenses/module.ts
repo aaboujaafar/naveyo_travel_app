@@ -1,4 +1,5 @@
 import { parseMoney, isCurrency, isLocalDate, isUuid } from '../_shared/validation'
+import { createUuid } from '../_shared/uuid'
 import type { ISO4217, Money, UUID } from '../_shared/model'
 import type { ExchangeRateProvider, ExpensesModule, ExpensesStore } from './interface'
 import type { AddExpenseInput, Budget, BudgetSummary, Expense, ExpenseCategory } from './model'
@@ -19,9 +20,7 @@ const assertDate = (value: string, name: string): void => {
 }
 
 const makeId = (): UUID => {
-  const random = globalThis.crypto?.randomUUID?.()
-  if (random !== undefined && isUuid(random)) return random
-  return '00000000-0000-4000-8000-000000000001' as UUID
+  return createUuid()
 }
 
 export class Expenses implements ExpensesModule {

@@ -1,4 +1,5 @@
 import { assertStableId, isIanaTimeZone, isLocalDate, parseStop, parseTrip } from '../../../modules/_shared/validation'
+import { createUuid } from '../../../modules/_shared/uuid'
 import type { Stop, Trip, TripMember, UUID } from '../../../modules/_shared/model'
 import { AuthorizationError, OfflineMutationError } from '../../../modules/trips'
 import type { AddTripMemberInput, CreateTripInput, TripsModule, UpdateTripInput } from '../../../modules/trips/interface'
@@ -30,7 +31,7 @@ export const createSupabaseTripsModule = (client: SupabaseClientLike, isOnline: 
       mutationGuard(isOnline)
       if (!input.name.trim()) throw new Error('Trip name is required')
       if ((input.startsOn !== undefined && !isLocalDate(input.startsOn)) || (input.endsOn !== undefined && !isLocalDate(input.endsOn)) || (input.startsOn !== undefined && input.endsOn !== undefined && input.startsOn > input.endsOn)) throw new Error('Invalid trip dates')
-      const id = assertStableId(crypto.randomUUID())
+      const id = assertStableId(createUuid())
       const user = await client.auth.getUser()
       throwDatabaseError(user.error)
       if (!user.data?.user) throw new AuthorizationError('An authenticated account is required to create a trip')
@@ -50,7 +51,7 @@ export const createSupabaseTripsModule = (client: SupabaseClientLike, isOnline: 
     async createStop(input: Omit<Stop, 'id'>) {
       mutationGuard(isOnline)
       if (!input.name.trim() || !/^[A-Z]{2}$/.test(input.countryCode) || !isLocalDate(input.startDate) || !isLocalDate(input.endDate) || input.startDate > input.endDate || !isIanaTimeZone(input.timeZone)) throw new Error('Invalid stop name, country, dates or timezone')
-      const id = assertStableId(crypto.randomUUID())
+      const id = assertStableId(createUuid())
       const data = await query(client.from('stops').insert({ id, trip_id: input.tripId, name: input.name.trim(), country_code: input.countryCode, timezone: input.timeZone, local_start: input.startDate, local_end: input.endDate }).select('id,trip_id,name,country_code,timezone,local_start,local_end').single())
       if (!data) throw new Error('Supabase did not return the created stop'); return mapStop(asRow(data))
     },
