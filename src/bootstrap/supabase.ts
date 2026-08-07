@@ -4,18 +4,18 @@ import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClientLike } from '../adapters/supabase/identity/client'
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseAnonKey)
+  return Boolean(supabaseUrl && supabaseKey)
 }
 
 export function createSupabaseClient(): SupabaseClientLike {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_KEY')
   }
 
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
+  const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
       storage: secureStorage,
       autoRefreshToken: true,
