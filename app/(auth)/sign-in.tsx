@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Input, ShellFrame, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
@@ -7,7 +8,23 @@ import { typography } from '../../src/theme/typography';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { signInForShell } = useShellSession();
+  const { signIn } = useShellSession();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    setLoading(true);
+    setError(null);
+    try {
+      await signIn({ email: email.trim(), password });
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Connexion impossible');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <ShellFrame
@@ -19,18 +36,14 @@ export default function SignInScreen() {
         <Text style={styles.tagline}>Préparation et consultation de voyage pour deux adultes.</Text>
       </View>
 
-      <StatusPanel
-        kind="empty"
-        title="Aucun compte connecté"
-        message="Ce shell prépare les routes protégées sans parler encore à Supabase."
-      />
+      {error ? <StatusPanel kind="error" title="Connexion impossible" message={error} /> : null}
 
       <View style={styles.form}>
-        <Input label="Adresse e-mail" placeholder="vous@exemple.com" keyboardType="email-address" autoCapitalize="none" />
-        <Input label="Mot de passe" placeholder="••••••••" secureTextEntry />
+        <Input label="Adresse e-mail" value={email} onChangeText={setEmail} placeholder="vous@exemple.com" keyboardType="email-address" autoCapitalize="none" />
+        <Input label="Mot de passe" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
       </View>
 
-      <Button onPress={signInForShell} fullWidth>
+      <Button onPress={() => void submit()} loading={loading} disabled={!email.trim() || password.length < 6} fullWidth>
         Se connecter
       </Button>
 
@@ -48,9 +61,7 @@ export default function SignInScreen() {
         </Pressable>
       </View>
 
-      <ScreenNote>
-        Ce bouton ouvre uniquement le shell authentifié local ; aucun compte réel n’est créé avant le branchement de l’identité.
-      </ScreenNote>
+      <ScreenNote>La connexion utilise Supabase Auth et conserve la session dans le stockage sécurisé de l’iPhone.</ScreenNote>
     </ShellFrame>
   );
 }

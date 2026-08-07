@@ -1,24 +1,52 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { resolveShellRedirect, type ShellRouteGroup } from './shell-helpers';
+import type { IdentityCredentials, IdentityModule } from '../modules/identity';
 
 type ShellSessionContextValue = {
+  isReady: boolean;
   isAuthenticated: boolean;
-  signInForShell: () => void;
-  signOut: () => void;
+  signIn: (credentials: IdentityCredentials) => Promise<void>;
+  signUp: (credentials: IdentityCredentials & { displayName: string }) => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const ShellSessionContext = createContext<ShellSessionContextValue | null>(null);
 
-export function ShellSessionProvider({ children }: { children: React.ReactNode }) {
+export function ShellSessionProvider({ children, identity }: { children: React.ReactNode; identity: IdentityModule }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void identity.currentAccount().then((account) => {
+      if (!mounted) return;
+      setIsAuthenticated(account !== null);
+      setIsReady(true);
+    }).catch(() => {
+      if (mounted) setIsReady(true);
+    });
+    return () => { mounted = false; };
+  }, [identity]);
+
   const value = useMemo(
     () => ({
+      isReady,
       isAuthenticated,
-      signInForShell: () => setIsAuthenticated(true),
-      signOut: () => setIsAuthenticated(false),
+      signIn: async (credentials: IdentityCredentials) => {
+        await identity.signIn(credentials);
+        setIsAuthenticated(true);
+      },
+      signUp: async (credentials: IdentityCredentials & { displayName: string }) => {
+        await identity.signUp(credentials);
+        setIsAuthenticated(true);
+      },
+      signOut: async () => {
+        await identity.signOut();
+        setIsAuthenticated(false);
+      },
     }),
-    [isAuthenticated],
+    [identity, isAuthenticated, isReady],
   );
 
   return <ShellSessionContext.Provider value={value}>{children}</ShellSessionContext.Provider>;
@@ -39,13 +67,13 @@ export function ShellNavigationGate({ children }: { children: React.ReactNode })
   const router = useRouter();
   const segments = useSegments();
   const navigationState = useRootNavigationState();
-  const { isAuthenticated } = useShellSession();
+  const { isAuthenticated, isReady } = useShellSession();
 
   useEffect(() => {
-    if (!navigationState?.key) return;
+    if (!navigationState?.key || !isReady) return;
     const redirect = resolveShellRedirect(isAuthenticated, routeGroupFromSegments(segments));
     if (redirect) router.replace(redirect);
-  }, [isAuthenticated, navigationState?.key, router, segments]);
+  }, [isAuthenticated, isReady, navigationState?.key, router, segments]);
 
   return children;
 }
