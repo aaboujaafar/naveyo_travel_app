@@ -11,7 +11,12 @@ const asRows = (value: unknown): Row[] => Array.isArray(value) ? value.filter((r
 const asRow = (value: unknown): Row => value && typeof value === 'object' && !Array.isArray(value) ? value as Row : {}
 const stringField = (row: Row, key: string): string => { const value = row[key]; if (typeof value !== 'string') throw new Error(`Invalid Supabase field: ${key}`); return value }
 const mutationGuard = (isOnline: () => boolean): void => { if (!isOnline()) throw new OfflineMutationError() }
-const throwDatabaseError = (error: { message: string; code?: string } | null): void => { if (!error) return; if (error.code && authErrorCodes.has(error.code)) throw new AuthorizationError(); throw new Error(error.message) }
+const throwDatabaseError = (error: { message: string; code?: string } | null): void => {
+  if (!error) return
+  const detail = error.code ? `${error.message} [Supabase ${error.code}]` : error.message
+  if (error.code && authErrorCodes.has(error.code)) throw new AuthorizationError(`You are not allowed to change this trip: ${detail}`)
+  throw new Error(detail)
+}
 const query = async <T>(request: SupabaseQuery<T>): Promise<T | null> => { const { data, error } = await request; throwDatabaseError(error); return data }
 
 const mapMember = (row: Row): TripMember => ({ accountId: assertStableId(stringField(row, 'account_id')), role: row.role === 'owner' ? 'owner' : 'editor' })
