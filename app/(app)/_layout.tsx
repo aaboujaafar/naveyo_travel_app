@@ -1,10 +1,11 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Button, ConnectivityBanner, useShellSession } from '../../src/ui';
 
 export default function AppLayout() {
+  const router = useRouter();
   const { signOut } = useShellSession();
   const lastSyncedAt = '2026-07-29T08:30:00.000Z';
 
@@ -12,9 +13,10 @@ export default function AppLayout() {
     <View style={styles.container}>
       <View style={styles.bannerWrap}>
         <ConnectivityBanner isOffline={false} lastSyncedAt={lastSyncedAt} />
-        <Button variant="ghost" size="sm" onPress={signOut}>
-          Se déconnecter
-        </Button>
+        <View style={styles.actions}>
+          <Button variant="secondary" size="sm" onPress={() => router.push('/(app)/account')}>Compte</Button>
+          <Button variant="ghost" size="sm" onPress={() => void signOut()}>Se déconnecter</Button>
+        </View>
       </View>
       <View style={styles.stack}>
         <Stack
@@ -38,6 +40,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
   },
   stack: {

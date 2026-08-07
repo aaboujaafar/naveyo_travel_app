@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { resolveShellRedirect, type ShellRouteGroup } from './shell-helpers';
-import type { IdentityCredentials, IdentityModule } from '../modules/identity';
+import type { Account, IdentityCredentials, IdentityModule } from '../modules/identity';
 
 type ShellSessionContextValue = {
   isReady: boolean;
   isAuthenticated: boolean;
+  account: Account | null;
   signIn: (credentials: IdentityCredentials) => Promise<void>;
   signUp: (credentials: IdentityCredentials & { displayName: string }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -15,12 +16,14 @@ const ShellSessionContext = createContext<ShellSessionContextValue | null>(null)
 
 export function ShellSessionProvider({ children, identity }: { children: React.ReactNode; identity: IdentityModule }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [account, setAccount] = useState<Account | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     void identity.currentAccount().then((account) => {
       if (!mounted) return;
+      setAccount(account);
       setIsAuthenticated(account !== null);
       setIsReady(true);
     }).catch(() => {
@@ -33,20 +36,24 @@ export function ShellSessionProvider({ children, identity }: { children: React.R
     () => ({
       isReady,
       isAuthenticated,
+      account,
       signIn: async (credentials: IdentityCredentials) => {
-        await identity.signIn(credentials);
+        const nextAccount = await identity.signIn(credentials);
+        setAccount(nextAccount);
         setIsAuthenticated(true);
       },
       signUp: async (credentials: IdentityCredentials & { displayName: string }) => {
-        await identity.signUp(credentials);
+        const nextAccount = await identity.signUp(credentials);
+        setAccount(nextAccount);
         setIsAuthenticated(true);
       },
       signOut: async () => {
         await identity.signOut();
+        setAccount(null);
         setIsAuthenticated(false);
       },
     }),
-    [identity, isAuthenticated, isReady],
+    [account, identity, isAuthenticated, isReady],
   );
 
   return <ShellSessionContext.Provider value={value}>{children}</ShellSessionContext.Provider>;
