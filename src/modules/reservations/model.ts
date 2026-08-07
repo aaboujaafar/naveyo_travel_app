@@ -1,1 +1,5 @@
-export type { Reservation, ReservationDraft, ReservationType } from '../_shared/model'
+export type {
+  Reservation,
+  ReservationDraft,
+  ReservationType,
+} from "../_shared/model";

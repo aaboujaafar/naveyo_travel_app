@@ -1,16 +1,21 @@
-import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
-import { colors } from '../theme/colors';
+import React from "react";
+import { View, StyleSheet, ViewStyle } from "react-native";
+import Svg, { Circle } from "react-native-svg";
+import { colors } from "../theme/colors";
 
 export interface ProgressBarProps {
   progress: number;
-  color?: 'accent' | 'teal' | 'gold' | 'success';
+  color?: "accent" | "teal" | "gold" | "success";
   height?: number;
   style?: ViewStyle;
 }
 
-export function ProgressBar({ progress, color = 'accent', height = 6, style }: ProgressBarProps) {
+export function ProgressBar({
+  progress,
+  color = "accent",
+  height = 6,
+  style,
+}: ProgressBarProps) {
   const clamped = Math.min(1, Math.max(0, progress));
 
   return (
@@ -33,7 +38,7 @@ export interface CircularProgressProps {
   progress: number;
   size?: number;
   strokeWidth?: number;
-  color?: 'accent' | 'teal' | 'gold' | 'success';
+  color?: "accent" | "teal" | "gold" | "success";
   children?: React.ReactNode;
   style?: ViewStyle;
 }
@@ -42,7 +47,7 @@ export function CircularProgress({
   progress,
   size = 64,
   strokeWidth = 6,
-  color = 'accent',
+  color = "accent",
   children,
   style,
 }: CircularProgressProps) {
@@ -84,19 +89,19 @@ export function CircularProgress({
 const styles = StyleSheet.create({
   track: {
     backgroundColor: colors.border,
-    overflow: 'hidden',
-    alignSelf: 'stretch',
+    overflow: "hidden",
+    alignSelf: "stretch",
   },
   fill: {
-    height: '100%',
+    height: "100%",
   },
   circular: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   circularContent: {
     ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

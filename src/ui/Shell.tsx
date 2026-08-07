@@ -1,15 +1,27 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, type StyleProp, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { typography } from '../theme/typography';
-import { Badge } from './Badge';
-import { Button } from './Button';
-import { Card } from './Card';
-import { Skeleton } from './Skeleton';
-import { describeConnectivity, type ShellConnectivityState } from './shell-helpers';
+import React from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { typography } from "../theme/typography";
+import { Badge } from "./Badge";
+import { Button } from "./Button";
+import { Card } from "./Card";
+import { Skeleton } from "./Skeleton";
+import {
+  describeConnectivity,
+  type ShellConnectivityState,
+} from "./shell-helpers";
 
 export interface ShellFrameProps {
   title: string;
@@ -19,33 +31,97 @@ export interface ShellFrameProps {
   footer?: React.ReactNode;
 }
 
-export function ShellFrame({ title, subtitle, children, headerAction, footer }: ShellFrameProps) {
+export function ShellFrame({
+  title,
+  subtitle,
+  children,
+  headerAction,
+  footer,
+}: ShellFrameProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.frame}
-      contentContainerStyle={[
-        styles.frameContent,
-        { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg) },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={insets.top}
     >
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title} accessibilityRole="header">
-            {title}
-          </Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <ScrollView
+        contentContainerStyle={[
+          styles.frameContent,
+          {
+            paddingTop: Math.max(insets.top, spacing.md) + spacing.sm,
+            paddingBottom: Math.max(insets.bottom, spacing.lg),
+          },
+        ]}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          </View>
+          {headerAction ? (
+            <View style={styles.headerAction}>{headerAction}</View>
+          ) : null}
         </View>
-        {headerAction ? <View style={styles.headerAction}>{headerAction}</View> : null}
-      </View>
 
-      <View style={styles.body}>{children}</View>
+        <View style={styles.body}>{children}</View>
 
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
-    </ScrollView>
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+export function AuthFrame({
+  title,
+  subtitle,
+  children,
+  headerAction,
+  footer,
+}: ShellFrameProps) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.frame}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={insets.top}
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.frameContent,
+          {
+            paddingTop: Math.max(insets.top, spacing.md) + spacing.sm,
+            paddingBottom: Math.max(insets.bottom, spacing.lg),
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          </View>
+          {headerAction ? (
+            <View style={styles.headerAction}>{headerAction}</View>
+          ) : null}
+        </View>
+
+        <View style={styles.body}>{children}</View>
+
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -53,8 +129,15 @@ export interface ConnectivityBannerProps extends ShellConnectivityState {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ConnectivityBanner({ isOffline, lastSyncedAt, style }: ConnectivityBannerProps) {
-  const { statusLabel, helperLabel, syncLabel } = describeConnectivity({ isOffline, lastSyncedAt });
+export function ConnectivityBanner({
+  isOffline,
+  lastSyncedAt,
+  style,
+}: ConnectivityBannerProps) {
+  const { statusLabel, helperLabel, syncLabel } = describeConnectivity({
+    isOffline,
+    lastSyncedAt,
+  });
 
   return (
     <View
@@ -62,7 +145,7 @@ export function ConnectivityBanner({ isOffline, lastSyncedAt, style }: Connectiv
       accessibilityLiveRegion="polite"
       accessibilityLabel={`${statusLabel}. ${syncLabel}`}
     >
-      <Badge label={statusLabel} variant={isOffline ? 'danger' : 'success'} />
+      <Badge label={statusLabel} variant={isOffline ? "danger" : "success"} />
       <View style={styles.bannerText}>
         <Text style={styles.bannerTitle}>{statusLabel}</Text>
         <Text style={styles.bannerMessage}>{helperLabel}</Text>
@@ -72,7 +155,7 @@ export function ConnectivityBanner({ isOffline, lastSyncedAt, style }: Connectiv
   );
 }
 
-export type StatusKind = 'loading' | 'error' | 'empty' | 'info';
+export type StatusKind = "loading" | "error" | "empty" | "info";
 
 export interface StatusPanelProps {
   kind?: StatusKind;
@@ -85,7 +168,7 @@ export interface StatusPanelProps {
 }
 
 export function StatusPanel({
-  kind = 'info',
+  kind = "info",
   title,
   message,
   actionLabel,
@@ -93,30 +176,48 @@ export function StatusPanel({
   secondaryActionLabel,
   onSecondaryAction,
 }: StatusPanelProps) {
-  const isLoading = kind === 'loading';
+  const isLoading = kind === "loading";
 
   return (
     <Card style={styles.statusCard}>
       <View style={styles.statusHeader}>
         <Badge
           label={
-            kind === 'loading' ? 'Chargement' : kind === 'error' ? 'Erreur' : kind === 'empty' ? 'Vide' : 'Info'
+            kind === "loading"
+              ? "Chargement"
+              : kind === "error"
+                ? "Erreur"
+                : kind === "empty"
+                  ? "Vide"
+                  : "Info"
           }
-          variant={kind === 'error' ? 'danger' : kind === 'empty' ? 'gold' : kind === 'loading' ? 'teal' : 'accent'}
+          variant={
+            kind === "error"
+              ? "danger"
+              : kind === "empty"
+                ? "gold"
+                : kind === "loading"
+                  ? "teal"
+                  : "accent"
+          }
         />
         <Text style={styles.statusTitle}>{title}</Text>
         {message ? <Text style={styles.statusMessage}>{message}</Text> : null}
       </View>
 
       {isLoading ? (
-        <View style={styles.skeletonStack} accessibilityLabel="Chargement en cours">
+        <View
+          style={styles.skeletonStack}
+          accessibilityLabel="Chargement en cours"
+        >
           <Skeleton height={16} />
           <Skeleton height={16} width="86%" />
           <Skeleton height={16} width="72%" />
         </View>
       ) : null}
 
-      {(actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction) ? (
+      {(actionLabel && onAction) ||
+      (secondaryActionLabel && onSecondaryAction) ? (
         <View style={styles.statusActions}>
           {actionLabel && onAction ? (
             <Button fullWidth size="sm" onPress={onAction}>
@@ -124,7 +225,12 @@ export function StatusPanel({
             </Button>
           ) : null}
           {secondaryActionLabel && onSecondaryAction ? (
-            <Button fullWidth size="sm" variant="secondary" onPress={onSecondaryAction}>
+            <Button
+              fullWidth
+              size="sm"
+              variant="secondary"
+              onPress={onSecondaryAction}
+            >
               {secondaryActionLabel}
             </Button>
           ) : null}
@@ -176,8 +282,8 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing.md,
   },
   headerText: {
@@ -185,7 +291,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   headerAction: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   title: {
     ...typography.h1,
@@ -202,7 +308,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
   },
   banner: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,

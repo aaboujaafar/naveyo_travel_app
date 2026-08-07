@@ -1,5 +1,5 @@
-export { Expenses } from './module'
-export { InMemoryExpensesStore } from './store'
+export { Expenses } from "./module";
+export { InMemoryExpensesStore } from "./store";
 export type {
   AddExpenseInput,
   Budget,
@@ -7,10 +7,10 @@ export type {
   Expense,
   ExpenseCategory,
   Money,
-} from './model'
+} from "./model";
 export type {
   ExchangeRateProvider,
   ExpensesModule,
   ExpensesStore,
   MoneyConversion,
-} from './interface'
+} from "./interface";

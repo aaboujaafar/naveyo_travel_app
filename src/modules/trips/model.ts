@@ -1,1 +1,1 @@
-export type { Stop, Trip, TripMember } from '../_shared/model'
+export type { Stop, Trip, TripInvitation, TripMember } from "../_shared/model";

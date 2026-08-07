@@ -1,17 +1,17 @@
-import { useEffect, useRef } from 'react';
-import { View, Text, Animated, Pressable, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { shadows } from '../theme/shadows';
+import { useEffect, useRef } from "react";
+import { View, Text, Animated, Pressable, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { shadows } from "../theme/shadows";
 
 export interface ToastData {
   id: string;
   title: string;
   message?: string;
-  variant?: 'success' | 'teal' | 'danger';
+  variant?: "success" | "teal" | "danger";
   actionLabel?: string;
   onAction?: () => void;
 }
@@ -46,14 +46,22 @@ export function Toast({ toast, onDismiss, duration = 3000 }: ToastProps) {
   }, [duration, onDismiss, toast.id, translateY]);
 
   const borderColor =
-    toast.variant === 'danger' ? colors.danger : toast.variant === 'teal' ? colors.teal : colors.success;
+    toast.variant === "danger"
+      ? colors.danger
+      : toast.variant === "teal"
+        ? colors.teal
+        : colors.success;
 
   return (
     <Animated.View
       style={[
         styles.toast,
         shadows.md,
-        { top: insets.top + spacing.sm, borderLeftColor: borderColor, transform: [{ translateY }] },
+        {
+          top: insets.top + spacing.sm,
+          borderLeftColor: borderColor,
+          transform: [{ translateY }],
+        },
       ]}
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"
@@ -67,8 +75,12 @@ export function Toast({ toast, onDismiss, duration = 3000 }: ToastProps) {
           <Text style={styles.action}>{toast.actionLabel}</Text>
         </Pressable>
       )}
-      <Pressable onPress={() => onDismiss(toast.id)} hitSlop={8} style={styles.close}>
-        <Text style={styles.closeText}>{'✕'}</Text>
+      <Pressable
+        onPress={() => onDismiss(toast.id)}
+        hitSlop={8}
+        style={styles.close}
+      >
+        <Text style={styles.closeText}>{"✕"}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -76,11 +88,11 @@ export function Toast({ toast, onDismiss, duration = 3000 }: ToastProps) {
 
 const styles = StyleSheet.create({
   toast: {
-    position: 'absolute',
+    position: "absolute",
     left: spacing.lg,
     right: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderLeftWidth: 3,

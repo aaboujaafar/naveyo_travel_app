@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ViewStyle, TextInputProps } from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
+import React, { useCallback, useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ViewStyle,
+  TextInputProps,
+} from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
 
-export interface InputProps extends Omit<TextInputProps, 'style'> {
+export interface InputProps extends Omit<TextInputProps, "style"> {
   label?: string;
   error?: string;
   hint?: string;
@@ -21,10 +28,26 @@ export function Input({
   leftIcon,
   rightIcon,
   containerStyle,
+  onFocus,
+  onBlur,
   ...props
 }: InputProps) {
   const [focused, setFocused] = useState(false);
-  const accessibilityLabel = label ?? props.placeholder ?? 'Champ de saisie';
+  const accessibilityLabel = label ?? props.placeholder ?? "Champ de saisie";
+  const handleFocus = useCallback(
+    (event: Parameters<NonNullable<TextInputProps["onFocus"]>>[0]) => {
+      setFocused(true);
+      onFocus?.(event);
+    },
+    [onFocus],
+  );
+  const handleBlur = useCallback(
+    (event: Parameters<NonNullable<TextInputProps["onBlur"]>>[0]) => {
+      setFocused(false);
+      onBlur?.(event);
+    },
+    [onBlur],
+  );
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -43,8 +66,8 @@ export function Input({
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={error ?? hint}
           importantForAccessibility="yes"
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           {...props}
         />
         {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
@@ -58,20 +81,31 @@ export function Input({
   );
 }
 
-export interface TextAreaProps extends Omit<TextInputProps, 'style'> {
+export interface TextAreaProps extends Omit<TextInputProps, "style"> {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
 }
 
-export function TextArea({ label, error, containerStyle, ...props }: TextAreaProps) {
+export function TextArea({
+  label,
+  error,
+  containerStyle,
+  ...props
+}: TextAreaProps) {
   const [focused, setFocused] = useState(false);
-  const accessibilityLabel = label ?? props.placeholder ?? 'Zone de texte';
+  const accessibilityLabel = label ?? props.placeholder ?? "Zone de texte";
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[styles.textArea, focused && styles.fieldFocused, error && styles.fieldError]}>
+      <View
+        style={[
+          styles.textArea,
+          focused && styles.fieldFocused,
+          error && styles.fieldError,
+        ]}
+      >
         <TextInput
           style={styles.textAreaInput}
           placeholderTextColor={colors.muted}
@@ -100,8 +134,8 @@ const styles = StyleSheet.create({
     color: colors.fg,
   },
   field: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
     borderWidth: 1.5,

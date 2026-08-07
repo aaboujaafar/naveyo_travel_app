@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { Button } from './Button';
+import React from "react";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { Button } from "./Button";
 
 export interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -14,14 +14,26 @@ export interface EmptyStateProps {
   style?: ViewStyle;
 }
 
-export function EmptyState({ icon, title, message, actionLabel, onAction, style }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  message,
+  actionLabel,
+  onAction,
+  style,
+}: EmptyStateProps) {
   return (
     <View style={[styles.container, style]} accessibilityRole="summary">
       {icon && <View style={styles.icon}>{icon}</View>}
       <Text style={styles.title}>{title}</Text>
       {message && <Text style={styles.message}>{message}</Text>}
       {actionLabel && onAction && (
-        <Button variant="secondary" size="sm" onPress={onAction} style={styles.action}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onPress={onAction}
+          style={styles.action}
+        >
           {actionLabel}
         </Button>
       )}
@@ -31,9 +43,9 @@ export function EmptyState({ icon, title, message, actionLabel, onAction, style 
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['2xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing["2xl"],
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
@@ -44,12 +56,12 @@ const styles = StyleSheet.create({
   title: {
     ...typography.h3,
     color: colors.fg,
-    textAlign: 'center',
+    textAlign: "center",
   },
   message: {
     ...typography.bodySmall,
     color: colors.muted,
-    textAlign: 'center',
+    textAlign: "center",
     maxWidth: 260,
   },
   action: {

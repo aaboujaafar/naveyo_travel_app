@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Pressable,
   Text,
@@ -6,16 +6,16 @@ import {
   ViewStyle,
   ActivityIndicator,
   View,
-} from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { shadows } from '../theme/shadows';
+} from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { shadows } from "../theme/shadows";
 
 export interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
+  size?: "sm" | "md" | "lg";
   loading?: boolean;
   disabled?: boolean;
   icon?: React.ReactNode;
@@ -27,8 +27,8 @@ export interface ButtonProps {
 }
 
 export function Button({
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   loading = false,
   disabled = false,
   icon,
@@ -55,19 +55,29 @@ export function Button({
         fullWidth && styles.fullWidth,
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,
-        variant === 'primary' && !isDisabled && shadows.accent,
+        variant === "primary" && !isDisabled && shadows.accent,
         style,
       ]}
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' || variant === 'danger' ? colors.white : colors.accent}
+          color={
+            variant === "primary" || variant === "danger"
+              ? colors.white
+              : colors.accent
+          }
           size="small"
         />
       ) : (
         <>
           {icon && <View style={styles.iconWrap}>{icon}</View>}
-          <Text style={[styles.text, styles[`text_${variant}`], styles[`textSize_${size}`]]}>
+          <Text
+            style={[
+              styles.text,
+              styles[`text_${variant}`],
+              styles[`textSize_${size}`],
+            ]}
+          >
             {children}
           </Text>
         </>
@@ -142,9 +152,9 @@ export function Fab({ icon, onPress, style, accessibilityLabel }: FabProps) {
 
 const styles = StyleSheet.create({
   base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
     borderRadius: radius.full,
   },
@@ -157,13 +167,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   ghost: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   danger: {
     backgroundColor: colors.danger,
   },
   outline: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1.5,
     borderColor: colors.danger,
   },
@@ -183,7 +193,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   fullWidth: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   disabled: {
     opacity: 0.4,
@@ -194,8 +204,8 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 20,
     height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   text: {
     ...typography.label,
@@ -225,8 +235,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   iconButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -236,7 +246,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

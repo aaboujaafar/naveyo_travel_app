@@ -1,7 +1,7 @@
-import { View, Text, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
+import { View, Text, Pressable, StyleSheet, ViewStyle } from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
 
 export interface SectionTitleProps {
   title: string;
@@ -10,7 +10,12 @@ export interface SectionTitleProps {
   style?: ViewStyle;
 }
 
-export function SectionTitle({ title, action, onAction, style }: SectionTitleProps) {
+export function SectionTitle({
+  title,
+  action,
+  onAction,
+  style,
+}: SectionTitleProps) {
   return (
     <View style={[styles.container, style]}>
       <Text style={styles.title}>{title}</Text>
@@ -25,19 +30,19 @@ export function SectionTitle({ title, action, onAction, style }: SectionTitlePro
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: spacing.md,
   },
   title: {
     ...typography.sectionTitle,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     color: colors.muted,
   },
   action: {
     ...typography.label,
     color: colors.fg,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
 });

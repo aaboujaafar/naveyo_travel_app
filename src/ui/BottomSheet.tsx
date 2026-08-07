@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -9,13 +9,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { shadows } from '../theme/shadows';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { shadows } from "../theme/shadows";
 
 export interface BottomSheetProps {
   visible: boolean;
@@ -26,14 +26,26 @@ export interface BottomSheetProps {
   style?: ViewStyle;
 }
 
-export function BottomSheet({ visible, onClose, title, children, maxHeight = 500, style }: BottomSheetProps) {
+export function BottomSheet({
+  visible,
+  onClose,
+  title,
+  children,
+  maxHeight = 500,
+  style,
+}: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.overlay} onPress={onClose}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.wrapper}
         >
           <Pressable
@@ -65,10 +77,10 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   wrapper: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: colors.surface,
@@ -82,7 +94,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.border,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: spacing.md,
   },
   title: {
