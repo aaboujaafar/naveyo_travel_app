@@ -6,6 +6,7 @@ import { colors } from "../src/theme/colors";
 import { ShellNavigationGate, ShellSessionProvider } from "../src/ui";
 import { TripsModuleProvider } from "../src/modules/trips";
 import { TripAssistantProvider } from "../src/modules/trip-assistant";
+import { DocumentsProvider } from "../src/modules/documents";
 import { createAppModules } from "../src/bootstrap/app-modules";
 import { useMemo } from "react";
 
@@ -17,7 +18,8 @@ export default function RootLayout() {
       <ShellSessionProvider identity={modules.identity}>
         <TripsModuleProvider module={modules.trips}>
           <TripAssistantProvider module={modules.tripAssistant}>
-            <ShellNavigationGate>
+            <DocumentsProvider module={modules.documents}>
+              <ShellNavigationGate>
             <StatusBar style="dark" />
             <View style={styles.container}>
               <Stack
@@ -28,7 +30,8 @@ export default function RootLayout() {
                 }}
               />
             </View>
-            </ShellNavigationGate>
+              </ShellNavigationGate>
+            </DocumentsProvider>
           </TripAssistantProvider>
         </TripsModuleProvider>
       </ShellSessionProvider>

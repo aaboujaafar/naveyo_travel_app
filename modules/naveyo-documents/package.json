@@ -2,5 +2,8 @@
   "name": "naveyo-documents",
   "version": "0.1.0",
   "private": true,
-  "main": "src/index.ts"
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo-modules-core": "^57.0.0"
+  }
 }
