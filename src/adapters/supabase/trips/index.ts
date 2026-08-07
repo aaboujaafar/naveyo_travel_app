@@ -6,7 +6,7 @@ import type { AddTripMemberInput, CreateTripInput, TripsModule, UpdateTripInput 
 import type { SupabaseClientLike, SupabaseQuery } from '../identity/client'
 
 type Row = Record<string, unknown>
-const authErrorCodes = new Set(['42501', 'PGRST301', 'PGRST116'])
+const authErrorCodes = new Set(['42501', 'PGRST301'])
 const asRows = (value: unknown): Row[] => Array.isArray(value) ? value.filter((row): row is Row => Boolean(row) && typeof row === 'object') : []
 const asRow = (value: unknown): Row => value && typeof value === 'object' && !Array.isArray(value) ? value as Row : {}
 const stringField = (row: Row, key: string): string => { const value = row[key]; if (typeof value !== 'string') throw new Error(`Invalid Supabase field: ${key}`); return value }
