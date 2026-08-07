@@ -1,9 +1,21 @@
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, CardHorizontal, Chip, EmptyState, ScreenNote, ShellFrame, ShellListPlaceholder, StatusPanel, useShellSession } from '../../src/ui';
-import { colors } from '../../src/theme/colors';
-import { spacing } from '../../src/theme/spacing';
-import { typography } from '../../src/theme/typography';
+import { useRouter } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHorizontal,
+  Chip,
+  EmptyState,
+  ScreenNote,
+  ShellFrame,
+  ShellListPlaceholder,
+  StatusPanel,
+  useShellSession,
+} from "../../src/ui";
+import { colors } from "../../src/theme/colors";
+import { spacing } from "../../src/theme/spacing";
+import { typography } from "../../src/theme/typography";
 
 export default function AppHomeScreen() {
   const router = useRouter();
@@ -22,7 +34,17 @@ export default function AppHomeScreen() {
         </Text>
       </View>
 
-      <Button fullWidth onPress={() => router.push('/(app)/trips')}>Mes Voyages</Button>
+      <Button fullWidth onPress={() => router.push("/(app)/trips")}>
+        Mes Voyages
+      </Button>
+
+      <Button
+        fullWidth
+        variant="secondary"
+        onPress={() => router.push("/(app)/invite")}
+      >
+        J’ai un code d’invitation
+      </Button>
 
       <StatusPanel
         kind="loading"
@@ -35,7 +57,7 @@ export default function AppHomeScreen() {
         title="État de synchronisation"
         message="Les modifications ordinaires nécessitent une connexion réseau."
         actionLabel="Réessayer"
-        onAction={() => router.replace('/(app)')}
+        onAction={() => router.replace("/(app)")}
       />
 
       <StatusPanel
@@ -43,7 +65,7 @@ export default function AppHomeScreen() {
         title="Prêt pour votre premier Voyage"
         message="Créez un Voyage privé ou ouvrez-en un auquel vous appartenez."
         actionLabel="Mes Voyages"
-        onAction={() => router.push('/(app)/trips')}
+        onAction={() => router.push("/(app)/trips")}
       />
 
       <Card style={styles.card}>
@@ -83,7 +105,8 @@ export default function AppHomeScreen() {
       </Button>
 
       <ScreenNote>
-        La vraie logique métier arrivera ensuite dans les modules dédiés, pas dans les routes.
+        La vraie logique métier arrivera ensuite dans les modules dédiés, pas
+        dans les routes.
       </ScreenNote>
     </ShellFrame>
   );
@@ -106,9 +129,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   cardTitle: {
     ...typography.label,
@@ -119,12 +142,12 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   grid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.md,
   },
   gridCard: {
     flex: 1,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     gap: 4,
   },
   metric: {
