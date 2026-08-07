@@ -8,3 +8,4 @@ export type {
   StoredDocumentFile,
 } from "./interface";
 export type { DocumentKind, TravelDocument } from "./model";
+export { DocumentsProvider, useDocuments } from "./context";
