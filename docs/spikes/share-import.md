@@ -13,22 +13,16 @@ Objectif : vérifier jusqu’où on peut aller localement sur le parcours “Par
 - traitement explicite d’un payload manquant ;
 - prise en compte d’une source `travel-app` en plus de Mail, Safari et Photos.
 
-## Garde-fous locaux
-
-Le vault valide à l’exécution les entrées reçues et les manifestes relus après `JSON.parse`. Un manifeste corrompu est ignoré et un chemin de payload qui sort du dossier de l’import est rejeté.
-
-Les limites appliquées avant la copie sont : 100 imports conservés, 25 MiB par PDF, 20 MiB par JPEG/PNG, 1 MiB par ICS, 256 KiB par texte ou URL, et 1 à 20 pages lorsque `pageCount` est fourni. Le nombre de pages d’un PDF n’est pas calculé par ce spike Node ; il sera contrôlé par le futur module PDFKit/OCR.
-
-Les types acceptés sont PDF, JPEG/PNG et ICS (`text/calendar` ou `application/ics`). Une URL est uniquement capturée si elle est HTTP(S) ; elle n’est jamais ouverte, téléchargée ou scrapée.
-
 ## Ce qui a été vérifié localement
 
 - un PDF factice est copié hors de son URI temporaire ;
 - le manifeste ne conserve pas l’URI temporaire ;
 - un partage texte reste lisible après réouverture du vault ;
 - un partage URL reste capturé sans tentative de scraping ;
-- un partage ICS est copié avec son type et ses limites ;
-- un payload trop volumineux, une date, une URL, un MIME, un nombre de pages ou un manifeste invalide est rejeté ;
+- un partage ICS est copié avec son type MIME et ses limites ;
+- un payload invalide est rejeté avant la création du dossier d’import ;
+- un import dont le fichier a disparu est listé avec l’état `missing` ;
+- un manifeste qui pointe hors de son dossier est ignoré ;
 - un import rechargé retrouve bien son état durable ;
 - un import cassé retourne un échec explicite au lieu d’inventer une reprise.
 
@@ -36,8 +30,8 @@ Les types acceptés sont PDF, JPEG/PNG et ICS (`text/calendar` ou `application/i
 
 - la vraie Share Extension iOS ;
 - les entitlements App Group ;
-- la configuration et le transport App Group entre extension et app hôte sur iPhone réel ;
-- les partages réels depuis Mail, Safari, Photos et une application de voyage (Airbnb/Booking inclus si disponible) ;
+- le transport entre extension et app hôte sur iPhone réel ;
+- les partages réels depuis Mail, Safari, Photos et une application de voyage ;
 - la reprise après relance sur iOS 26 / iOS 27 ;
 - le fallback depuis Fichiers / Photos en environnement iOS natif ;
 - toute intégration avec `app.config.ts` ou les identifiants de provisioning.
@@ -45,6 +39,8 @@ Les types acceptés sont PDF, JPEG/PNG et ICS (`text/calendar` ou `application/i
 ## Limite confirmée du spike
 
 Ce spike démontre le comportement durable attendu dans un environnement de test, mais il ne prouve pas la mécanique native de l’extension, ni la configuration App Group. Sans credentials et sans exécution sur iPhone, la validation finale reste bloquée.
+
+Le plugin `withNaveyoDocuments` reste volontairement neutre tant que l’identifiant App Group, le bundle identifier de l’extension et les entitlements Apple ne sont pas fournis. Il ne faut pas générer de valeurs fictives dans `app.config`.
 
 ## Décision
 
