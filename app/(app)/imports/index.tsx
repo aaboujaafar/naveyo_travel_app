@@ -1,3 +1,4 @@
+import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
@@ -17,6 +18,7 @@ import {
   sharedLocalReservations,
   type ReservationImportResult,
 } from "../../../src/modules/reservations";
+import { createAppleReservationAnalyzer } from "../../../src/adapters/apple-document-analysis";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
@@ -29,13 +31,19 @@ export default function ReservationImportScreen() {
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId?: string }>();
   const tripId = (rawTripId ?? defaultTripId) as UUID;
   const [sourceText, setSourceText] = useState("");
+  const [selectedSource, setSelectedSource] = useState<{
+    uri: string;
+    kind: "pdf" | "image";
+    fileName?: string;
+    sizeBytes?: number;
+  } | null>(null);
   const [result, setResult] = useState<ReservationImportResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function analyze() {
-    if (isAnalyzing || !sourceText.trim()) {
+    if (isAnalyzing || (!sourceText.trim() && !selectedSource)) {
       setError("Ajoutez le contenu de la confirmation à analyser.");
       return;
     }
@@ -43,11 +51,15 @@ export default function ReservationImportScreen() {
     setResult(null);
     setIsAnalyzing(true);
     try {
-      const next = await analyzeReservationImport(analyzer, {
+      const source = selectedSource ?? {
         uri: `text:${encodeURIComponent(sourceText)}`,
-        kind: "text",
+        kind: "text" as const,
         sizeBytes: new TextEncoder().encode(sourceText).byteLength,
-      });
+      };
+      const next = await analyzeReservationImport(
+        selectedSource ? createAppleReservationAnalyzer() : analyzer,
+        source,
+      );
       if (next.state === "needs-confirmation") {
         const existing = await sharedLocalReservations.findDuplicate(tripId, next.draft);
         setResult(
@@ -63,6 +75,25 @@ export default function ReservationImportScreen() {
     } finally {
       setIsAnalyzing(false);
     }
+  }
+
+  async function chooseDocument() {
+    setError(null);
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/jpeg", "image/png"],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset) return;
+    setSelectedSource({
+      uri: asset.uri,
+      kind: asset.mimeType === "application/pdf" ? "pdf" : "image",
+      fileName: asset.name,
+      sizeBytes: asset.size,
+    });
+    setSourceText("");
   }
 
   async function confirm(draft: ReservationDraft) {
@@ -96,13 +127,19 @@ export default function ReservationImportScreen() {
         <Badge label="FALLBACK LOCAL" variant="gold" />
         <Text style={styles.cardTitle}>Coller une confirmation</Text>
         <Text style={styles.cardMessage}>
-          Le partage iOS et l’analyse PDF/OCR seront branchés par les tâches natives.
-          Pour l’instant, utilisez une ligne par champ.
+          Choisissez un PDF ou une image pour l’analyse locale, ou utilisez le fallback texte.
         </Text>
+        <Button fullWidth variant="secondary" onPress={() => void chooseDocument()}>
+          Choisir un PDF ou une image
+        </Button>
+        {selectedSource ? <Text style={styles.selectedFile}>Fichier : {selectedSource.fileName ?? selectedSource.uri}</Text> : null}
         <TextArea
           label="Contenu"
           value={sourceText}
-          onChangeText={setSourceText}
+          onChangeText={(value) => {
+            setSourceText(value);
+            setSelectedSource(null);
+          }}
           placeholder={'type=flight\ntitle=Vol Paris Athènes\nprovider=Aegean\nreference=AB123'}
           autoCapitalize="none"
           returnKeyType="done"
@@ -168,4 +205,5 @@ const styles = StyleSheet.create({
   cardMessage: { ...typography.bodySmall, color: colors.muted },
   detail: { ...typography.bodySmall, color: colors.fg },
   confirmationLabel: { ...typography.caption, color: colors.accent },
+  selectedFile: { ...typography.caption, color: colors.teal },
 });

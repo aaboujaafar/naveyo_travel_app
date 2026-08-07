@@ -1,11 +1,10 @@
+import { requireNativeModule } from "expo";
 import type { DocumentAnalyzer, ReservationImportSource } from '../../modules/reservations'
 import type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult } from './interface'
 import { assertPageLimit, parseDocumentAnalysisResult } from './validation'
 
 const nativeModule = (): AppleDocumentAnalysisModule => {
-  const moduleValue = (globalThis as { NaveyoDocuments?: AppleDocumentAnalysisModule }).NaveyoDocuments
-  if (!moduleValue) throw new Error('Naveyo document analysis native module is unavailable; use an iOS development build')
-  return moduleValue
+  return requireNativeModule<AppleDocumentAnalysisModule>("NaveyoDocuments");
 }
 
 export const createAppleDocumentAnalyzer = (moduleOverride?: AppleDocumentAnalysisModule): AppleDocumentAnalyzer => ({
