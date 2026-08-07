@@ -29,7 +29,8 @@ export function ShellFrame({ title, subtitle, children, headerAction, footer }: 
         styles.frameContent,
         { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg) },
       ]}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="always"
+      keyboardDismissMode="none"
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
