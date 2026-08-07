@@ -12,3 +12,4 @@ export {
   reservationFingerprint,
   validateImportSource,
 } from "./module";
+export { sharedLocalReservations } from "./local";

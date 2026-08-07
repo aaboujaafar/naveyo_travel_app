@@ -3,12 +3,10 @@ import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Badge, Button, Card, EmptyState, ShellFrame, StatusPanel } from "../../../../../src/ui";
 import type { Reservation, UUID } from "../../../../../src/modules/_shared/model";
-import { InMemoryReservationsModule } from "../../../../../src/modules/reservations";
+import { sharedLocalReservations } from "../../../../../src/modules/reservations";
 import { colors } from "../../../../../src/theme/colors";
 import { spacing } from "../../../../../src/theme/spacing";
 import { typography } from "../../../../../src/theme/typography";
-
-const reservations = new InMemoryReservationsModule();
 
 export default function ReservationsScreen() {
   const router = useRouter();
@@ -19,7 +17,7 @@ export default function ReservationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void reservations.list(tripId).then(setItems).catch((cause: unknown) => {
+      void sharedLocalReservations.list(tripId).then(setItems).catch((cause: unknown) => {
         setError(cause instanceof Error ? cause.message : "Chargement impossible");
       });
     }, [tripId]),

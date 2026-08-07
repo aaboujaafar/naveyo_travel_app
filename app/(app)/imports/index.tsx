@@ -13,8 +13,8 @@ import {
 import type { ReservationDraft, UUID } from "../../../src/modules/_shared/model";
 import {
   analyzeReservationImport,
-  InMemoryReservationsModule,
   ManualReservationAnalyzer,
+  sharedLocalReservations,
   type ReservationImportResult,
 } from "../../../src/modules/reservations";
 import { colors } from "../../../src/theme/colors";
@@ -22,7 +22,6 @@ import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
 
 const defaultTripId = "00000000-0000-4000-8000-000000000001" as UUID;
-const reservations = new InMemoryReservationsModule();
 const analyzer = new ManualReservationAnalyzer();
 
 export default function ReservationImportScreen() {
@@ -50,7 +49,7 @@ export default function ReservationImportScreen() {
         sizeBytes: new TextEncoder().encode(sourceText).byteLength,
       });
       if (next.state === "needs-confirmation") {
-        const existing = await reservations.findDuplicate(tripId, next.draft);
+        const existing = await sharedLocalReservations.findDuplicate(tripId, next.draft);
         setResult(
           existing
             ? { state: "duplicate", draft: next.draft, existing }
@@ -70,7 +69,7 @@ export default function ReservationImportScreen() {
     setIsSaving(true);
     setError(null);
     try {
-      await reservations.confirm({
+      await sharedLocalReservations.confirm({
         tripId,
         draft,
         confirmedFields: draft.fieldsRequiringConfirmation,
