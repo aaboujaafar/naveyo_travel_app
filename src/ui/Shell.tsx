@@ -32,16 +32,16 @@ export function ShellFrame({ title, subtitle, children, headerAction, footer }: 
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView
-      style={styles.frame}
-      contentContainerStyle={[
-        styles.frameContent,
-        { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg) },
-      ]}
-      keyboardShouldPersistTaps="always"
-      keyboardDismissMode="none"
-      showsVerticalScrollIndicator={false}
-    >
+    <KeyboardAvoidingView style={styles.frame} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={insets.top}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.frameContent,
+          { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg) },
+        ]}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.title} accessibilityRole="header">
@@ -55,7 +55,8 @@ export function ShellFrame({ title, subtitle, children, headerAction, footer }: 
       <View style={styles.body}>{children}</View>
 
       {footer ? <View style={styles.footer}>{footer}</View> : null}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

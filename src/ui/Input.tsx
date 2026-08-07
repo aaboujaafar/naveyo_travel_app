@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, ViewStyle, TextInputProps } from 'react-native';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -21,10 +21,26 @@ export function Input({
   leftIcon,
   rightIcon,
   containerStyle,
+  onFocus,
+  onBlur,
   ...props
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const accessibilityLabel = label ?? props.placeholder ?? 'Champ de saisie';
+  const handleFocus = useCallback(
+    (event: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
+      setFocused(true);
+      onFocus?.(event);
+    },
+    [onFocus],
+  );
+  const handleBlur = useCallback(
+    (event: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
+      setFocused(false);
+      onBlur?.(event);
+    },
+    [onBlur],
+  );
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -43,8 +59,8 @@ export function Input({
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={error ?? hint}
           importantForAccessibility="yes"
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           {...props}
         />
         {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
