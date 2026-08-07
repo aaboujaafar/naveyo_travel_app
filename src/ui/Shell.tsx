@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -47,6 +56,42 @@ export function ShellFrame({ title, subtitle, children, headerAction, footer }: 
 
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </ScrollView>
+  );
+}
+
+export function AuthFrame({ title, subtitle, children, headerAction, footer }: ShellFrameProps) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.frame}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={insets.top}
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.frameContent,
+          { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg) },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          </View>
+          {headerAction ? <View style={styles.headerAction}>{headerAction}</View> : null}
+        </View>
+
+        <View style={styles.body}>{children}</View>
+
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

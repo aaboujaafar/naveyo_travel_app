@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, Input, ShellFrame, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
+import { AuthFrame, Button, Input, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
@@ -28,7 +28,7 @@ export default function SignUpScreen() {
   }
 
   return (
-    <ShellFrame
+    <AuthFrame
       title="Créer un compte"
       subtitle="Préparez le second compte membre du voyage dans le shell."
     >
@@ -52,7 +52,7 @@ export default function SignUpScreen() {
       </Button>
 
       <ScreenNote>Le Compte est créé dans Supabase et la session est conservée dans le stockage sécurisé de l’iPhone.</ScreenNote>
-    </ShellFrame>
+    </AuthFrame>
   );
 }
 

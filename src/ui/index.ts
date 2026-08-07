@@ -39,6 +39,7 @@ export type { ToastProps, ToastData } from './Toast';
 
 export {
   AuthChoice,
+  AuthFrame,
   ConnectivityBanner,
   ShellFrame,
   ShellListPlaceholder,

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Button, Input, ShellFrame, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
+import { AuthFrame, Button, Input, ScreenNote, StatusPanel, useShellSession } from '../../src/ui';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
@@ -27,7 +27,7 @@ export default function SignInScreen() {
   }
 
   return (
-    <ShellFrame
+    <AuthFrame
       title="Connexion"
       subtitle="Accédez à votre voyage privé ou passez au shell authentifié."
     >
@@ -62,7 +62,7 @@ export default function SignInScreen() {
       </View>
 
       <ScreenNote>La connexion utilise Supabase Auth et conserve la session dans le stockage sécurisé de l’iPhone.</ScreenNote>
-    </ShellFrame>
+    </AuthFrame>
   );
 }
 
