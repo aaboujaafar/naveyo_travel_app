@@ -4,6 +4,10 @@ import PDFKit
 import UIKit
 import Vision
 
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
 public class NaveyoDocumentsModule: Module {
   private let maxBytes = 25 * 1024 * 1024
   private let maxPages = 50
@@ -11,12 +15,12 @@ public class NaveyoDocumentsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("NaveyoDocuments")
 
-    AsyncFunction("analyzeDocument") { (fileUri: String, options: [String: Any]?) throws -> [String: Any] in
-      try self.analyze(fileUri: fileUri, options: options)
+    AsyncFunction("analyzeDocument") { (fileUri: String, options: [String: Any]?) async throws -> [String: Any] in
+      try await self.analyze(fileUri: fileUri, options: options)
     }
   }
 
-  private func analyze(fileUri: String, options: [String: Any]?) throws -> [String: Any] {
+  private func analyze(fileUri: String, options: [String: Any]?) async throws -> [String: Any] {
     guard let url = URL(string: fileUri), url.isFileURL else { throw DocumentError.invalidUri }
     let values = try url.resourceValues(forKeys: [.fileSizeKey])
     guard let fileSize = values.fileSize, fileSize > 0, fileSize <= maxBytes else { throw DocumentError.fileTooLarge }
@@ -43,7 +47,7 @@ public class NaveyoDocumentsModule: Module {
 
     let fullText = pageTexts.map { $0.1 }.joined(separator: "\n")
     let evidence = detectEvidence(in: pageTexts)
-    let draft: [String: Any] = [
+    let fallbackDraft: [String: Any] = [
       "type": inferType(from: fullText),
       "title": title(from: fullText),
       "provider": provider(from: fullText),
@@ -51,6 +55,7 @@ public class NaveyoDocumentsModule: Module {
       "confidence": evidence.isEmpty ? "low" : "medium",
       "fieldsRequiringConfirmation": ["type", "title", "provider", "reference", "start", "end", "venue", "origin", "destination"]
     ]
+    let draft = await LocalReservationExtractor.extract(text: fullText, fallback: fallbackDraft) ?? fallbackDraft
     return ["extractedText": String(fullText.prefix(20_000)), "pagesAnalyzed": pageTexts.count, "evidence": evidence, "draft": draft]
   }
 
