@@ -2,3 +2,4 @@ export type { SuggestPlacesInput, TripAssistant, TripAssistantModule, TripAssist
 export type { SuggestionDraft, SuggestionDraftStore, SuggestionModel, SuggestionModelInput } from './model'
 export { InMemorySuggestionDraftStore, TripAssistantService } from './module'
 export { SuggestionError, SuggestionInvalidOutputError, SuggestionTimeoutError, SuggestionUsageLimitError } from './module'
+export { TripAssistantProvider, useTripAssistant } from './context'

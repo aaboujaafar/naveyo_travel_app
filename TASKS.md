@@ -205,7 +205,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | OFF-001 | P0 | IN_PROGRESS | 5 h | ARC-001 | offline-trip-pack et SQLite |
 | PLS-001 | P0 | TODO | 6 h | ARC-001, MOB-001 | places, Geoapify, fonction dédiée |
 | ITN-001 | P0 | TODO | 7 h | ARC-001, MOB-001 | itinerary, MapKit et routes |
-| AI-001 | P0 | TODO | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
+| AI-001 | P0 | DONE | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
 | RSV-001 | P0 | TODO | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
@@ -484,7 +484,7 @@ Acceptation :
 ### AI-001 — Suggestions IA contrôlées
 
 - Priorité : `P0`
-- État : `TODO`
+- État : `DONE`
 - Timebox : 8 h
 - Dépendances : `BCK-001`, `PLS-001`
 - Possède : implementation `trip-assistant`, `supabase/functions/trip-assistant/**`, `app/(app)/trips/[tripId]/assistant/**`
@@ -503,6 +503,8 @@ Acceptation :
 - aucune mutation de l'itinéraire avant confirmation ;
 - `store: false`, modèle configurable, limite et plafond de dépense ;
 - tests de refus, timeout, sortie invalide et identifiant inconnu.
+
+Validation : écran intégré, sortie limitée aux candidats fournis, brouillons persistés dans Supabase, quota quotidien serveur et aucune mutation automatique de l’itinéraire ; 5 tests métier dédiés passent.
 
 ### EXP-001 — Budget global et Dépenses réelles
 

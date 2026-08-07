@@ -7,8 +7,6 @@ type RequestInput = { tripId: string; stopId: string; query: string; preferences
 const MAX_CANDIDATES = 50
 const MAX_SUGGESTIONS = 5
 const TIMEOUT_MS = 10_000
-const MAX_REQUESTS_PER_DAY = 20
-const requestCounts = new Map<string, { day: string; count: number }>()
 
 const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -24,15 +22,6 @@ function parseRequest(value: unknown): RequestInput {
   const preferences = request?.preferences === undefined ? undefined : text(request.preferences, 1000)
   if (request?.preferences !== undefined && !preferences) throw new Response(JSON.stringify({ error: 'invalid_preferences' }), { status: 400 })
   return { tripId, stopId, query, preferences }
-}
-
-function takeUsage(userId: string): boolean {
-  const day = new Date().toISOString().slice(0, 10)
-  const current = requestCounts.get(userId)
-  if (!current || current.day !== day) { requestCounts.set(userId, { day, count: 1 }); return true }
-  if (current.count >= MAX_REQUESTS_PER_DAY) return false
-  current.count += 1
-  return true
 }
 
 function mapCandidate(row: Row): Candidate | null {
@@ -83,7 +72,9 @@ Deno.serve(async (request) => {
   try {
     const input = parseRequest(await request.json())
     const authenticated = await requireTripMember(request, input.tripId)
-    if (!takeUsage(authenticated.user.id)) return json({ error: 'suggestions_quota_reached' }, 429)
+    const quota = await authenticated.client.rpc('consume_trip_assistant_quota', { target_account: authenticated.user.id })
+    if (quota.error) return json({ error: 'assistant_quota_unavailable' }, 503)
+    if (quota.data !== true) return json({ error: 'suggestions_quota_reached' }, 429)
 
     const [tripResult, stopResult, placesResult] = await Promise.all([
       authenticated.client.from('trips').select('name,reference_currency').eq('id', input.tripId).single(),
@@ -120,7 +111,12 @@ Deno.serve(async (request) => {
     const providerResponse = await response.json()
     const suggestions = schemaOutput(JSON.parse(extractOutputText(providerResponse)), candidates)
     const createdAt = new Date().toISOString()
-    return json({ drafts: suggestions.map((suggestion) => ({ id: crypto.randomUUID(), tripId: input.tripId, stopId: input.stopId, ...suggestion, createdAt })) })
+    const drafts = suggestions.map((suggestion) => ({ id: crypto.randomUUID(), trip_id: input.tripId, stop_id: input.stopId, candidate_id: suggestion.candidateId, title: suggestion.title, reason: suggestion.reason, created_by: authenticated.user.id, created_at: createdAt }))
+    if (drafts.length > 0) {
+      const saved = await authenticated.client.from('trip_suggestion_drafts').insert(drafts)
+      if (saved.error) return json({ error: 'suggestions_persistence_failed' }, 503)
+    }
+    return json({ drafts: suggestions.map((suggestion, index) => ({ id: drafts[index]?.id ?? crypto.randomUUID(), tripId: input.tripId, stopId: input.stopId, ...suggestion, createdAt })) })
   } catch (error) {
     if (error instanceof Response) return error
     if (error instanceof DOMException && error.name === 'AbortError') return json({ error: 'assistant_timeout' }, 408)

@@ -103,14 +103,15 @@ export default function TripDetailScreen() {
       ) : null}
       <View style={{ gap: 12 }}>
         {stops.map((stop) => (
-          <Card key={stop.id}>
-            <Text>{stop.name}</Text>
-            <Text>
-              {stop.countryCode} · {stop.timeZone}
-            </Text>
-            <Text>
-              {stop.startDate} → {stop.endDate}
-            </Text>
+          <Card key={stop.id} style={styles.stopCard}>
+            <View style={styles.stopText}>
+              <Text style={styles.stopTitle}>{stop.name}</Text>
+              <Text style={styles.stopMeta}>{stop.countryCode} · {stop.timeZone}</Text>
+              <Text style={styles.stopMeta}>{stop.startDate} → {stop.endDate}</Text>
+            </View>
+            <Button size="sm" variant="secondary" onPress={() => router.push(`/(app)/trips/${tripId}/assistant?stopId=${stop.id}`)}>
+              Découvrir
+            </Button>
           </Card>
         ))}
       </View>
@@ -191,6 +192,22 @@ const styles = StyleSheet.create({
   },
   memberId: {
     fontSize: 11,
+    color: "#6b6b7b",
+  },
+  stopCard: {
+    padding: 14,
+    gap: 12,
+  },
+  stopText: {
+    gap: 3,
+  },
+  stopTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#1a1a2e",
+  },
+  stopMeta: {
+    fontSize: 13,
     color: "#6b6b7b",
   },
 });

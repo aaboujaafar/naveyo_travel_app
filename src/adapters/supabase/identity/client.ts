@@ -21,6 +21,7 @@ export interface SupabaseUser {
 }
 export interface SupabaseAuth {
   getUser(): Promise<SupabaseResponse<{ user: SupabaseUser | null }>>;
+  getSession(): Promise<SupabaseResponse<{ session: { access_token: string } | null }>>;
   signInWithPassword(input: {
     email: string;
     password: string;

@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { colors } from "../src/theme/colors";
 import { ShellNavigationGate, ShellSessionProvider } from "../src/ui";
 import { TripsModuleProvider } from "../src/modules/trips";
+import { TripAssistantProvider } from "../src/modules/trip-assistant";
 import { createAppModules } from "../src/bootstrap/app-modules";
 import { useMemo } from "react";
 
@@ -15,7 +16,8 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ShellSessionProvider identity={modules.identity}>
         <TripsModuleProvider module={modules.trips}>
-          <ShellNavigationGate>
+          <TripAssistantProvider module={modules.tripAssistant}>
+            <ShellNavigationGate>
             <StatusBar style="dark" />
             <View style={styles.container}>
               <Stack
@@ -26,7 +28,8 @@ export default function RootLayout() {
                 }}
               />
             </View>
-          </ShellNavigationGate>
+            </ShellNavigationGate>
+          </TripAssistantProvider>
         </TripsModuleProvider>
       </ShellSessionProvider>
     </SafeAreaProvider>
