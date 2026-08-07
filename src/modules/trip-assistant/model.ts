@@ -1,1 +1,1 @@
-export type { SuggestionDraft } from '../_shared/model'
+export type { SuggestionDraft } from "../_shared/model";

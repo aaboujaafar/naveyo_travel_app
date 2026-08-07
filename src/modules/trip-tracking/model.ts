@@ -1,1 +1,1 @@
-export type { TrackPoint, TrackingStatus } from '../_shared/model'
+export type { TrackPoint, TrackingStatus } from "../_shared/model";

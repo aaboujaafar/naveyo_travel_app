@@ -1,13 +1,19 @@
-import { useRouter } from 'expo-router'
-import { Button, Card, ShellFrame, StatusPanel, useShellSession } from '../../src/ui'
+import { useRouter } from "expo-router";
+import {
+  Button,
+  Card,
+  ShellFrame,
+  StatusPanel,
+  useShellSession,
+} from "../../src/ui";
 
 export default function AccountScreen() {
-  const router = useRouter()
-  const { account, signOut } = useShellSession()
+  const router = useRouter();
+  const { account, signOut } = useShellSession();
 
   async function changeAccount() {
-    await signOut()
-    router.replace('/(auth)/sign-in')
+    await signOut();
+    router.replace("/(auth)/sign-in");
   }
 
   return (
@@ -16,7 +22,7 @@ export default function AccountScreen() {
         <StatusPanel
           kind="info"
           title="Compte connecté"
-          message={account?.email || 'Adresse e-mail indisponible'}
+          message={account?.email || "Adresse e-mail indisponible"}
         />
         <Button fullWidth onPress={() => void changeAccount()}>
           Changer de compte
@@ -26,5 +32,5 @@ export default function AccountScreen() {
         Retour
       </Button>
     </ShellFrame>
-  )
+  );
 }

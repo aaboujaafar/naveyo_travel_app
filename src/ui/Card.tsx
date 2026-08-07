@@ -1,9 +1,18 @@
-import { View, Text, Pressable, Image, StyleSheet, type StyleProp, type ViewStyle, type ImageSourcePropType } from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { spacing } from '../theme/spacing';
-import { radius } from '../theme/radius';
-import { shadows } from '../theme/shadows';
+import {
+  View,
+  Text,
+  Pressable,
+  Image,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+  type ImageSourcePropType,
+} from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { spacing } from "../theme/spacing";
+import { radius } from "../theme/radius";
+import { shadows } from "../theme/shadows";
 
 export interface CardProps {
   children: React.ReactNode;
@@ -18,7 +27,12 @@ export function Card({ children, onPress, style }: CardProps) {
         onPress={onPress}
         accessibilityRole="button"
         hitSlop={8}
-        style={({ pressed }) => [styles.card, shadows.sm, pressed && styles.pressed, style]}
+        style={({ pressed }) => [
+          styles.card,
+          shadows.sm,
+          pressed && styles.pressed,
+          style,
+        ]}
       >
         {children}
       </Pressable>
@@ -35,10 +49,20 @@ export interface CardImageProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function CardImage({ source, imageHeight = 160, children, onPress, style }: CardImageProps) {
+export function CardImage({
+  source,
+  imageHeight = 160,
+  children,
+  onPress,
+  style,
+}: CardImageProps) {
   return (
     <Card onPress={onPress} style={[styles.overflow, style]}>
-      <Image source={source} style={[styles.image, { height: imageHeight }]} resizeMode="cover" />
+      <Image
+        source={source}
+        style={[styles.image, { height: imageHeight }]}
+        resizeMode="cover"
+      />
       {children && <View style={styles.cardBody}>{children}</View>}
     </Card>
   );
@@ -66,11 +90,23 @@ export function CardHorizontal({
   return (
     <Card onPress={onPress} style={[styles.horizontal, style]}>
       {imageSource && (
-        <Image source={imageSource} style={[styles.horizontalImage, { width: imageSize, height: imageSize }]} />
+        <Image
+          source={imageSource}
+          style={[
+            styles.horizontalImage,
+            { width: imageSize, height: imageSize },
+          ]}
+        />
       )}
       <View style={styles.horizontalContent}>
-        <Text style={styles.horizontalTitle} numberOfLines={1}>{title}</Text>
-        {subtitle && <Text style={styles.horizontalSubtitle} numberOfLines={2}>{subtitle}</Text>}
+        <Text style={styles.horizontalTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle && (
+          <Text style={styles.horizontalSubtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        )}
       </View>
       {trailing && <View style={styles.horizontalTrailing}>{trailing}</View>}
     </Card>
@@ -100,7 +136,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   overflow: {
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   pressed: {
     transform: [{ scale: 0.98 }],
@@ -109,11 +145,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   image: {
-    width: '100%',
+    width: "100%",
   },
   horizontal: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: spacing.md,
     gap: spacing.md,
   },
@@ -136,7 +172,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   stat: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,

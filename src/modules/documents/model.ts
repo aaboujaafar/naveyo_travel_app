@@ -1,1 +1,1 @@
-export type { DocumentKind, TravelDocument } from '../_shared/model'
+export type { DocumentKind, TravelDocument } from "../_shared/model";

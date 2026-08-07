@@ -1,17 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
-import { radius } from '../theme/radius';
+import React from "react";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
+import { colors } from "../theme/colors";
+import { typography } from "../theme/typography";
+import { radius } from "../theme/radius";
 
 export interface BadgeProps {
   label: string;
-  variant?: 'accent' | 'teal' | 'gold' | 'success' | 'danger';
+  variant?: "accent" | "teal" | "gold" | "success" | "danger";
   icon?: React.ReactNode;
   style?: ViewStyle;
 }
 
-export function Badge({ label, variant = 'accent', icon, style }: BadgeProps) {
+export function Badge({ label, variant = "accent", icon, style }: BadgeProps) {
   return (
     <View style={[styles.badge, styles[variant], style]}>
       {icon && icon}
@@ -22,13 +22,13 @@ export function Badge({ label, variant = 'accent', icon, style }: BadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: radius.full,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   accent: {
     backgroundColor: colors.accentSoft,
@@ -40,14 +40,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldSoft,
   },
   success: {
-    backgroundColor: '#e8f5ee',
+    backgroundColor: "#e8f5ee",
   },
   danger: {
-    backgroundColor: '#fdeaea',
+    backgroundColor: "#fdeaea",
   },
   text: {
     ...typography.badge,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   text_accent: {
     color: colors.accent,
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     color: colors.teal,
   },
   text_gold: {
-    color: '#8a6b1e',
+    color: "#8a6b1e",
   },
   text_success: {
     color: colors.success,

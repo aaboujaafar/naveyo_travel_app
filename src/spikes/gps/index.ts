@@ -3,5 +3,5 @@ export {
   formatGpsSpikeReport,
   gpsSpikeReport,
   mergeLocationBackgroundModes,
-  trackingPermissionPrompts
-} from './report';
+  trackingPermissionPrompts,
+} from "./report";
