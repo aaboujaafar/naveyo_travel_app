@@ -132,6 +132,24 @@ export default function TripDetailScreen() {
           Trace de trajet
         </Button>
       ) : null}
+      {trip ? (
+        <View style={styles.actions}>
+          <Button
+            fullWidth
+            variant="secondary"
+            onPress={() => router.push(`/(app)/trips/${tripId}/reservations`)}
+          >
+            Réservations
+          </Button>
+          <Button
+            fullWidth
+            variant="secondary"
+            onPress={() => router.push(`/(app)/trips/${tripId}/documents`)}
+          >
+            Documents
+          </Button>
+        </View>
+      ) : null}
     </ShellFrame>
   );
 }
@@ -161,6 +179,9 @@ const styles = StyleSheet.create({
   },
   memberList: {
     gap: 10,
+  },
+  actions: {
+    gap: 12,
   },
   memberCard: {
     flexDirection: "row",
