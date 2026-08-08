@@ -3,7 +3,7 @@ import { requireTripMember } from '../_shared/auth.ts'
 type RecordValue = Record<string, unknown>
 
 const MAX_TEXT_LENGTH = 20_000
-const TIMEOUT_MS = 15_000
+const TIMEOUT_MS = 45_000
 const ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions'
 const RESERVATION_TYPES = ['accommodation', 'flight', 'train', 'ferry', 'activity', 'other'] as const
 const CONFIRMATION_FIELDS = ['type', 'title', 'provider', 'reference', 'start', 'end', 'venue', 'origin', 'destination']
