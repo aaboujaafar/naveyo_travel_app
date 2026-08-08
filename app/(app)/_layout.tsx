@@ -1,13 +1,26 @@
 import { Stack, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { colors } from "../../src/theme/colors";
 import { spacing } from "../../src/theme/spacing";
 import { Button, ConnectivityBanner, useShellSession } from "../../src/ui";
+import { createAppleShareInbox } from "../../src/adapters/apple-document-analysis";
 
 export default function AppLayout() {
   const router = useRouter();
   const { signOut } = useShellSession();
   const lastSyncedAt = "2026-07-29T08:30:00.000Z";
+
+  useEffect(() => {
+    void createAppleShareInbox()
+      .list()
+      .then((pending) => {
+        if (pending.length > 0) router.replace("/(app)/imports");
+      })
+      .catch(() => {
+        // The native inbox is unavailable outside an iOS development build.
+      });
+  }, [router]);
 
   return (
     <View style={styles.container}>
