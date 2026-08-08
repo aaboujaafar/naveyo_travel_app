@@ -36,9 +36,10 @@ function schemaOutput(value: unknown): RecordValue {
   const origin = stringValue(root?.origin, 300)
   const destination = stringValue(root?.destination, 300)
   if (!RESERVATION_TYPES.includes(type as typeof RESERVATION_TYPES[number])) throw new Error('invalid_structured_output')
+  if (!title) throw new Error('invalid_structured_output')
 
   const draft: RecordValue = { type, confidence: 'high', fieldsRequiringConfirmation: CONFIRMATION_FIELDS }
-  if (title) draft.title = title
+  draft.title = title
   if (provider) draft.provider = provider
   if (reference) draft.reference = reference
   if (startLocal && startTimeZone) draft.start = { local: startLocal, timeZone: startTimeZone }
