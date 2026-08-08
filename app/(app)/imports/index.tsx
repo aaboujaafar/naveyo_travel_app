@@ -1,6 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import {
   Badge,
@@ -11,26 +11,28 @@ import {
   StatusPanel,
   TextArea,
 } from "../../../src/ui";
-import type { ReservationDraft, UUID } from "../../../src/modules/_shared/model";
+import type { ReservationDraft, Trip, UUID } from "../../../src/modules/_shared/model";
+import { useTripsModule } from "../../../src/modules/trips";
 import {
   ManualReservationAnalyzer,
   type ReservationImportResult,
 } from "../../../src/modules/reservations";
 import { sharedLocalReservations } from "../../../src/bootstrap/reservations";
-import { createAppleDocumentAnalyzer } from "../../../src/adapters/apple-document-analysis";
+import { createAppleDocumentAnalyzer, createAppleShareInbox, type PendingShareImport } from "../../../src/adapters/apple-document-analysis";
 import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
 import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
 
-const defaultTripId = "00000000-0000-4000-8000-000000000001" as UUID;
 const analyzer = new ManualReservationAnalyzer();
 
 export default function ReservationImportScreen() {
   const router = useRouter();
-  const { tripId: rawTripId } = useLocalSearchParams<{ tripId?: string }>();
-  const tripId = (rawTripId ?? defaultTripId) as UUID;
+  const { tripId: rawTripId, pendingId: rawPendingId } = useLocalSearchParams<{ tripId?: string; pendingId?: string }>();
+  const tripId = rawTripId as UUID | undefined;
+  const pendingId = rawPendingId as string | undefined;
+  const trips = useTripsModule();
   const [sourceText, setSourceText] = useState("");
   const [selectedSource, setSelectedSource] = useState<{
     uri: string;
@@ -42,8 +44,41 @@ export default function ReservationImportScreen() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableTrips, setAvailableTrips] = useState<Trip[]>([]);
+  const [pendingImports, setPendingImports] = useState<PendingShareImport[]>([]);
+
+  useEffect(() => {
+    const inbox = createAppleShareInbox();
+    void inbox.list().then(setPendingImports).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger l’import"));
+    if (!tripId && trips) {
+      void trips.list().then(setAvailableTrips).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger les Voyages"));
+    }
+  }, [tripId, trips]);
+
+  useEffect(() => {
+    if (!tripId || !pendingId) return;
+    const pending = pendingImports.find((item) => item.id === pendingId);
+    if (!pending) return;
+    void Promise.resolve().then(() => {
+      if (pending.kind === "text") {
+        setSourceText(pending.text ?? "");
+        setSelectedSource(null);
+      } else {
+        setSelectedSource({
+          uri: pending.uri,
+          kind: pending.mimeType === "application/pdf" ? "pdf" : "image",
+          fileName: pending.fileName,
+        });
+        setSourceText("");
+      }
+    });
+  }, [pendingId, pendingImports, tripId]);
 
   async function analyze() {
+    if (!tripId) {
+      setError("Sélectionnez d’abord un Voyage.");
+      return;
+    }
     if (isAnalyzing || (!sourceText.trim() && !selectedSource)) {
       setError("Ajoutez le contenu de la confirmation à analyser.");
       return;
@@ -61,15 +96,13 @@ export default function ReservationImportScreen() {
       if (selectedSource) {
         const local = await createAppleDocumentAnalyzer().analyze(selectedSource.uri);
         draft = local;
-        if (local.confidence !== "high") {
-          try {
-            draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
-              tripId,
-              extractedText: local.extractedText,
-            });
-          } catch {
-            // Keep the local draft when the remote provider is unavailable.
-          }
+        try {
+          draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
+            tripId,
+            extractedText: local.extractedText,
+          });
+        } catch {
+          // Keep the local draft when the remote provider is unavailable.
         }
       } else if (sourceText.trim()) {
         try {
@@ -121,6 +154,7 @@ export default function ReservationImportScreen() {
   }
 
   async function confirm(draft: ReservationDraft) {
+    if (!tripId) return;
     setIsSaving(true);
     setError(null);
     try {
@@ -129,6 +163,7 @@ export default function ReservationImportScreen() {
         draft,
         confirmedFields: draft.fieldsRequiringConfirmation,
       });
+      if (pendingId) await createAppleShareInbox().remove(pendingId);
       router.replace(`/(app)/trips/${tripId}/reservations`);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Enregistrement impossible");
@@ -148,6 +183,11 @@ export default function ReservationImportScreen() {
       }
     >
       <Card style={styles.card}>
+        {!tripId ? <TripPicker trips={availableTrips} onSelect={(selectedTripId) => {
+          const pending = pendingImports[0];
+          router.replace(pending ? `/(app)/imports?tripId=${selectedTripId}&pendingId=${pending.id}` : `/(app)/imports?tripId=${selectedTripId}`);
+        }} /> : null}
+        {tripId ? <>
         <Badge label="FALLBACK LOCAL" variant="gold" />
         <Text style={styles.cardTitle}>Coller une confirmation</Text>
         <Text style={styles.cardMessage}>
@@ -171,6 +211,7 @@ export default function ReservationImportScreen() {
         <Button fullWidth onPress={() => void analyze()} loading={isAnalyzing}>
           Analyser le brouillon
         </Button>
+        </> : null}
       </Card>
 
       {error ? <StatusPanel kind="error" title="Import impossible" message={error} /> : null}
@@ -195,6 +236,16 @@ export default function ReservationImportScreen() {
       </ScreenNote>
     </ShellFrame>
   );
+}
+
+function TripPicker({ trips, onSelect }: { trips: Trip[]; onSelect: (tripId: UUID) => void }) {
+  return <>
+    <Badge label="NOUVEL IMPORT" variant="teal" />
+    <Text style={styles.cardTitle}>Associer au Voyage</Text>
+    <Text style={styles.cardMessage}>Choisissez le Voyage auquel rattacher ce document.</Text>
+    {trips.length === 0 ? <StatusPanel kind="info" title="Aucun Voyage disponible" message="Créez ou rejoignez un Voyage avant d’importer cette réservation." /> : null}
+    {trips.map((trip) => <Button key={trip.id} fullWidth variant="secondary" onPress={() => onSelect(trip.id)}>{trip.name}</Button>)}
+  </>;
 }
 
 function DraftCard({

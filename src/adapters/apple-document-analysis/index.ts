@@ -1,6 +1,6 @@
 import { requireNativeModule } from "expo";
 import type { DocumentAnalyzer, ReservationImportSource } from '../../modules/reservations'
-import type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult } from './interface'
+import type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, PendingShareImport } from './interface'
 import { assertPageLimit, parseDocumentAnalysisResult } from './validation'
 
 const nativeModule = (): AppleDocumentAnalysisModule => {
@@ -24,5 +24,23 @@ export const createAppleReservationAnalyzer = (moduleOverride?: AppleDocumentAna
   }
 }
 
-export type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, DocumentEvidence } from './interface'
+export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModule) => ({
+  async list(): Promise<PendingShareImport[]> {
+    const module = moduleOverride ?? nativeModule()
+    if (!module.listPendingShareImports) return []
+    const value = await module.listPendingShareImports()
+    if (!Array.isArray(value)) return []
+    return value.filter((item): item is PendingShareImport => {
+      if (!item || typeof item !== 'object') return false
+      const candidate = item as Record<string, unknown>
+      return typeof candidate.id === 'string' && (candidate.kind === 'file' || candidate.kind === 'text') && typeof candidate.uri === 'string' && typeof candidate.createdAt === 'string'
+    })
+  },
+  async remove(id: string): Promise<void> {
+    const module = moduleOverride ?? nativeModule()
+    await module.removePendingShareImport?.(id)
+  },
+})
+
+export type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, DocumentEvidence, PendingShareImport } from './interface'
 export { assertDocumentSize, assertPageLimit, documentAnalysisLimits, parseDocumentAnalysisResult } from './validation'

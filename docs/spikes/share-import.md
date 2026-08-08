@@ -26,10 +26,20 @@ Objectif : vérifier jusqu’où on peut aller localement sur le parcours “Par
 - un import rechargé retrouve bien son état durable ;
 - un import cassé retourne un échec explicite au lieu d’inventer une reprise.
 
-## Ce qui reste non vérifiable ici
+## Implémentation de la Share Extension
 
-- la vraie Share Extension iOS ;
-- les entitlements App Group ;
+Le plugin Expo configure désormais une vraie cible iOS `NaveyoShare` avec :
+
+- une extension de partage activée pour les PDF, images, textes et URLs ;
+- une copie immédiate dans l’App Group `group.com.naveyo.app` ;
+- un manifeste persistant par import ;
+- une ouverture de Naveyo sur l’écran d’association au Voyage ;
+- une suppression du fichier partagé après confirmation de la Réservation.
+
+L’extension ne choisit pas le Voyage elle-même : elle ouvre l’application principale afin d’utiliser la session et la liste des Voyages Supabase. Le choix du Voyage précède l’analyse OpenCode.
+
+## Ce qui reste à vérifier sur appareil
+
 - le transport entre extension et app hôte sur iPhone réel ;
 - les partages réels depuis Mail, Safari, Photos et une application de voyage ;
 - la reprise après relance sur iOS 26 / iOS 27 ;

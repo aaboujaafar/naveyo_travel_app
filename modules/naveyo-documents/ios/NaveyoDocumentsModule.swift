@@ -18,6 +18,14 @@ public class NaveyoDocumentsModule: Module {
     AsyncFunction("analyzeDocument") { (fileUri: String, options: [String: Any]?) async throws -> [String: Any] in
       try await self.analyze(fileUri: fileUri, options: options)
     }
+
+    AsyncFunction("listPendingShareImports") { () -> [[String: Any]] in
+      NaveyoShareStore.list()
+    }
+
+    AsyncFunction("removePendingShareImport") { (id: String) in
+      NaveyoShareStore.remove(id: id)
+    }
   }
 
   private func analyze(fileUri: String, options: [String: Any]?) async throws -> [String: Any] {
