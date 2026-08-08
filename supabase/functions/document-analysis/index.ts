@@ -59,6 +59,11 @@ function outputText(value: unknown): string {
   throw new Error('invalid_provider_response')
 }
 
+function parseJsonOutput(value: string): unknown {
+  const cleaned = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  try { return JSON.parse(cleaned) } catch { throw new Error('invalid_structured_output') }
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
   try {
@@ -75,42 +80,17 @@ Deno.serve(async (request) => {
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          model: Deno.env.get('OPENCODE_DOCUMENT_MODEL') ?? 'deepseek-v4-flash',
+          model: Deno.env.get('OPENCODE_DOCUMENT_MODEL') ?? 'deepseek-v4-pro',
           messages: [
-            { role: 'system', content: 'Extract travel reservation data. Never invent values. Return empty strings for missing fields. The result is only a draft requiring human confirmation.' },
+            { role: 'system', content: 'Extract travel reservation data. Never invent values. Return empty strings for missing fields. The result is only a draft requiring human confirmation. Return only one valid JSON object with exactly these keys: type, title, provider, reference, startLocal, startTimeZone, endLocal, endTimeZone, venue, origin, destination. The type must be accommodation, flight, train, ferry, activity, or other.' },
             { role: 'user', content: input.extractedText },
           ],
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
-              name: 'reservation_extraction',
-              strict: true,
-              schema: {
-                type: 'object',
-                properties: {
-                  type: { type: 'string', enum: RESERVATION_TYPES },
-                  title: { type: 'string' },
-                  provider: { type: 'string' },
-                  reference: { type: 'string' },
-                  startLocal: { type: 'string' },
-                  startTimeZone: { type: 'string' },
-                  endLocal: { type: 'string' },
-                  endTimeZone: { type: 'string' },
-                  venue: { type: 'string' },
-                  origin: { type: 'string' },
-                  destination: { type: 'string' },
-                },
-                required: ['type', 'title', 'provider', 'reference', 'startLocal', 'startTimeZone', 'endLocal', 'endTimeZone', 'venue', 'origin', 'destination'],
-                additionalProperties: false,
-              },
-            },
-          },
         }),
       })
     } finally { clearTimeout(timeout) }
     if (response.status === 429) return json({ error: 'document_provider_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'document_provider_failed' }, 503)
-    const draft = schemaOutput(JSON.parse(outputText(await response.json())))
+    const draft = schemaOutput(parseJsonOutput(outputText(await response.json())))
     return json({ draft })
   } catch (error) {
     if (error instanceof Response) return error
