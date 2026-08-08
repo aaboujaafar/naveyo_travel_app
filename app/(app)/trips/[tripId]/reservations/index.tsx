@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { Badge, Button, Card, EmptyState, ShellFrame, StatusPanel } from "../../../../../src/ui";
 import type { Reservation, UUID } from "../../../../../src/modules/_shared/model";
 import { sharedLocalReservations } from "../../../../../src/modules/reservations";
@@ -51,6 +51,7 @@ export default function ReservationsScreen() {
               </View>
               {item.provider ? <Text style={styles.detail}>{item.provider}</Text> : null}
               {item.reference ? <Text style={styles.detail}>Référence : {item.reference}</Text> : null}
+              <LocationBlock reservation={item} />
               <Text style={styles.confirmed}>Confirmée après relecture</Text>
             </Card>
           ))}
@@ -58,6 +59,41 @@ export default function ReservationsScreen() {
       )}
     </ShellFrame>
   );
+}
+
+function LocationBlock({ reservation }: { reservation: Reservation }) {
+  const locations = [
+    reservation.venue ? { label: "Lieu", place: reservation.venue } : null,
+    reservation.origin ? { label: "Départ", place: reservation.origin } : null,
+    reservation.destination ? { label: "Arrivée", place: reservation.destination } : null,
+  ].filter((value): value is { label: string; place: NonNullable<Reservation["venue"]> } => value !== null);
+  if (locations.length === 0) return null;
+  return (
+    <View style={styles.locations}>
+      {locations.map(({ label, place }) => (
+        <View key={`${label}-${place.label}`} style={styles.location}>
+          <Text style={styles.locationText}>{label} : {place.label}</Text>
+          <View style={styles.navigationButtons}>
+            <Button size="sm" variant="secondary" onPress={() => void openNavigation(place, "apple")}>Plans</Button>
+            <Button size="sm" variant="secondary" onPress={() => void openNavigation(place, "waze")}>Waze</Button>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+async function openNavigation(place: NonNullable<Reservation["venue"]>, provider: "apple" | "waze") {
+  const query = encodeURIComponent(place.address ? `${place.label}, ${place.address}` : place.label);
+  const coordinates = place.coordinates;
+  const url = provider === "apple"
+    ? coordinates
+      ? `http://maps.apple.com/?ll=${coordinates.latitude},${coordinates.longitude}&q=${query}`
+      : `http://maps.apple.com/?q=${query}`
+    : coordinates
+      ? `https://waze.com/ul?ll=${coordinates.latitude},${coordinates.longitude}&navigate=yes`
+      : `https://waze.com/ul?q=${query}&navigate=yes`;
+  await Linking.openURL(url);
 }
 
 function labelForType(type: Reservation["type"]): string {
@@ -78,4 +114,8 @@ const styles = StyleSheet.create({
   title: { ...typography.h3, color: colors.fg },
   detail: { ...typography.bodySmall, color: colors.muted },
   confirmed: { ...typography.caption, color: colors.teal, marginTop: spacing.xs },
+  locations: { gap: spacing.sm, marginTop: spacing.sm },
+  location: { gap: spacing.xs },
+  locationText: { ...typography.bodySmall, color: colors.fg },
+  navigationButtons: { flexDirection: "row", gap: spacing.xs },
 });
