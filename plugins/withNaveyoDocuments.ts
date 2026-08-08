@@ -8,6 +8,45 @@ export const naveyoDocumentsPluginVersion = '0.2.0'
 const shareTargetName = 'NaveyoShare'
 const appGroup = 'group.com.naveyo.app'
 
+const shareInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDisplayName</key><string>Naveyo</string>
+  <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+  <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.share-services</string>
+    <key>NSExtensionPrincipalClass</key><string>$(PRODUCT_MODULE_NAME).NaveyoShareViewController</string>
+    <key>NSExtensionAttributes</key>
+    <dict>
+      <key>NSExtensionActivationRule</key>
+      <dict>
+        <key>NSExtensionActivationSupportsAttachmentsWithMaxCount</key><integer>1</integer>
+        <key>NSExtensionActivationSupportsImageWithMaxCount</key><integer>1</integer>
+        <key>NSExtensionActivationSupportsText</key><true/>
+        <key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>1</integer>
+        <key>NSExtensionActivationSupportsMovieWithMaxCount</key><integer>0</integer>
+        <key>NSExtensionActivationSupportsPDFWithMaxCount</key><integer>1</integer>
+      </dict>
+    </dict>
+  </dict>
+</dict>
+</plist>
+`
+
+const appGroupEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.application-groups</key>
+  <array><string>${appGroup}</string></array>
+</dict>
+</plist>
+`
+
 const withNaveyoDocuments: ConfigPlugin = (config) => {
   config = withEntitlementsPlist(config, (config) => {
     config.modResults['com.apple.security.application-groups'] = [appGroup]
@@ -20,27 +59,8 @@ const withNaveyoDocuments: ConfigPlugin = (config) => {
     fs.mkdirSync(targetRoot, { recursive: true })
     fs.copyFileSync(path.join(sourceRoot, 'NaveyoShareViewController.swift'), path.join(targetRoot, 'NaveyoShareViewController.swift'))
     fs.copyFileSync(path.join(sourceRoot, 'NaveyoShareStore.swift'), path.join(targetRoot, 'NaveyoShareStore.swift'))
-    fs.writeFileSync(path.join(targetRoot, `${shareTargetName}-Info.plist`), JSON.stringify({
-      CFBundleDisplayName: 'Naveyo',
-      CFBundleIdentifier: '$(PRODUCT_BUNDLE_IDENTIFIER)',
-      CFBundleShortVersionString: '$(MARKETING_VERSION)',
-      CFBundleVersion: '$(CURRENT_PROJECT_VERSION)',
-      NSExtension: {
-        NSExtensionPointIdentifier: 'com.apple.share-services',
-        NSExtensionPrincipalClass: '$(PRODUCT_MODULE_NAME).NaveyoShareViewController',
-        NSExtensionAttributes: {
-          NSExtensionActivationRule: {
-            NSExtensionActivationSupportsAttachmentsWithMaxCount: 1,
-            NSExtensionActivationSupportsImageWithMaxCount: 1,
-            NSExtensionActivationSupportsText: true,
-            NSExtensionActivationSupportsWebURLWithMaxCount: 1,
-            NSExtensionActivationSupportsMovieWithMaxCount: 0,
-            NSExtensionActivationSupportsPDFWithMaxCount: 1,
-          },
-        },
-      },
-    }, null, 2))
-    fs.writeFileSync(path.join(targetRoot, `${shareTargetName}.entitlements`), `${JSON.stringify({ 'com.apple.security.application-groups': [appGroup] }, null, 2)}\n`)
+    fs.writeFileSync(path.join(targetRoot, `${shareTargetName}-Info.plist`), shareInfoPlist)
+    fs.writeFileSync(path.join(targetRoot, `${shareTargetName}.entitlements`), appGroupEntitlements)
     return config
   }])
 
