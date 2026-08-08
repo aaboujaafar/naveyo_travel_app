@@ -15,8 +15,8 @@ const shareInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleDisplayName</key><string>Naveyo</string>
   <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
   <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-  <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
-  <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key><string>com.apple.share-services</string>
@@ -72,9 +72,9 @@ const withNaveyoDocuments: ConfigPlugin = (config) => {
     const targetUuid = target.uuid
     const sourcePath = `${shareTargetName}/NaveyoShareViewController.swift`
     const storePath = `${shareTargetName}/NaveyoShareStore.swift`
-    const nativeTarget = project.pbxNativeTargetSection()[targetUuid] as { buildPhases?: { comment?: string; value?: string }[] }
+    const shareNativeTarget = project.pbxNativeTargetSection()[targetUuid] as { buildPhases?: { comment?: string; value?: string }[] }
     const objects = (project as unknown as { hash: { project: { objects: Record<string, Record<string, unknown>> } } }).hash.project.objects
-    const hasShareSources = (nativeTarget.buildPhases ?? []).some((phase) => {
+    const hasShareSources = (shareNativeTarget.buildPhases ?? []).some((phase) => {
       if (phase.comment !== 'Sources' || !phase.value) return false
       const sourcePhase = objects.PBXSourcesBuildPhase?.[phase.value] as { files?: unknown[] } | undefined
       return Boolean(sourcePhase?.files?.length)
@@ -82,17 +82,22 @@ const withNaveyoDocuments: ConfigPlugin = (config) => {
     if (!hasShareSources) {
       project.addBuildPhase([sourcePath, storePath], 'PBXSourcesBuildPhase', 'Sources', targetUuid)
     }
+    const configuredTarget = project.pbxNativeTargetSection()[targetUuid] as { buildConfigurationList: string }
+    const configurationLists = project.pbxXCConfigurationList()
+    const configurationList = configurationLists[configuredTarget.buildConfigurationList] as { buildConfigurations?: { value: string }[] }
     const configurations = project.pbxXCBuildConfigurationSection()
-    Object.values(configurations).forEach((entry: unknown) => {
-      if (!entry || typeof entry !== 'object' || !('buildSettings' in entry)) return
-      const settings = (entry as { buildSettings?: Record<string, unknown> }).buildSettings
-      if (settings?.PRODUCT_BUNDLE_IDENTIFIER === `"${config.ios?.bundleIdentifier ?? 'com.naveyo.app'}.share"`) {
-        settings.INFOPLIST_FILE = `"${shareTargetName}/${shareTargetName}-Info.plist"`
-        settings.CODE_SIGN_ENTITLEMENTS = `"${shareTargetName}/${shareTargetName}.entitlements"`
-        settings.SWIFT_VERSION = '5.0'
-        settings.IPHONEOS_DEPLOYMENT_TARGET = '15.1'
-      }
-    })
+    for (const configuration of configurationList.buildConfigurations ?? []) {
+      const entry = configurations[configuration.value] as { buildSettings?: Record<string, unknown> } | undefined
+      const settings = entry?.buildSettings
+      if (!settings) continue
+      settings.CODE_SIGN_ENTITLEMENTS = `${shareTargetName}/${shareTargetName}.entitlements`
+      settings.INFOPLIST_FILE = `${shareTargetName}/${shareTargetName}-Info.plist`
+      settings.IPHONEOS_DEPLOYMENT_TARGET = '15.1'
+      settings.PRODUCT_BUNDLE_IDENTIFIER = `${config.ios?.bundleIdentifier ?? 'com.naveyo.app'}.share`
+      settings.PRODUCT_NAME = shareTargetName
+      settings.SWIFT_VERSION = '5.0'
+      settings.SKIP_INSTALL = 'YES'
+    }
     return config
   })
 
