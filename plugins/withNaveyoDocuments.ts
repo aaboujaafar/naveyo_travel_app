@@ -26,14 +26,14 @@ const shareInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
     <key>NSExtensionPrincipalClass</key><string>$(PRODUCT_MODULE_NAME).NaveyoShareViewController</string>
     <key>NSExtensionAttributes</key>
     <dict>
-      <key>NSExtensionActivationRule</key>
+        <key>NSExtensionActivationRule</key>
       <dict>
         <key>NSExtensionActivationSupportsAttachmentsWithMaxCount</key><integer>1</integer>
+        <key>NSExtensionActivationSupportsFileWithMaxCount</key><integer>1</integer>
         <key>NSExtensionActivationSupportsImageWithMaxCount</key><integer>1</integer>
         <key>NSExtensionActivationSupportsText</key><true/>
         <key>NSExtensionActivationSupportsWebURLWithMaxCount</key><integer>1</integer>
         <key>NSExtensionActivationSupportsMovieWithMaxCount</key><integer>0</integer>
-        <key>NSExtensionActivationSupportsPDFWithMaxCount</key><integer>1</integer>
       </dict>
     </dict>
   </dict>
