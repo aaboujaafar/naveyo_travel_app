@@ -1,4 +1,4 @@
 import { InMemoryReservationsModule } from "./module";
 
-/** Temporary process-local fallback shared by import and listing screens. */
+/** Process-local test fallback; app routes use the device-persistent bootstrap store. */
 export const sharedLocalReservations = new InMemoryReservationsModule();

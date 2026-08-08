@@ -14,9 +14,9 @@ import {
 import type { ReservationDraft, UUID } from "../../../src/modules/_shared/model";
 import {
   ManualReservationAnalyzer,
-  sharedLocalReservations,
   type ReservationImportResult,
 } from "../../../src/modules/reservations";
+import { sharedLocalReservations } from "../../../src/bootstrap/reservations";
 import { createAppleDocumentAnalyzer } from "../../../src/adapters/apple-document-analysis";
 import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
 import { createSupabaseClient } from "../../../src/bootstrap/supabase";

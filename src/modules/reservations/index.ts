@@ -13,3 +13,4 @@ export {
   validateImportSource,
 } from "./module";
 export { sharedLocalReservations } from "./local";
+export { PersistentReservationsModule } from "./persistent";

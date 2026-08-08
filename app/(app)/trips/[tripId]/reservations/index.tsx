@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import { Badge, Button, Card, EmptyState, ShellFrame, StatusPanel } from "../../../../../src/ui";
 import type { Reservation, UUID } from "../../../../../src/modules/_shared/model";
-import { sharedLocalReservations } from "../../../../../src/modules/reservations";
+import { sharedLocalReservations } from "../../../../../src/bootstrap/reservations";
 import { colors } from "../../../../../src/theme/colors";
 import { spacing } from "../../../../../src/theme/spacing";
 import { typography } from "../../../../../src/theme/typography";
