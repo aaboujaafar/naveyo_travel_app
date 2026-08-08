@@ -72,13 +72,15 @@ const withNaveyoDocuments: ConfigPlugin = (config) => {
     const targetUuid = target.uuid
     const sourcePath = `${shareTargetName}/NaveyoShareViewController.swift`
     const storePath = `${shareTargetName}/NaveyoShareStore.swift`
-    if (!project.hasFile(sourcePath)) {
-      const mainGroup = project.getFirstProject().firstProject.mainGroup
-      project.addSourceFile(sourcePath, { target: targetUuid }, mainGroup)
-    }
-    if (!project.hasFile(storePath)) {
-      const mainGroup = project.getFirstProject().firstProject.mainGroup
-      project.addSourceFile(storePath, { target: targetUuid }, mainGroup)
+    const nativeTarget = project.pbxNativeTargetSection()[targetUuid] as { buildPhases?: { comment?: string; value?: string }[] }
+    const objects = (project as unknown as { hash: { project: { objects: Record<string, Record<string, unknown>> } } }).hash.project.objects
+    const hasShareSources = (nativeTarget.buildPhases ?? []).some((phase) => {
+      if (phase.comment !== 'Sources' || !phase.value) return false
+      const sourcePhase = objects.PBXSourcesBuildPhase?.[phase.value] as { files?: unknown[] } | undefined
+      return Boolean(sourcePhase?.files?.length)
+    })
+    if (!hasShareSources) {
+      project.addBuildPhase([sourcePath, storePath], 'PBXSourcesBuildPhase', 'Sources', targetUuid)
     }
     const configurations = project.pbxXCBuildConfigurationSection()
     Object.values(configurations).forEach((entry: unknown) => {
