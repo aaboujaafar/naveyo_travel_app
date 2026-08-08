@@ -13,12 +13,13 @@ import {
 } from "../../../src/ui";
 import type { ReservationDraft, UUID } from "../../../src/modules/_shared/model";
 import {
-  analyzeReservationImport,
   ManualReservationAnalyzer,
   sharedLocalReservations,
   type ReservationImportResult,
 } from "../../../src/modules/reservations";
-import { createAppleReservationAnalyzer } from "../../../src/adapters/apple-document-analysis";
+import { createAppleDocumentAnalyzer } from "../../../src/adapters/apple-document-analysis";
+import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
+import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
@@ -56,10 +57,33 @@ export default function ReservationImportScreen() {
         kind: "text" as const,
         sizeBytes: new TextEncoder().encode(sourceText).byteLength,
       };
-      const next = await analyzeReservationImport(
-        selectedSource ? createAppleReservationAnalyzer() : analyzer,
-        source,
-      );
+      let draft: ReservationDraft;
+      if (selectedSource) {
+        const local = await createAppleDocumentAnalyzer().analyze(selectedSource.uri);
+        draft = local;
+        if (local.confidence !== "high") {
+          try {
+            draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
+              tripId,
+              extractedText: local.extractedText,
+            });
+          } catch {
+            // Keep the local draft when the remote provider is unavailable.
+          }
+        }
+      } else if (sourceText.trim()) {
+        try {
+          draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
+            tripId,
+            extractedText: sourceText,
+          });
+        } catch {
+          draft = await analyzer.analyze(source);
+        }
+      } else {
+        draft = await analyzer.analyze(source);
+      }
+      const next = { state: "needs-confirmation" as const, draft };
       if (next.state === "needs-confirmation") {
         const existing = await sharedLocalReservations.findDuplicate(tripId, next.draft);
         setResult(
