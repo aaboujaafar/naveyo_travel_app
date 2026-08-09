@@ -41,6 +41,14 @@ export default function AppHomeScreen() {
       <Button
         fullWidth
         variant="secondary"
+        onPress={() => router.push("/(app)/imports")}
+      >
+        Centre d’imports
+      </Button>
+
+      <Button
+        fullWidth
+        variant="secondary"
         onPress={() => router.push("/(app)/invite")}
       >
         J’ai un code d’invitation
