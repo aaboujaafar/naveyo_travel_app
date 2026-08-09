@@ -4,7 +4,10 @@ Date de cadrage : 28 juillet 2026.
 
 Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au début de septembre 2026.
 
-## Audit de la vague 4 — 9 août 2026
+## Intégration et audit de la vague 4 — 9 août 2026
+
+- La branche `wave-4` est intégrée dans `main` par avance rapide jusqu'au commit `7440500`.
+- Les livrables applicatifs de la vague 4 sont présents dans `main`. Les états restent `IN_PROGRESS` lorsque le critère restant est une validation sur iPhone réel ; cette validation sera consommée par `INT-001` puis `QA-001`.
 
 - `RSV-001` est `IN_PROGRESS` : Share Extension iOS, App Group, association au Voyage, persistance et centre d’imports sont intégrés. Le parsing est exclusivement confié à OpenCode Go ; l’extraction locale ne produit plus de brouillon. Il reste le test appareil complet et la validation d’une réservation réelle.
 - `OCR-001` est `IN_PROGRESS` : le Module Swift extrait le texte PDF/OCR localement et transmet uniquement ce texte à l’Edge Function `document-analysis`, qui appelle OpenCode Go. Il reste la validation Xcode/iPhone et les fixtures réelles.
@@ -153,7 +156,7 @@ Avec trois agents de réalisation au maximum :
 3. Vague 2 : `BCK-001`, `PLS-001`, `ITN-001`; puis `OFF-001` et `EXP-001`.
 4. Vague 3 : `TRP-001`, `AI-001`, `GPS-001` si son gate passe.
 5. Vague 4 : `RSV-001`, `DOC-001`, `OCR-001` si conservé.
-6. Vague 5 : `INT-001`.
+6. Vague 5 : `INT-001` (intégration fonctionnelle et stabilisation appareil).
 7. Vague 6 : `QA-001`, puis `REL-001`.
 
 Ne pas lancer deux tâches qui possèdent le même chemin. Les branches peuvent être développées en parallèle, mais sont intégrées dans l'ordre du graphe.
@@ -221,7 +224,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
 | DOC-001 | P0 | TODO (STANDBY) | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
-| INT-001 | P0 | TODO | 4 h | fonctionnalités retenues | composition et tests d'intégration |
+| INT-001 | P0 | READY | 6 h | fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
 | QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
 
@@ -651,10 +654,27 @@ Audit du 9 août 2026 : l’API native `extractDocumentText` sépare désormais 
 ### INT-001 — Composition et parcours intégré
 
 - Priorité : `P0`
-- État : `TODO`
-- Timebox : 4 h
-- Dépendances : toutes les fonctionnalités retenues à la ligne de coupe
+- État : `READY`
+- Timebox : 6 h
+- Dépendances : fonctionnalités retenues à la ligne de coupe, installation iPhone de la wave 4
 - Possède : `src/bootstrap/**`, wiring des routes racine, `tests/integration/**`
+
+Lots de travail de la vague 5, à réaliser dans cette tâche et sans réactiver `DOC-001` :
+
+| Lot | Objectif | Validation attendue |
+|---|---|---|
+| INT-101 | Vérifier le wiring de l'application : authentification, Voyage, Étapes, lieux, itinéraire et suggestions | Un parcours complet avec le propriétaire puis le second membre, sans Adapter construit dans une route |
+| INT-102 | Finaliser le parcours Réservation : partage iOS, association au Voyage, analyse OpenCode, confirmation et persistance | Import depuis Mail/Fichiers/Photos, fermeture de l'application, reprise dans le centre d'import puis réservation visible après confirmation |
+| INT-103 | Intégrer la Trace de trajet au parcours du Voyage | Démarrage/arrêt visibles, points conservés après reprise, test au minimum écran verrouillé ou perte réseau si le matériel le permet |
+| INT-104 | Vérifier les états de démarrage et de dégradation | Démarrage en ligne, démarrage sans réseau avec données déjà chargées, erreur OpenCode lisible et réessayable |
+| INT-105 | Ajouter les tests d'intégration des parcours retenus | Fakes aux Seams externes, doublons d'import couverts, permissions et compte extérieur couverts |
+
+Contraintes de la vague 5 :
+
+- `DOC-001` reste `TODO (STANDBY)` ; aucune dépendance nouvelle ne doit supposer un coffre documentaire complet.
+- Le parsing des réservations reste exclusivement confié à OpenCode Go ; l'extraction native ne produit que le texte et les preuves locales.
+- Les validations natives restantes de `SPI-002`, `RSV-001` et `OCR-001` doivent être consignées dans le compte rendu d'intégration, sans contourner les critères appareil.
+- Une réservation importée est toujours un brouillon jusqu'à confirmation humaine.
 
 Livrables :
 
@@ -671,6 +691,8 @@ Acceptation :
 - démarrage online et offline vérifié ;
 - deep link de partage et reprise après fermeture vérifiés ;
 - `pnpm verify` passe après intégration de la vague.
+- les scénarios des lots `INT-101` à `INT-105` sont consignés avec leur résultat et les risques restants ;
+- la vague 5 ne bloque pas sur `DOC-001`, mais signale explicitement les capacités documentaires absentes.
 
 ### QA-001 — Sécurité, offline et répétition de voyage
 
