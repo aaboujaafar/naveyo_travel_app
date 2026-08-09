@@ -7,6 +7,7 @@ type RequestInput = { tripId: string; stopId: string; query: string; preferences
 const MAX_CANDIDATES = 50
 const MAX_SUGGESTIONS = 5
 const TIMEOUT_MS = 10_000
+const OPENCODE_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions'
 
 const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -53,18 +54,29 @@ function schemaOutput(value: unknown, candidates: Candidate[]): { candidateId: s
 
 function extractOutputText(value: unknown): string {
   const response = record(value)
-  const output = response?.output
-  if (!Array.isArray(output)) throw new Error('invalid_provider_response')
-  for (const item of output) {
-    const message = record(item)
-    const content = message?.content
-    if (!Array.isArray(content)) continue
-    for (const part of content) {
-      const textValue = record(part)?.text
-      if (typeof textValue === 'string') return textValue
-    }
+  const choices = response?.choices
+  if (!Array.isArray(choices)) throw new Error('invalid_provider_response')
+  const content = record(record(choices[0])?.message)?.content
+  if (typeof content === 'string' && content.trim()) return content
+  if (Array.isArray(content)) {
+    const text = content.map((part) => {
+      const item = record(part)
+      return typeof item?.text === 'string' ? item.text : ''
+    }).join('')
+    if (text.trim()) return text
   }
   throw new Error('invalid_provider_response')
+}
+
+function parseJsonOutput(value: string): unknown {
+  const cleaned = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  try { return JSON.parse(cleaned) } catch { /* Try the first complete JSON object below. */ }
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)) } catch { /* Fall through to the stable provider error. */ }
+  }
+  throw new Error('invalid_structured_output')
 }
 
 Deno.serve(async (request) => {
@@ -86,30 +98,30 @@ Deno.serve(async (request) => {
     const candidates = (Array.isArray(placesResult.data) ? placesResult.data : []).map((row) => mapCandidate(row as Row)).filter((row): row is Candidate => row !== null).slice(0, MAX_CANDIDATES)
     if (candidates.length === 0) return json({ drafts: [] })
 
-    const apiKey = Deno.env.get('OPENAI_API_KEY')
+    const apiKey = Deno.env.get('OPENCODE_GO_API_KEY')
     if (!apiKey) return json({ error: 'assistant_provider_unavailable' }, 503)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
     let response: Response
     try {
-      response = await fetch('https://api.openai.com/v1/responses', {
+      response = await fetch(OPENCODE_ENDPOINT, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          model: Deno.env.get('OPENAI_SUGGESTIONS_MODEL') ?? 'gpt-5.6-terra',
-          store: false,
-          max_output_tokens: 900,
-          reasoning: { effort: 'low' },
-          input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ task: 'recommend places from the supplied candidates only', trip: tripResult.data, stop: stopResult.data, preferences: input.preferences, query: input.query, candidates }) }] }],
-          text: { format: { type: 'json_schema', name: 'trip_suggestions', strict: true, schema: { type: 'object', properties: { suggestions: { type: 'array', maxItems: MAX_SUGGESTIONS, items: { type: 'object', properties: { candidateId: { type: 'string' }, title: { type: 'string' }, reason: { type: 'string' } }, required: ['candidateId', 'title', 'reason'], additionalProperties: false } } }, required: ['suggestions'], additionalProperties: false } } },
+          model: Deno.env.get('OPENCODE_ACTIVITY_MODEL') ?? 'deepseek-v4-pro',
+          temperature: 0,
+          messages: [
+            { role: 'system', content: 'You recommend travel places. Use only the supplied candidates. Never invent places, coordinates, prices, opening hours, or travel times. Return only valid JSON with a suggestions array. Each item must contain candidateId, title, and reason. Return at most five suggestions. Suggestions are drafts and never confirmed itinerary items.' },
+            { role: 'user', content: JSON.stringify({ task: 'recommend places from the supplied candidates only', trip: tripResult.data, stop: stopResult.data, preferences: input.preferences, query: input.query, candidates }) },
+          ],
         }),
       })
     } finally { clearTimeout(timeout) }
     if (response.status === 429) return json({ error: 'assistant_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'assistant_provider_failed' }, 503)
     const providerResponse = await response.json()
-    const suggestions = schemaOutput(JSON.parse(extractOutputText(providerResponse)), candidates)
+    const suggestions = schemaOutput(parseJsonOutput(extractOutputText(providerResponse)), candidates)
     const createdAt = new Date().toISOString()
     const drafts = suggestions.map((suggestion) => ({ id: crypto.randomUUID(), trip_id: input.tripId, stop_id: input.stopId, candidate_id: suggestion.candidateId, title: suggestion.title, reason: suggestion.reason, created_by: authenticated.user.id, created_at: createdAt }))
     if (drafts.length > 0) {
@@ -120,7 +132,7 @@ Deno.serve(async (request) => {
   } catch (error) {
     if (error instanceof Response) return error
     if (error instanceof DOMException && error.name === 'AbortError') return json({ error: 'assistant_timeout' }, 408)
-    if (error instanceof SyntaxError || error instanceof Error && error.message === 'invalid_structured_output') return json({ error: 'assistant_invalid_output' }, 502)
+    if (error instanceof SyntaxError || error instanceof Error && ['invalid_structured_output', 'invalid_provider_response'].includes(error.message)) return json({ error: 'assistant_invalid_output' }, 502)
     return json({ error: 'assistant_failed' }, 500)
   }
 })
