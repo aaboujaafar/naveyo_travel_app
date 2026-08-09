@@ -8,6 +8,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 
 - La branche `wave-4` est intégrée dans `main` par avance rapide jusqu'au commit `7440500`.
 - Les livrables applicatifs de la vague 4 sont présents dans `main`. Les états restent `IN_PROGRESS` lorsque le critère restant est une validation sur iPhone réel ; cette validation sera consommée par `INT-001` puis `QA-001`.
+- La vague 5 est lancée le 9 août 2026 : `INT-001` est `IN_PROGRESS`, avec les lots `INT-101` à `INT-105` distribués à des agents sur des chemins disjoints.
 
 - `RSV-001` est `IN_PROGRESS` : Share Extension iOS, App Group, association au Voyage, persistance et centre d’imports sont intégrés. Le parsing est exclusivement confié à OpenCode Go ; l’extraction locale ne produit plus de brouillon. Il reste le test appareil complet et la validation d’une réservation réelle.
 - `OCR-001` est `IN_PROGRESS` : le Module Swift extrait le texte PDF/OCR localement et transmet uniquement ce texte à l’Edge Function `document-analysis`, qui appelle OpenCode Go. Il reste la validation Xcode/iPhone et les fixtures réelles.
@@ -224,7 +225,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
 | DOC-001 | P0 | TODO (STANDBY) | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
-| INT-001 | P0 | READY | 6 h | fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
+| INT-001 | P0 | IN_PROGRESS | 6 h | fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
 | QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
 
@@ -233,7 +234,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 ### DEC-001 — Verrouiller les décisions de release
 
 - Priorité : `Gate`
-- État : `READY`
+- État : `IN_PROGRESS`
 - Owner : coordinateur avec l'utilisateur
 - Timebox : 1 h
 - Parallèle avec : `FND-001`
