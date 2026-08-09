@@ -22,6 +22,9 @@ export default function AppLayout() {
       try {
         const response = await fetch(`${url}/auth/v1/health`, {
           method: "GET",
+          headers: {
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_KEY ?? "",
+          },
           signal: controller.signal,
         });
         if (mounted) setIsOffline(!response.ok);
