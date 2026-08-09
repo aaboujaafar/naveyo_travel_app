@@ -7,20 +7,33 @@ import type {
 } from "../../../../../src/modules/_shared/model";
 import { createExpoLocationTrackingModule } from "../../../../../src/adapters/expo-location";
 import { Button, Card, ShellFrame, StatusPanel } from "../../../../../src/ui";
+import {
+  trackingButtonLabel,
+  trackingErrorStatus,
+  trackingStatusMessage,
+  trackingStatusTitle,
+} from "./tracking-screen-state";
 
 const tracking = createExpoLocationTrackingModule();
 
 export default function TrackingScreen() {
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
-  const tripId = rawTripId as UUID;
+  const tripId = typeof rawTripId === "string" ? (rawTripId as UUID) : undefined;
   const [status, setStatus] = useState<TrackingStatus>({ state: "stopped" });
   const [pointCount, setPointCount] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!tripId) return;
-    setStatus(await tracking.tracker.getStatus());
-    setPointCount((await tracking.list(tripId)).length);
+    if (!tripId) {
+      setStatus(trackingErrorStatus(undefined, "Voyage introuvable"));
+      return;
+    }
+    try {
+      setStatus(await tracking.tracker.getStatus());
+      setPointCount((await tracking.list(tripId)).length);
+    } catch (cause: unknown) {
+      setStatus(trackingErrorStatus(tripId, cause));
+    }
   }, [tripId]);
 
   useEffect(() => {
@@ -28,24 +41,20 @@ export default function TrackingScreen() {
     return () => clearTimeout(timeout);
   }, [refresh]);
 
-  const message = useMemo(() => {
-    if (status.state === "recording")
-      return "Les points sont enregistrés localement sur cet iPhone.";
-    if (status.state === "error")
-      return status.message ?? "Le suivi n’a pas pu démarrer.";
-    return "Le suivi est arrêté. Le démarrage demande les autorisations de localisation iOS.";
-  }, [status]);
+  const message = useMemo(() => trackingStatusMessage(status), [status]);
 
   async function toggleTracking() {
     if (!tripId || busy) return;
     setBusy(true);
     try {
-      setStatus(
+      const nextStatus =
         status.state === "recording"
           ? await tracking.tracker.stop()
-          : await tracking.tracker.start(tripId),
-      );
+          : await tracking.tracker.start(tripId);
+      setStatus(nextStatus);
       await refresh();
+    } catch (cause: unknown) {
+      setStatus(trackingErrorStatus(tripId, cause));
     } finally {
       setBusy(false);
     }
@@ -59,22 +68,20 @@ export default function TrackingScreen() {
       <Card>
         <StatusPanel
           kind={status.state === "error" ? "error" : "info"}
-          title={
-            status.state === "recording"
-              ? "Enregistrement actif"
-              : status.state === "starting"
-                ? "Démarrage…"
-                : "Enregistrement arrêté"
-          }
+          title={trackingStatusTitle(status)}
           message={message}
         />
         <Text accessibilityLabel={`${pointCount} points enregistrés`}>
           {pointCount} point(s) enregistré(s) sur cet appareil
         </Text>
-        <Button fullWidth loading={busy} onPress={toggleTracking}>
-          {status.state === "recording"
-            ? "Arrêter la trace"
-            : "Démarrer la trace"}
+        <Button
+          fullWidth
+          loading={busy}
+          disabled={!tripId || busy || status.state === "starting"}
+          onPress={toggleTracking}
+          accessibilityLabel={trackingButtonLabel(status)}
+        >
+          {trackingButtonLabel(status)}
         </Button>
       </Card>
       <StatusPanel
