@@ -1,7 +1,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { AppState, StyleSheet, Text } from "react-native";
 import {
   Badge,
   Button,
@@ -21,6 +21,7 @@ import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
+import { describeAnalysisFailure, recoverPendingImport } from "./import-state";
 import { selectPendingImport } from "./import-selection";
 
 export default function ReservationImportScreen() {
@@ -40,15 +41,46 @@ export default function ReservationImportScreen() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [availableTrips, setAvailableTrips] = useState<Trip[]>([]);
   const [pendingImports, setPendingImports] = useState<PendingShareImport[]>([]);
 
   useEffect(() => {
-    const inbox = createAppleShareInbox();
-    void inbox.list().then(setPendingImports).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger l’import"));
+    let mounted = true;
+    const loadPendingImports = async () => {
+      try {
+        const inbox = createAppleShareInbox();
+        const listed = await inbox.list();
+        const recovered = listed.map(recoverPendingImport);
+        await Promise.all(
+          listed
+            .filter((item) => item.status === "processing")
+            .map((item) => inbox.updateStatus(item.id, "seen")),
+        );
+        if (mounted) setPendingImports(recovered);
+      } catch (cause: unknown) {
+        if (!mounted) return;
+        const failure = describeAnalysisFailure(cause);
+        setIsOffline(failure.isOffline);
+        setError(failure.message || "Impossible de charger l’import");
+      }
+    };
+    void loadPendingImports();
     if (!tripId && trips) {
-      void trips.list().then(setAvailableTrips).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger les Voyages"));
+      void trips.list().then(setAvailableTrips).catch((cause: unknown) => {
+        if (!mounted) return;
+        const failure = describeAnalysisFailure(cause);
+        setIsOffline(failure.isOffline);
+        setError(failure.isOffline ? failure.message : "Impossible de charger les Voyages");
+      });
     }
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void loadPendingImports();
+    });
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
   }, [tripId, trips]);
 
   useEffect(() => {
@@ -117,16 +149,18 @@ export default function ReservationImportScreen() {
         setResult(next);
       }
     } catch (cause: unknown) {
+      const failure = describeAnalysisFailure(cause);
       if (pendingId) {
         const inbox = createAppleShareInbox();
         try {
-          await inbox.updateStatus(pendingId, "failed", cause instanceof Error ? cause.message : "Analyse OpenCode impossible");
+          await inbox.updateStatus(pendingId, "failed", failure.message);
           await inbox.list().then(setPendingImports);
         } catch {
           // Preserve the analysis error when the native inbox cannot update its status.
         }
       }
-      setError(cause instanceof Error ? `Analyse OpenCode impossible : ${cause.message}` : "Analyse OpenCode impossible");
+      setIsOffline(failure.isOffline);
+      setError(failure.message);
     } finally {
       setIsAnalyzing(false);
     }
@@ -228,13 +262,21 @@ export default function ReservationImportScreen() {
         </> : null}
       </Card>
 
+      {isOffline ? (
+        <StatusPanel
+          kind="info"
+          title="Mode hors ligne"
+          message="Les imports déjà reçus restent disponibles sur cet appareil. L’analyse OpenCode reprendra dès que la connexion sera rétablie."
+        />
+      ) : null}
       <ImportCenter
         items={pendingImports}
         tripId={tripId}
+        onRetry={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
         onSelect={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
       />
 
-      {error ? <StatusPanel kind="error" title="Import impossible" message={error} /> : null}
+      {error ? <StatusPanel kind="error" title="Import impossible" message={error} actionLabel="Réessayer" onAction={() => void analyze()} /> : null}
       {result?.state === "error" ? (
         <StatusPanel kind="error" title="Brouillon invalide" message={result.message} />
       ) : null}
@@ -261,10 +303,12 @@ export default function ReservationImportScreen() {
 function ImportCenter({
   items,
   tripId,
+  onRetry,
   onSelect,
 }: {
   items: PendingShareImport[];
   tripId?: UUID;
+  onRetry: (id: string) => void;
   onSelect: (id: string) => void;
 }) {
   if (items.length === 0) return null;
@@ -275,10 +319,9 @@ function ImportCenter({
       <Text style={styles.detail}>
         {item.fileName ?? "Texte partagé"} · {item.status === "confirmed" ? "traité" : item.status === "failed" ? "échec" : item.status === "processing" ? "en analyse" : "à traiter"}
       </Text>
-      {item.status !== "confirmed" ? <Button size="sm" variant="secondary" onPress={() => onSelect(item.id)}>
-        {tripId ? "Analyser cet import" : "Associer ce document"}
-      </Button> : null}
       {item.error ? <Text style={styles.errorDetail}>{item.error}</Text> : null}
+      {item.status === "failed" || item.status === "seen" ? <Button size="sm" variant="secondary" onPress={() => onRetry(item.id)}>{tripId ? "Analyser cet import" : "Associer ce document"}</Button> : null}
+      {item.status === "processing" ? <Button size="sm" variant="secondary" onPress={() => onSelect(item.id)}>Ouvrir cet import</Button> : null}
     </Card>)}
   </Card>;
 }
@@ -327,5 +370,5 @@ const styles = StyleSheet.create({
   confirmationLabel: { ...typography.caption, color: colors.accent },
   selectedFile: { ...typography.caption, color: colors.teal },
   importItem: { padding: spacing.sm, gap: spacing.xs },
-  errorDetail: { ...typography.caption, color: colors.accent },
+  errorDetail: { ...typography.caption, color: colors.danger },
 });
