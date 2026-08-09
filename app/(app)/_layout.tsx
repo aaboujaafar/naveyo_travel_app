@@ -14,8 +14,10 @@ export default function AppLayout() {
   useEffect(() => {
     void createAppleShareInbox()
       .list()
-      .then((pending) => {
-        if (pending.length > 0) router.replace("/(app)/imports");
+      .then(async (pending) => {
+        const fresh = pending.filter((item) => item.status === "new");
+        await Promise.all(fresh.map((item) => createAppleShareInbox().updateStatus(item.id, "seen")));
+        if (fresh.length > 0) router.replace("/(app)/imports");
       })
       .catch(() => {
         // The native inbox is unavailable outside an iOS development build.

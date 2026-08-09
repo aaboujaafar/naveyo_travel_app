@@ -235,7 +235,7 @@ const parseOptionalString = (
   value: unknown,
   name: string,
 ): string | undefined => {
-  if (value === undefined) return undefined;
+  if (value === undefined || value === null) return undefined;
   return stringValue(value, name);
 };
 
@@ -385,29 +385,12 @@ export const parseReservationDraft = (value: unknown): ReservationDraft => {
       "reservation draft confirmation fields",
     ).map((field) => stringValue(field, "confirmation field")),
   };
-  if (
-    result.confidence !== "low" &&
-    result.confidence !== "medium" &&
-    result.confidence !== "high"
-  )
-    throw new Error("Invalid reservation draft confidence");
   if (candidate.sourceDocumentId !== undefined)
     result.sourceDocumentId = uuidValue(
       candidate.sourceDocumentId,
       "reservation draft sourceDocumentId",
     );
   if (candidate.type !== undefined) {
-    if (
-      ![
-        "accommodation",
-        "flight",
-        "train",
-        "ferry",
-        "activity",
-        "other",
-      ].includes(String(candidate.type))
-    )
-      throw new Error("Invalid reservation draft type");
     result.type = candidate.type as ReservationDraft["type"];
   }
   result.title = parseOptionalString(

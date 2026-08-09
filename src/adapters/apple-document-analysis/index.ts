@@ -30,15 +30,24 @@ export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModu
     if (!module.listPendingShareImports) return []
     const value = await module.listPendingShareImports()
     if (!Array.isArray(value)) return []
-    return value.filter((item): item is PendingShareImport => {
+    return value.map((item) => {
+      if (item && typeof item === 'object' && !(item as Record<string, unknown>).status) {
+        return { ...(item as Record<string, unknown>), status: 'seen' }
+      }
+      return item
+    }).filter((item): item is PendingShareImport => {
       if (!item || typeof item !== 'object') return false
       const candidate = item as Record<string, unknown>
-      return typeof candidate.id === 'string' && (candidate.kind === 'file' || candidate.kind === 'text') && typeof candidate.uri === 'string' && typeof candidate.createdAt === 'string'
+      return typeof candidate.id === 'string' && (candidate.kind === 'file' || candidate.kind === 'text') && typeof candidate.uri === 'string' && typeof candidate.createdAt === 'string' && ['new', 'seen', 'processing', 'failed', 'confirmed'].includes(String(candidate.status))
     })
   },
   async remove(id: string): Promise<void> {
     const module = moduleOverride ?? nativeModule()
     await module.removePendingShareImport?.(id)
+  },
+  async updateStatus(id: string, status: PendingShareImport['status'], error?: string): Promise<void> {
+    const module = moduleOverride ?? nativeModule()
+    await module.updatePendingShareImportStatus?.(id, status, error)
   },
 })
 

@@ -37,6 +37,8 @@ export const parseDocumentAnalysisResult = (value: unknown): DocumentAnalysisRes
     return result
   })
 
+
+
   const extractedText = stringValue(candidate.extractedText, 'Extracted text')
   const draft = parseReservationDraft(candidate.draft) as ReservationDraft
   return { ...draft, evidence, extractedText, pagesAnalyzed }

@@ -13,10 +13,7 @@ import {
 } from "../../../src/ui";
 import type { ReservationDraft, Trip, UUID } from "../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../src/modules/trips";
-import {
-  ManualReservationAnalyzer,
-  type ReservationImportResult,
-} from "../../../src/modules/reservations";
+import type { ReservationImportResult } from "../../../src/modules/reservations";
 import { sharedLocalReservations } from "../../../src/bootstrap/reservations";
 import { createAppleDocumentAnalyzer, createAppleShareInbox, type PendingShareImport } from "../../../src/adapters/apple-document-analysis";
 import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
@@ -24,8 +21,6 @@ import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
-
-const analyzer = new ManualReservationAnalyzer();
 
 export default function ReservationImportScreen() {
   const router = useRouter();
@@ -74,6 +69,8 @@ export default function ReservationImportScreen() {
     });
   }, [pendingId, pendingImports, tripId]);
 
+  const activePending = pendingImports.find((item) => item.status !== "confirmed");
+
   async function analyze() {
     if (!tripId) {
       setError("Sélectionnez d’abord un Voyage.");
@@ -87,34 +84,21 @@ export default function ReservationImportScreen() {
     setResult(null);
     setIsAnalyzing(true);
     try {
-      const source = selectedSource ?? {
-        uri: `text:${encodeURIComponent(sourceText)}`,
-        kind: "text" as const,
-        sizeBytes: new TextEncoder().encode(sourceText).byteLength,
-      };
+      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "processing");
       let draft: ReservationDraft;
       if (selectedSource) {
         const local = await createAppleDocumentAnalyzer().analyze(selectedSource.uri);
-        draft = local;
-        try {
-          draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
-            tripId,
-            extractedText: local.extractedText,
-          });
-        } catch {
-          // Keep the local draft when the remote provider is unavailable.
-        }
+        draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
+          tripId,
+          extractedText: local.extractedText,
+        });
       } else if (sourceText.trim()) {
-        try {
-          draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
-            tripId,
-            extractedText: sourceText,
-          });
-        } catch {
-          draft = await analyzer.analyze(source);
-        }
+        draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
+          tripId,
+          extractedText: sourceText,
+        });
       } else {
-        draft = await analyzer.analyze(source);
+        throw new Error("Le texte du document est requis pour OpenCode.");
       }
       const next = { state: "needs-confirmation" as const, draft };
       if (next.state === "needs-confirmation") {
@@ -128,7 +112,8 @@ export default function ReservationImportScreen() {
         setResult(next);
       }
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : "Import impossible");
+      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "failed", cause instanceof Error ? cause.message : "Analyse OpenCode impossible");
+      setError(cause instanceof Error ? `Analyse OpenCode impossible : ${cause.message}` : "Analyse OpenCode impossible");
     } finally {
       setIsAnalyzing(false);
     }
@@ -163,7 +148,7 @@ export default function ReservationImportScreen() {
         draft,
         confirmedFields: draft.fieldsRequiringConfirmation,
       });
-      if (pendingId) await createAppleShareInbox().remove(pendingId);
+      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "confirmed");
       router.replace(`/(app)/trips/${tripId}/reservations`);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Enregistrement impossible");
@@ -172,19 +157,27 @@ export default function ReservationImportScreen() {
     }
   }
 
+  const goBackOrHome = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
   return (
     <ShellFrame
       title="Importer une réservation"
       subtitle="Un brouillon est toujours vérifié avant l’enregistrement."
       headerAction={
-        <Button size="sm" variant="secondary" onPress={() => router.back()}>
+        <Button size="sm" variant="secondary" onPress={goBackOrHome}>
           Fermer
         </Button>
       }
     >
       <Card style={styles.card}>
-        {!tripId ? <TripPicker trips={availableTrips} onSelect={(selectedTripId) => {
-          const pending = pendingImports[0];
+        {!tripId ? <TripPicker trips={availableTrips} pending={activePending} onSelect={(selectedTripId) => {
+          const pending = activePending;
           router.replace(pending ? `/(app)/imports?tripId=${selectedTripId}&pendingId=${pending.id}` : `/(app)/imports?tripId=${selectedTripId}`);
         }} /> : null}
         {tripId ? <>
@@ -214,6 +207,8 @@ export default function ReservationImportScreen() {
         </> : null}
       </Card>
 
+      <ImportCenter items={pendingImports} />
+
       {error ? <StatusPanel kind="error" title="Import impossible" message={error} /> : null}
       {result?.state === "error" ? (
         <StatusPanel kind="error" title="Brouillon invalide" message={result.message} />
@@ -238,11 +233,22 @@ export default function ReservationImportScreen() {
   );
 }
 
-function TripPicker({ trips, onSelect }: { trips: Trip[]; onSelect: (tripId: UUID) => void }) {
+function ImportCenter({ items }: { items: PendingShareImport[] }) {
+  if (items.length === 0) return null;
+  return <Card style={styles.card}>
+    <Badge label="CENTRE D’IMPORT" variant="gold" />
+    <Text style={styles.cardTitle}>Documents partagés</Text>
+    {items.map((item) => <Text key={item.id} style={styles.detail}>
+      {item.fileName ?? "Texte partagé"} · {item.status === "confirmed" ? "traité" : item.status === "failed" ? "échec" : item.status === "processing" ? "en analyse" : "à traiter"}
+    </Text>)}
+  </Card>;
+}
+
+function TripPicker({ trips, pending, onSelect }: { trips: Trip[]; pending?: PendingShareImport; onSelect: (tripId: UUID) => void }) {
   return <>
     <Badge label="NOUVEL IMPORT" variant="teal" />
     <Text style={styles.cardTitle}>Associer au Voyage</Text>
-    <Text style={styles.cardMessage}>Choisissez le Voyage auquel rattacher ce document.</Text>
+    <Text style={styles.cardMessage}>{pending ? `Document en attente : ${pending.fileName ?? pending.id}` : "Choisissez le Voyage auquel rattacher ce document."}</Text>
     {trips.length === 0 ? <StatusPanel kind="info" title="Aucun Voyage disponible" message="Créez ou rejoignez un Voyage avant d’importer cette réservation." /> : null}
     {trips.map((trip) => <Button key={trip.id} fullWidth variant="secondary" onPress={() => onSelect(trip.id)}>{trip.name}</Button>)}
   </>;

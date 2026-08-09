@@ -28,6 +28,17 @@ enum NaveyoShareStore {
     }.sorted { ($0["createdAt"] as? String ?? "") > ($1["createdAt"] as? String ?? "") }
   }
 
+  static func updateStatus(id: String, status: String, error: String? = nil) {
+    guard let directory = try? directoryURL() else { return }
+    let manifest = directory.appendingPathComponent("\(id).json")
+    guard var value = try? JSONSerialization.jsonObject(with: (try? Data(contentsOf: manifest)) ?? Data()) as? [String: Any] else { return }
+    value["status"] = status
+    if let error { value["error"] = String(error.prefix(500)) } else { value.removeValue(forKey: "error") }
+    if let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .withoutEscapingSlashes]) {
+      try? data.write(to: manifest, options: .atomic)
+    }
+  }
+
   static func remove(id: String) {
     guard let directory = try? directoryURL() else { return }
     let manifest = directory.appendingPathComponent("\(id).json")
@@ -47,6 +58,7 @@ enum NaveyoShareStore {
       "mimeType": mimeType ?? NSNull(),
       "uri": uri,
       "text": text ?? NSNull(),
+      "status": "new",
       "createdAt": ISO8601DateFormatter().string(from: Date())
     ]
     let data = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .withoutEscapingSlashes])
