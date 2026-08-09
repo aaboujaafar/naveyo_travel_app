@@ -19,6 +19,7 @@ export interface DocumentAnalysisResult extends ReservationDraft {
 
 export interface AppleDocumentAnalysisModule {
   analyzeDocument(fileUri: string, options?: DocumentAnalysisOptions): Promise<unknown>
+  extractDocumentText?(fileUri: string, options?: DocumentAnalysisOptions): Promise<unknown>
   listPendingShareImports?(): Promise<unknown>
   removePendingShareImport?(id: string): Promise<void>
   updatePendingShareImportStatus?(id: string, status: string, error?: string): Promise<void>

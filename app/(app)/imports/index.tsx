@@ -15,7 +15,7 @@ import type { ReservationDraft, Trip, UUID } from "../../../src/modules/_shared/
 import { useTripsModule } from "../../../src/modules/trips";
 import type { ReservationImportResult } from "../../../src/modules/reservations";
 import { sharedLocalReservations } from "../../../src/bootstrap/reservations";
-import { createAppleDocumentAnalyzer, createAppleShareInbox, type PendingShareImport } from "../../../src/adapters/apple-document-analysis";
+import { createAppleDocumentTextExtractor, createAppleShareInbox, type PendingShareImport } from "../../../src/adapters/apple-document-analysis";
 import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
 import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
@@ -87,10 +87,10 @@ export default function ReservationImportScreen() {
       if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "processing");
       let draft: ReservationDraft;
       if (selectedSource) {
-        const local = await createAppleDocumentAnalyzer().analyze(selectedSource.uri);
+        const extractedText = await createAppleDocumentTextExtractor().extract(selectedSource.uri);
         draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
           tripId,
-          extractedText: local.extractedText,
+          extractedText,
         });
       } else if (sourceText.trim()) {
         draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({

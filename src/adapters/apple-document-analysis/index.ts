@@ -24,6 +24,18 @@ export const createAppleReservationAnalyzer = (moduleOverride?: AppleDocumentAna
   }
 }
 
+export const createAppleDocumentTextExtractor = (moduleOverride?: AppleDocumentAnalysisModule) => ({
+  async extract(fileUri: string, options?: DocumentAnalysisOptions): Promise<string> {
+    const module = moduleOverride ?? nativeModule()
+    if (!module.extractDocumentText) throw new Error('Native text extraction is unavailable')
+    const value = await module.extractDocumentText(fileUri, options)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid native text extraction result')
+    const extractedText = (value as Record<string, unknown>).extractedText
+    if (typeof extractedText !== 'string' || extractedText.trim().length === 0) throw new Error('No text could be extracted from this document')
+    return extractedText
+  },
+})
+
 export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModule) => ({
   async list(): Promise<PendingShareImport[]> {
     const module = moduleOverride ?? nativeModule()

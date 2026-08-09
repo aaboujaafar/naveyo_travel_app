@@ -19,6 +19,10 @@ public class NaveyoDocumentsModule: Module {
       try await self.analyze(fileUri: fileUri, options: options)
     }
 
+    AsyncFunction("extractDocumentText") { (fileUri: String, options: [String: Any]?) async throws -> [String: Any] in
+      try await self.analyze(fileUri: fileUri, options: options, includeDraft: false)
+    }
+
     AsyncFunction("listPendingShareImports") { () -> [[String: Any]] in
       NaveyoShareStore.list()
     }
@@ -32,7 +36,7 @@ public class NaveyoDocumentsModule: Module {
     }
   }
 
-  private func analyze(fileUri: String, options: [String: Any]?) async throws -> [String: Any] {
+  private func analyze(fileUri: String, options: [String: Any]?, includeDraft: Bool = true) async throws -> [String: Any] {
     guard let url = URL(string: fileUri), url.isFileURL else { throw DocumentError.invalidUri }
     let values = try url.resourceValues(forKeys: [.fileSizeKey])
     guard let fileSize = values.fileSize, fileSize > 0, fileSize <= maxBytes else { throw DocumentError.fileTooLarge }
@@ -59,6 +63,8 @@ public class NaveyoDocumentsModule: Module {
 
     let fullText = pageTexts.map { $0.1 }.joined(separator: "\n")
     let evidence = detectEvidence(in: pageTexts)
+    let extraction: [String: Any] = ["extractedText": String(fullText.prefix(20_000)), "pagesAnalyzed": pageTexts.count, "evidence": evidence]
+    if !includeDraft { return extraction }
     let fallbackDraft: [String: Any] = [
       "type": inferType(from: fullText),
       "title": title(from: fullText),
@@ -68,7 +74,9 @@ public class NaveyoDocumentsModule: Module {
       "fieldsRequiringConfirmation": ["type", "title", "provider", "reference", "start", "end", "venue", "origin", "destination"]
     ]
     let draft = await LocalReservationExtractor.extract(text: fullText, fallback: fallbackDraft) ?? fallbackDraft
-    return ["extractedText": String(fullText.prefix(20_000)), "pagesAnalyzed": pageTexts.count, "evidence": evidence, "draft": draft]
+    var result = extraction
+    result["draft"] = draft
+    return result
   }
 
   private func recognizeText(image: CGImage) throws -> String {
