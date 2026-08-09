@@ -18,21 +18,29 @@ export default function TripAssistantScreen() {
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debugRequest, setDebugRequest] = useState<string | null>(null);
+  const [debugResponse, setDebugResponse] = useState<string | null>(null);
 
   const discover = async () => {
     if (!assistant || !tripId || !stopId) return;
+    const requestPayload = {
+      tripId: tripId as UUID,
+      stopId: stopId as UUID,
+      query,
+      preferences: preferences || undefined,
+    };
+    setDebugRequest(JSON.stringify(requestPayload, null, 2));
+    setDebugResponse(null);
     setLoading(true);
     setError(null);
     try {
-      const result = await assistant.suggestPlaces({
-        tripId: tripId as UUID,
-        stopId: stopId as UUID,
-        query,
-        preferences: preferences || undefined,
-      });
+      const result = await assistant.suggestPlaces(requestPayload);
       setDrafts(result);
+      setDebugResponse(JSON.stringify(result, null, 2));
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : "Suggestions indisponibles");
+      const message = cause instanceof Error ? cause.message : "Suggestions indisponibles";
+      setError(message);
+      setDebugResponse(JSON.stringify({ error: message }, null, 2));
     } finally {
       setLoading(false);
     }
@@ -76,6 +84,13 @@ export default function TripAssistantScreen() {
       </View>
 
       <ScreenNote>Les suggestions réussies sont conservées pour consultation ultérieure. L’IA ne modifie jamais directement l’itinéraire.</ScreenNote>
+      <Card style={styles.debugCard}>
+        <Badge label="DEBUG IA" variant="gold" />
+        <Text style={styles.debugLabel}>Entrée envoyée</Text>
+        <Text selectable style={styles.debugText}>{debugRequest ?? "Aucune requête envoyée"}</Text>
+        <Text style={styles.debugLabel}>Retour reçu</Text>
+        <Text selectable style={styles.debugText}>{debugResponse ?? "Aucun retour reçu"}</Text>
+      </Card>
       <Button fullWidth variant="secondary" onPress={() => router.back()}>Retour à l’Étape</Button>
     </ShellFrame>
   );
@@ -93,4 +108,7 @@ const styles = StyleSheet.create({
   resultTitle: { ...typography.h3, color: colors.fg },
   resultReason: { ...typography.bodySmall, color: colors.muted },
   confirmation: { ...typography.caption, color: colors.gold },
+  debugCard: { padding: spacing.md, gap: spacing.sm, backgroundColor: colors.surface },
+  debugLabel: { ...typography.caption, color: colors.muted },
+  debugText: { ...typography.caption, color: colors.fg, fontFamily: "Menlo" },
 });
