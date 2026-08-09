@@ -12,7 +12,7 @@ import {
   trackingErrorStatus,
   trackingStatusMessage,
   trackingStatusTitle,
-} from "./tracking-screen-state";
+} from "../../../../../src/modules/trip-tracking/tracking-screen-state";
 
 const tracking = createExpoLocationTrackingModule();
 

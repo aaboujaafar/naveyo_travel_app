@@ -5,7 +5,7 @@ import {
   trackingErrorStatus,
   trackingStatusMessage,
   trackingStatusTitle,
-} from "../app/(app)/trips/[tripId]/tracking/tracking-screen-state";
+} from "../src/modules/trip-tracking/tracking-screen-state";
 
 describe("INT-103 tracking screen", () => {
   it.each([

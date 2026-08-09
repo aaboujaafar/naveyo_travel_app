@@ -1,4 +1,4 @@
-import type { TrackingStatus } from "../../../../../src/modules/_shared/model";
+import type { TrackingStatus } from "../_shared/model";
 
 export function trackingStatusTitle(status: TrackingStatus): string {
   switch (status.state) {

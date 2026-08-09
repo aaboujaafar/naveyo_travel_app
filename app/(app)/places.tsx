@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { loadPlacesView, useNaveyoBootstrap } from '../../src/bootstrap';
 import type { PlacesView } from '../../src/bootstrap';
-import { SectionRoute } from './_components/SectionRoute';
+import { SectionRoute } from '../../src/ui/SectionRoute';
 
 export default function PlacesRoute() {
   const bootstrap = useNaveyoBootstrap();

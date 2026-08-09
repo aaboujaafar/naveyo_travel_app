@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingShareImport } from "../../src/adapters/apple-document-analysis";
-import { selectPendingImport } from "../../app/(app)/imports/import-selection";
+import { selectPendingImport } from "../../src/modules/reservations/import-selection";
 
 const pending = (id: string, status: PendingShareImport["status"] = "seen"): PendingShareImport => ({
   id,

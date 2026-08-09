@@ -21,8 +21,8 @@ import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
-import { describeAnalysisFailure, recoverPendingImport } from "./import-state";
-import { selectPendingImport } from "./import-selection";
+import { describeAnalysisFailure, recoverPendingImport } from "../../../src/modules/reservations/import-state";
+import { selectPendingImport } from "../../../src/modules/reservations/import-selection";
 
 export default function ReservationImportScreen() {
   const router = useRouter();

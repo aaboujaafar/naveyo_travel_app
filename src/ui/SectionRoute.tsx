@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
-import { Button, Card, ShellFrame, StatusPanel } from "../../../src/ui";
-import { spacing } from "../../../src/theme/spacing";
+import { Button } from "./Button";
+import { Card } from "./Card";
+import { ShellFrame, StatusPanel } from "./Shell";
+import { spacing } from "../theme/spacing";
 
 export function SectionRoute({
   title,

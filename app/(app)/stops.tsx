@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { loadTripWorkspace, useNaveyoBootstrap } from '../../src/bootstrap';
 import type { TripWorkspace } from '../../src/bootstrap';
-import { SectionRoute } from './_components/SectionRoute';
+import { SectionRoute } from '../../src/ui/SectionRoute';
 
 export default function StopsRoute() {
   const bootstrap = useNaveyoBootstrap();

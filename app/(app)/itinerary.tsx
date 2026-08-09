@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { loadItineraryView, useNaveyoBootstrap } from '../../src/bootstrap';
 import type { ItineraryView } from '../../src/bootstrap';
-import { SectionRoute } from './_components/SectionRoute';
+import { SectionRoute } from '../../src/ui/SectionRoute';
 
 export default function ItineraryRoute() {
   const bootstrap = useNaveyoBootstrap();

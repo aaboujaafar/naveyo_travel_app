@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PendingShareImport } from "../src/adapters/apple-document-analysis";
-import { describeAnalysisFailure, recoverPendingImport } from "../app/(app)/imports/import-state";
+import { describeAnalysisFailure, recoverPendingImport } from "../src/modules/reservations/import-state";
 
 const pending = (status: PendingShareImport["status"]): PendingShareImport => ({
   id: "share-1",
