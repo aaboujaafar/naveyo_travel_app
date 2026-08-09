@@ -47,8 +47,11 @@ export async function loadPlacesView(
   const suggestions = await bootstrap.modules.tripAssistant.suggestPlaces({
     tripId: workspace.trip.id,
     stopId: stop.id,
-    candidates,
+    query: input.query,
     preferences: input.preferences,
+    stopName: stop.name,
+    countryCode: stop.countryCode,
+    timeZone: stop.timeZone,
   })
 
   return { trip: workspace.trip, stop, candidates, suggestions }

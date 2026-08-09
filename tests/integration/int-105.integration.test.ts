@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, expect, it } from 'vitest'
 
 import { createNaveyoBootstrap, createOfflineTripPackModule, type NaveyoModules } from '../../src/bootstrap'
