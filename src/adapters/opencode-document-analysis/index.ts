@@ -47,7 +47,11 @@ export function createOpenCodeDocumentAnalyzer(
           const message = typeof body.error === 'string' ? body.error : 'Remote document analysis failed'
           throw new Error(message)
         }
-        return parseReservationDraft(body.draft)
+        try {
+          return parseReservationDraft(body.draft)
+        } catch (error) {
+          throw new Error(`OpenCode returned an invalid reservation draft: ${error instanceof Error ? error.message : 'validation failed'}`)
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           throw new Error('Remote document analysis timed out')

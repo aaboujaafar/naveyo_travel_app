@@ -57,12 +57,25 @@ function outputText(value: unknown): string {
   const message = record(choices[0])?.message
   const content = record(message)?.content
   if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    const text = content.map((block) => {
+      const item = record(block)
+      return typeof item?.text === 'string' ? item.text : ''
+    }).join('')
+    if (text.trim()) return text
+  }
   throw new Error('invalid_provider_response')
 }
 
 function parseJsonOutput(value: string): unknown {
-  const cleaned = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-  try { return JSON.parse(cleaned) } catch { throw new Error('invalid_structured_output') }
+  const cleaned = value.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  try { return JSON.parse(cleaned) } catch { /* Try the first complete JSON object below. */ }
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)) } catch { /* Fall through to the stable provider error. */ }
+  }
+  throw new Error('invalid_structured_output')
 }
 
 Deno.serve(async (request) => {

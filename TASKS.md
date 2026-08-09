@@ -4,6 +4,15 @@ Date de cadrage : 28 juillet 2026.
 
 Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au début de septembre 2026.
 
+## Audit de la vague 4 — 9 août 2026
+
+- `RSV-001` est `IN_PROGRESS` : Share Extension iOS, App Group, association au Voyage, persistance et centre d’imports sont intégrés. Le parsing est exclusivement confié à OpenCode Go ; l’extraction locale ne produit plus de brouillon. Il reste le test appareil complet et la validation d’une réservation réelle.
+- `OCR-001` est `IN_PROGRESS` : le Module Swift extrait le texte PDF/OCR localement et transmet uniquement ce texte à l’Edge Function `document-analysis`, qui appelle OpenCode Go. Il reste la validation Xcode/iPhone et les fixtures réelles.
+- `SPI-002` est `IN_PROGRESS` : la cible `NaveyoShare`, les entitlements App Group et la réception PDF/image/texte/URL sont générés. Il reste à valider les sources Mail/Fichiers/Photos sur l’iPhone.
+- Les imports partagés sont persistants et idempotents côté interface : `new`, `seen`, `processing`, `failed`, `confirmed`. Un import déjà vu ne redirige plus vers l’écran à chaque démarrage ; le centre d’imports reste accessible depuis le tableau de bord.
+- Correction de parsing : les champs optionnels `null` issus du pont natif sont traités comme absents. Une réponse OpenCode partiellement entourée de Markdown ou renvoyée en blocs texte est normalisée avant validation.
+- Validation locale après correction : `pnpm verify` passe avec 73 tests. La validation native finale exige encore une installation et un partage réel depuis Mail/Fichiers/Photos.
+
 ## Mode d'emploi
 
 - `AGENTS.md` contient les règles durables ; ce fichier contient le travail planifié.
@@ -199,7 +208,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | ARC-001 | P0 | DONE | 3 h | FND-001 | contrats et fixtures des Modules |
 | MOB-001 | P0 | IN_PROGRESS | 4 h | FND-001 | layouts, auth shell, `src/ui/` |
 | SPI-001 | P0-Gate | BLOCKED | 4 h | FND-001 | spike GPS et rapport |
-| SPI-002 | P0 | BLOCKED | 4 h | FND-001 | spike Share Extension et rapport |
+| SPI-002 | P0 | IN_PROGRESS | 4 h | FND-001 | spike Share Extension et rapport |
 | BCK-001 | P0 | IN_PROGRESS | 7 h | ARC-001 | `supabase/` fondation, schéma, RLS |
 | TRP-001 | P0 | DONE | 6 h | ARC-001, BCK-001, MOB-001 | identity/trips et routes associées |
 | OFF-001 | P0 | IN_PROGRESS | 5 h | ARC-001 | offline-trip-pack et SQLite |
@@ -208,9 +217,9 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | AI-001 | P0 | DONE | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
-| RSV-001 | P0 | TODO | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
+| RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
 | DOC-001 | P0 | TODO | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
-| OCR-001 | P0-Stretch | TODO | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et analyse locale |
+| OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
 | INT-001 | P0 | TODO | 4 h | fonctionnalités retenues | composition et tests d'intégration |
 | QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
@@ -340,7 +349,7 @@ Audit du 6 août 2026 : `expo-location`, `expo-task-manager` et `expo-file-syste
 ### SPI-002 — Spike Share Extension et import durable
 
 - Priorité : `P0`
-- État : `BLOCKED`
+- État : `IN_PROGRESS`
 - Timebox : 4 h
 - Dépendances : `FND-001`
 - Possède : `src/spikes/share-import/**`, `docs/spikes/share-import.md`, `plugins/withNaveyoDocuments.ts`
@@ -361,7 +370,9 @@ Acceptation :
 - fallback Fichiers/Photos démontré ;
 - aucun payload temporaire considéré comme persistant.
 
-Audit du 4 août 2026 : la validation runtime du manifeste et des entrées, ICS, les limites explicites, les URLs HTTP(S) sans scraping et six tests locaux sont intégrés. La vraie Share Extension, les entitlements App Group, les types reçus par source, le fallback Fichiers/Photos et la matrice iPhone/iOS restent non testés ; la tâche est donc toujours `BLOCKED` sur l'intégration native, les credentials et les appareils.
+Audit du 4 août 2026 : la validation runtime du manifeste et des entrées, ICS, les limites explicites, les URLs HTTP(S) sans scraping et six tests locaux sont intégrés. À cette date, la vraie Share Extension, les entitlements App Group, les types reçus par source, le fallback Fichiers/Photos et la matrice iPhone/iOS restaient non testés.
+
+Audit du 9 août 2026 : la cible native `NaveyoShare` et l’App Group sont maintenant générées par `withNaveyoDocuments`. Le payload est copié dans un manifeste persistant et le centre d’imports gère son cycle de vie. La validation appareil reste à faire ; l’état passe donc à `IN_PROGRESS`.
 
 ### BCK-001 — Fondation Supabase, schéma et RLS
 
@@ -563,7 +574,7 @@ Fallback si le gate échoue :
 ### RSV-001 — Partage entrant et brouillon de Réservation
 
 - Priorité : `P0`
-- État : `TODO`
+- État : `IN_PROGRESS`
 - Timebox : 7 h
 - Dépendances : `ARC-001`, `BCK-001`, `MOB-001`, `SPI-002`
 - Possède : implementation `reservations`, Adapter share intent, `app/(app)/imports/**`, `app/(app)/trips/[tripId]/reservations/**`
@@ -583,6 +594,8 @@ Acceptation :
 - une URL authentifiée n'est pas scrapée ;
 - le payload n'est effacé qu'après copie vérifiée ;
 - partage reçu hors ligne puis repris au retour réseau.
+
+Audit du 9 août 2026 : le partage entrant, l’association au Voyage, la persistance locale et le centre d’imports sont intégrés. OpenCode Go est le seul parseur ; PDFKit/Vision ne fournissent que le texte extrait. Les erreurs OpenCode passent en état `failed` et ne créent jamais de Réservation. Il reste à valider le parcours réel sur iPhone et à confirmer une Réservation issue de Mail.
 
 ### DOC-001 — Coffre de Documents privé et hors ligne
 
@@ -610,7 +623,7 @@ Acceptation :
 ### OCR-001 — Analyse locale PDFKit, Vision et DataDetection
 
 - Priorité : `P0-Stretch`
-- État : `TODO`
+- État : `IN_PROGRESS`
 - Timebox : 8 h
 - Dépendances : `ARC-001`, `SPI-002`, `PLS-001`
 - Possède : `modules/naveyo-documents/**`, `src/adapters/apple-document-analysis/**`, tests et fixtures OCR
@@ -621,7 +634,7 @@ Livrables :
 - extraction PDFKit lorsque du texte est embarqué ;
 - rendu et Vision OCR uniquement pour les pages sans texte exploitable ;
 - détection locale d'adresses, dates, montants et numéros de vol ;
-- production d'un `ReservationDraft` avec preuves et confiance ;
+- production du texte extrait et des preuves pour l’Edge Function ;
 - résolution des candidats via `PlacesProvider` au retour du réseau.
 
 Acceptation :
@@ -631,6 +644,8 @@ Acceptation :
 - `venue`, `meetingPoint`, `origin` et `destination` distingués ;
 - aucune donnée détectée confirmée automatiquement ;
 - document original non envoyé à un LLM.
+
+Audit du 9 août 2026 : l’API native `extractDocumentText` sépare désormais extraction et parsing. Le brouillon n’est plus produit localement ; le `ReservationDraft` vient exclusivement d’OpenCode Go après validation serveur et mobile. Il reste la compilation Xcode et le test sur des documents réels.
 
 ### INT-001 — Composition et parcours intégré
 
