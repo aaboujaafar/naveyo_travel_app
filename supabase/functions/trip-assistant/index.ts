@@ -96,7 +96,7 @@ Deno.serve(async (request) => {
     if (tripResult.error || !tripResult.data || stopResult.error || !stopResult.data) return json({ error: 'trip_context_not_found' }, 404)
     if (placesResult.error) return json({ error: 'places_lookup_failed' }, 503)
     const candidates = (Array.isArray(placesResult.data) ? placesResult.data : []).map((row) => mapCandidate(row as Row)).filter((row): row is Candidate => row !== null).slice(0, MAX_CANDIDATES)
-    if (candidates.length === 0) return json({ drafts: [] })
+    if (candidates.length === 0) return json({ drafts: [], trip: tripResult.data, stop: stopResult.data })
 
     const apiKey = Deno.env.get('OPENCODE_GO_API_KEY')
     if (!apiKey) return json({ error: 'assistant_provider_unavailable' }, 503)
@@ -128,7 +128,7 @@ Deno.serve(async (request) => {
       const saved = await authenticated.client.from('trip_suggestion_drafts').insert(drafts)
       if (saved.error) return json({ error: 'suggestions_persistence_failed' }, 503)
     }
-    return json({ drafts: suggestions.map((suggestion, index) => ({ id: drafts[index]?.id ?? crypto.randomUUID(), tripId: input.tripId, stopId: input.stopId, ...suggestion, createdAt })) })
+    return json({ drafts: suggestions.map((suggestion, index) => ({ id: drafts[index]?.id ?? crypto.randomUUID(), tripId: input.tripId, stopId: input.stopId, ...suggestion, createdAt })), trip: tripResult.data, stop: stopResult.data })
   } catch (error) {
     if (error instanceof Response) return error
     if (error instanceof DOMException && error.name === 'AbortError') return json({ error: 'assistant_timeout' }, 408)

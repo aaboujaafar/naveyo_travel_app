@@ -1,7 +1,24 @@
 import type { SuggestionDraft, SuggestPlacesInput, TripAssistant } from '../../../modules/trip-assistant'
 import type { SupabaseClientLike } from '../identity/client'
 
-type ResponseBody = { drafts?: SuggestionDraft[]; error?: string; message?: string }
+type ResponseBody = {
+  drafts?: SuggestionDraft[]
+  error?: string
+  message?: string
+  trip?: Record<string, unknown>
+  stop?: Record<string, unknown>
+}
+
+export type TripAssistantDebugContext = {
+  trip: Record<string, unknown> | null
+  stop: Record<string, unknown> | null
+}
+
+let lastDebugContext: TripAssistantDebugContext = { trip: null, stop: null }
+
+export function getLastTripAssistantDebugContext(): TripAssistantDebugContext {
+  return lastDebugContext
+}
 
 export function createSupabaseTripAssistant(
   client: SupabaseClientLike,
@@ -28,6 +45,10 @@ export function createSupabaseTripAssistant(
         body = JSON.parse(rawBody) as ResponseBody
       } catch {
         throw new Error(`Suggestions service returned ${response.status}`)
+      }
+      lastDebugContext = {
+        trip: body.trip ?? null,
+        stop: body.stop ?? null,
       }
       if (!response.ok) {
         throw new Error(body.error ?? body.message ?? `Suggestions service returned ${response.status}`)

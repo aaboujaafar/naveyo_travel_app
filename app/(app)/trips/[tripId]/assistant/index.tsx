@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Badge, Button, Card, Input, ScreenNote, ShellFrame, StatusPanel } from "../../../../../src/ui";
 import { useTripAssistant } from "../../../../../src/modules/trip-assistant";
 import type { SuggestionDraft } from "../../../../../src/modules/trip-assistant";
+import { getLastTripAssistantDebugContext } from "../../../../../src/adapters/supabase/trip-assistant";
 import type { Stop, Trip, UUID } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { colors } from "../../../../../src/theme/colors";
@@ -24,6 +25,7 @@ export default function TripAssistantScreen() {
   const [debugResponse, setDebugResponse] = useState<string | null>(null);
   const [debugTrip, setDebugTrip] = useState<Trip | null>(null);
   const [debugStop, setDebugStop] = useState<Stop | null>(null);
+  const [debugServerContext, setDebugServerContext] = useState(getLastTripAssistantDebugContext());
 
   useEffect(() => {
     if (!trips || !tripId || !stopId) return;
@@ -62,6 +64,7 @@ export default function TripAssistantScreen() {
     try {
       const result = await assistant.suggestPlaces(requestPayload);
       setDrafts(result);
+      setDebugServerContext(getLastTripAssistantDebugContext());
       setDebugResponse(JSON.stringify(result, null, 2));
     } catch (cause: unknown) {
       const message = cause instanceof Error ? cause.message : "Suggestions indisponibles";
@@ -118,6 +121,8 @@ export default function TripAssistantScreen() {
         <Text selectable style={styles.debugText}>{debugResponse ?? "Aucun retour reçu"}</Text>
         <Text style={styles.debugLabel}>Contexte Trip / Stop chargé par l’app</Text>
         <Text selectable style={styles.debugText}>{JSON.stringify({ trip: debugTrip, stop: debugStop }, null, 2)}</Text>
+        <Text style={styles.debugLabel}>Contexte Trip / Stop trouvé par l’Edge Function</Text>
+        <Text selectable style={styles.debugText}>{JSON.stringify(debugServerContext, null, 2)}</Text>
       </Card>
       <Button fullWidth variant="secondary" onPress={() => router.back()}>Retour à l’Étape</Button>
     </ShellFrame>
