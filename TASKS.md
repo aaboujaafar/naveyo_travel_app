@@ -12,6 +12,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 - Les imports partagés sont persistants et idempotents côté interface : `new`, `seen`, `processing`, `failed`, `confirmed`. Un import déjà vu ne redirige plus vers l’écran à chaque démarrage ; le centre d’imports reste accessible depuis le tableau de bord.
 - Correction de parsing : les champs optionnels `null` issus du pont natif sont traités comme absents. Une réponse OpenCode partiellement entourée de Markdown ou renvoyée en blocs texte est normalisée avant validation.
 - Validation locale après correction : `pnpm verify` passe avec 73 tests. La validation native finale exige encore une installation et un partage réel depuis Mail/Fichiers/Photos.
+- Décision utilisateur du 9 août 2026 : `DOC-001` est mis en standby. Il reste planifié mais ne bloque pas la finalisation de la vague 4 ; `INT-001`, `QA-001` et `REL-001` ne pourront toutefois pas être clôturées avec le périmètre Documents complet tant que cette tâche restera en standby.
 
 ## Mode d'emploi
 
@@ -218,7 +219,7 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
-| DOC-001 | P0 | TODO | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
+| DOC-001 | P0 | TODO (STANDBY) | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
 | INT-001 | P0 | TODO | 4 h | fonctionnalités retenues | composition et tests d'intégration |
 | QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
@@ -449,7 +450,7 @@ Audit du 4 août 2026 : le module, le seam SQLite, les fakes, le staging/activat
 ### PLS-001 — Recherche et résolution de lieux
 
 - Priorité : `P0`
-- État : `TODO`
+- État : `TODO (STANDBY — décision utilisateur du 9 août 2026)`
 - Timebox : 6 h
 - Dépendances : `ARC-001`, `MOB-001`
 - Possède : implementation `places`, `src/adapters/geoapify/**`, `supabase/functions/places-search/**`, `app/(app)/places/**`
