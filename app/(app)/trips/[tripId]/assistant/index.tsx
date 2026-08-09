@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Badge, Button, Card, Input, ScreenNote, ShellFrame, StatusPanel } from "../../../../../src/ui";
 import { useTripAssistant } from "../../../../../src/modules/trip-assistant";
 import type { SuggestionDraft } from "../../../../../src/modules/trip-assistant";
-import type { UUID } from "../../../../../src/modules/_shared/model";
+import type { Stop, Trip, UUID } from "../../../../../src/modules/_shared/model";
+import { useTripsModule } from "../../../../../src/modules/trips";
 import { colors } from "../../../../../src/theme/colors";
 import { spacing } from "../../../../../src/theme/spacing";
 import { typography } from "../../../../../src/theme/typography";
@@ -13,6 +14,7 @@ export default function TripAssistantScreen() {
   const router = useRouter();
   const { tripId, stopId } = useLocalSearchParams<{ tripId: string; stopId: string }>();
   const assistant = useTripAssistant();
+  const trips = useTripsModule();
   const [query, setQuery] = useState("restaurant, musée, balade...");
   const [preferences, setPreferences] = useState("");
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
@@ -20,6 +22,30 @@ export default function TripAssistantScreen() {
   const [loading, setLoading] = useState(false);
   const [debugRequest, setDebugRequest] = useState<string | null>(null);
   const [debugResponse, setDebugResponse] = useState<string | null>(null);
+  const [debugTrip, setDebugTrip] = useState<Trip | null>(null);
+  const [debugStop, setDebugStop] = useState<Stop | null>(null);
+
+  useEffect(() => {
+    if (!trips || !tripId || !stopId) return;
+    let mounted = true;
+    void Promise.all([
+      trips.get(tripId as UUID),
+      trips.listStops(tripId as UUID),
+    ])
+      .then(([trip, stops]) => {
+        if (!mounted) return;
+        setDebugTrip(trip);
+        setDebugStop(stops.find((stop) => stop.id === stopId) ?? null);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setDebugTrip(null);
+        setDebugStop(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [stopId, tripId, trips]);
 
   const discover = async () => {
     if (!assistant || !tripId || !stopId) return;
@@ -90,6 +116,8 @@ export default function TripAssistantScreen() {
         <Text selectable style={styles.debugText}>{debugRequest ?? "Aucune requête envoyée"}</Text>
         <Text style={styles.debugLabel}>Retour reçu</Text>
         <Text selectable style={styles.debugText}>{debugResponse ?? "Aucun retour reçu"}</Text>
+        <Text style={styles.debugLabel}>Contexte Trip / Stop chargé par l’app</Text>
+        <Text selectable style={styles.debugText}>{JSON.stringify({ trip: debugTrip, stop: debugStop }, null, 2)}</Text>
       </Card>
       <Button fullWidth variant="secondary" onPress={() => router.back()}>Retour à l’Étape</Button>
     </ShellFrame>
