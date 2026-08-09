@@ -21,6 +21,7 @@ import { createSupabaseClient } from "../../../src/bootstrap/supabase";
 import { colors } from "../../../src/theme/colors";
 import { spacing } from "../../../src/theme/spacing";
 import { typography } from "../../../src/theme/typography";
+import { selectPendingImport } from "./import-selection";
 
 export default function ReservationImportScreen() {
   const router = useRouter();
@@ -69,7 +70,7 @@ export default function ReservationImportScreen() {
     });
   }, [pendingId, pendingImports, tripId]);
 
-  const activePending = pendingImports.find((item) => item.status !== "confirmed");
+  const activePending = selectPendingImport(pendingImports, pendingId);
 
   async function analyze() {
     if (!tripId) {
@@ -84,7 +85,11 @@ export default function ReservationImportScreen() {
     setResult(null);
     setIsAnalyzing(true);
     try {
-      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "processing");
+      if (pendingId) {
+        const inbox = createAppleShareInbox();
+        await inbox.updateStatus(pendingId, "processing");
+        await inbox.list().then(setPendingImports);
+      }
       let draft: ReservationDraft;
       if (selectedSource) {
         const extractedText = await createAppleDocumentTextExtractor().extract(selectedSource.uri);
@@ -112,7 +117,15 @@ export default function ReservationImportScreen() {
         setResult(next);
       }
     } catch (cause: unknown) {
-      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "failed", cause instanceof Error ? cause.message : "Analyse OpenCode impossible");
+      if (pendingId) {
+        const inbox = createAppleShareInbox();
+        try {
+          await inbox.updateStatus(pendingId, "failed", cause instanceof Error ? cause.message : "Analyse OpenCode impossible");
+          await inbox.list().then(setPendingImports);
+        } catch {
+          // Preserve the analysis error when the native inbox cannot update its status.
+        }
+      }
       setError(cause instanceof Error ? `Analyse OpenCode impossible : ${cause.message}` : "Analyse OpenCode impossible");
     } finally {
       setIsAnalyzing(false);
@@ -148,7 +161,15 @@ export default function ReservationImportScreen() {
         draft,
         confirmedFields: draft.fieldsRequiringConfirmation,
       });
-      if (pendingId) await createAppleShareInbox().updateStatus(pendingId, "confirmed");
+      if (pendingId) {
+        const inbox = createAppleShareInbox();
+        try {
+          await inbox.updateStatus(pendingId, "confirmed");
+          await inbox.list().then(setPendingImports);
+        } catch {
+          // The reservation is already persisted; status refresh can be retried from the center.
+        }
+      }
       router.replace(`/(app)/trips/${tripId}/reservations`);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Enregistrement impossible");
@@ -181,10 +202,10 @@ export default function ReservationImportScreen() {
           router.replace(pending ? `/(app)/imports?tripId=${selectedTripId}&pendingId=${pending.id}` : `/(app)/imports?tripId=${selectedTripId}`);
         }} /> : null}
         {tripId ? <>
-        <Badge label="FALLBACK LOCAL" variant="gold" />
+        <Badge label="ANALYSE OPENCODE" variant="teal" />
         <Text style={styles.cardTitle}>Coller une confirmation</Text>
         <Text style={styles.cardMessage}>
-          Choisissez un PDF ou une image pour l’analyse locale, ou utilisez le fallback texte.
+          Le texte est extrait localement si nécessaire, puis analysé par OpenCode avant confirmation.
         </Text>
         <Button fullWidth variant="secondary" onPress={() => void chooseDocument()}>
           Choisir un PDF ou une image
@@ -207,7 +228,11 @@ export default function ReservationImportScreen() {
         </> : null}
       </Card>
 
-      <ImportCenter items={pendingImports} />
+      <ImportCenter
+        items={pendingImports}
+        tripId={tripId}
+        onSelect={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
+      />
 
       {error ? <StatusPanel kind="error" title="Import impossible" message={error} /> : null}
       {result?.state === "error" ? (
@@ -233,14 +258,28 @@ export default function ReservationImportScreen() {
   );
 }
 
-function ImportCenter({ items }: { items: PendingShareImport[] }) {
+function ImportCenter({
+  items,
+  tripId,
+  onSelect,
+}: {
+  items: PendingShareImport[];
+  tripId?: UUID;
+  onSelect: (id: string) => void;
+}) {
   if (items.length === 0) return null;
   return <Card style={styles.card}>
     <Badge label="CENTRE D’IMPORT" variant="gold" />
     <Text style={styles.cardTitle}>Documents partagés</Text>
-    {items.map((item) => <Text key={item.id} style={styles.detail}>
-      {item.fileName ?? "Texte partagé"} · {item.status === "confirmed" ? "traité" : item.status === "failed" ? "échec" : item.status === "processing" ? "en analyse" : "à traiter"}
-    </Text>)}
+    {items.map((item) => <Card key={item.id} style={styles.importItem}>
+      <Text style={styles.detail}>
+        {item.fileName ?? "Texte partagé"} · {item.status === "confirmed" ? "traité" : item.status === "failed" ? "échec" : item.status === "processing" ? "en analyse" : "à traiter"}
+      </Text>
+      {item.status !== "confirmed" ? <Button size="sm" variant="secondary" onPress={() => onSelect(item.id)}>
+        {tripId ? "Analyser cet import" : "Associer ce document"}
+      </Button> : null}
+      {item.error ? <Text style={styles.errorDetail}>{item.error}</Text> : null}
+    </Card>)}
   </Card>;
 }
 
@@ -287,4 +326,6 @@ const styles = StyleSheet.create({
   detail: { ...typography.bodySmall, color: colors.fg },
   confirmationLabel: { ...typography.caption, color: colors.accent },
   selectedFile: { ...typography.caption, color: colors.teal },
+  importItem: { padding: spacing.sm, gap: spacing.xs },
+  errorDetail: { ...typography.caption, color: colors.accent },
 });
