@@ -24,6 +24,16 @@ Le spike ne peut pas valider honnêtement le comportement GPS de bout en bout da
 - l’écran Trace de trajet permet le démarrage et l’arrêt explicites sur appareil ;
 - les tests locaux couvrent le rapport, la fusion des modes de fond et les valeurs du `Info.plist`.
 
+## Échantillonnage adaptatif — GPS-002
+
+La tâche native conserve une configuration stable pendant toute la session. Elle utilise une précision élevée avec un seuil natif de 20 m, la pause automatique iOS et la livraison différée en arrière-plan. Elle n'est ni arrêtée ni réenregistrée à chaque point.
+
+Un moteur déterministe et persistant classe les mesures en `STATIONARY`, `WALKING` ou `FAST_MOVING` à partir de la vitesse fournie, ou d'une vitesse dérivée de la distance et du temps lorsque la vitesse est absente. Trois mesures soutenues pendant au moins 15 secondes confirment un mouvement. Le retour à l'arrêt exige quatre mesures sur au moins deux minutes.
+
+Les points conservés visent environ 25 m à pied et 75 m en déplacement rapide. À l'arrêt, seuls un déplacement significatif ou un point de présence après 15 minutes sont conservés. Les mesures imprécises au-delà de 75 m et les horodatages non croissants sont ignorés.
+
+Cette stratégie doit encore être validée sur appareil pendant une journée représentative. Le rapport final doit comparer fidélité visuelle, nombre de points et consommation de batterie ; les options natives réduisent théoriquement l'activité en arrière-plan, mais aucun gain chiffré ne sera affirmé sans mesure réelle.
+
 ## Matrice de scénario
 
 Les scénarios suivants restent non exécutés ici :

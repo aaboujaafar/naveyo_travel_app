@@ -3,6 +3,7 @@ import type { LocationObject } from "expo-location";
 import type { UUID } from "../../modules/_shared/model";
 import {
   appendUniquePoint,
+  makeLocationObservation,
   makeTrackPoint,
   parseStoredTrackingState,
 } from "./normalize";
@@ -31,6 +32,24 @@ describe("Expo location normalization", () => {
       recordedAt: "2025-07-31T22:13:20.000Z",
       accuracyMeters: 8,
     });
+  });
+
+  it("normalizes the provider speed for adaptive tracking", () => {
+    expect(makeLocationObservation(location)).toEqual({
+      latitude: 48.8566,
+      longitude: 2.3522,
+      recordedAtMs: 1_754_000_000_000,
+      accuracyMeters: 8,
+      speedMetersPerSecond: 1,
+    });
+    expect(makeLocationObservation({
+      ...location,
+      coords: { ...location.coords, speed: -1 },
+    })).not.toHaveProperty("speedMetersPerSecond");
+    expect(makeLocationObservation({
+      ...location,
+      coords: { ...location.coords, accuracy: null },
+    }).accuracyMeters).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("keeps a retry idempotent", () => {
@@ -62,5 +81,6 @@ describe("Expo location normalization", () => {
       tripId,
     );
     expect(state.points).toHaveLength(1);
+    expect(state.adaptive).toEqual({ mode: "STATIONARY", candidateCount: 0 });
   });
 });

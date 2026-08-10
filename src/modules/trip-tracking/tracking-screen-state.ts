@@ -15,7 +15,7 @@ export function trackingStatusTitle(status: TrackingStatus): string {
 
 export function trackingStatusMessage(status: TrackingStatus): string {
   if (status.state === "recording")
-    return "Les points sont enregistrés localement sur cet iPhone.";
+    return "Les points sont enregistrés localement avec une fréquence adaptée au mouvement.";
   if (status.state === "error")
     return status.message ?? "Le suivi n’a pas pu démarrer.";
   if (status.state === "starting") return "Vérification des autorisations iOS…";
