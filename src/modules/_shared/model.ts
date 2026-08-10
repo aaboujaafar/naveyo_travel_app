@@ -138,6 +138,7 @@ export interface TravelDocument {
   storagePath?: string;
   persistentUri: string;
   checksum: string;
+  stopId?: UUID;
   reservationId?: UUID;
   createdAt: ISODateTime;
 }

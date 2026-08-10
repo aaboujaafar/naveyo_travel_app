@@ -10,7 +10,9 @@ export interface SupabaseQuery<T = unknown>
     values: Record<string, unknown> | Record<string, unknown>[],
   ): SupabaseQuery<T>;
   update(values: Record<string, unknown>): SupabaseQuery<T>;
+  delete?(): SupabaseQuery<T>;
   eq(column: string, value: string): SupabaseQuery<T>;
+  is?(column: string, value: null): SupabaseQuery<T>;
   order(column: string, options?: { ascending?: boolean }): SupabaseQuery<T>;
   single(): SupabaseQuery<T>;
 }

@@ -65,18 +65,29 @@ const mapDocument = (row: Row) => {
     storagePath,
     persistentUri: `supabase://trip-documents/${storagePath}`,
     checksum: typeof row.checksum === 'string' ? row.checksum : '',
+    stopId: typeof row.stop_id === 'string' ? row.stop_id as UUID : undefined,
     reservationId: typeof row.reservation_id === 'string' ? row.reservation_id as UUID : undefined,
     createdAt: text(row, 'created_at') as ISODateTime,
   }
 }
 
+const documentColumns = 'id,trip_id,stop_id,reservation_id,storage_path,mime_type,byte_size,checksum,original_filename,created_at'
+
 const createStore = (client: SupabaseDocumentsClientLike): DocumentsStore => ({
-  async list(tripId) {
-    const data = await query(client.from('travel_documents').select('id,trip_id,reservation_id,storage_path,mime_type,byte_size,checksum,original_filename,created_at').eq('trip_id', tripId).order('created_at', { ascending: false }))
+  async list(tripId, stopId) {
+    let request = client.from('travel_documents').select(documentColumns).eq('trip_id', tripId)
+    if (stopId !== undefined) request = request.eq('stop_id', stopId)
+    const data = await query(request.order('created_at', { ascending: false }))
+    return asRows(data).map(mapDocument)
+  },
+  async listUnclassified(tripId) {
+    const request = client.from('travel_documents').select(documentColumns).eq('trip_id', tripId)
+    if (!request.is) throw new Error('Supabase null filtering is unavailable')
+    const data = await query(request.is('stop_id', null).order('created_at', { ascending: false }))
     return asRows(data).map(mapDocument)
   },
   async get(tripId, documentId) {
-    const data = await query(client.from('travel_documents').select('id,trip_id,reservation_id,storage_path,mime_type,byte_size,checksum,original_filename,created_at').eq('trip_id', tripId).eq('id', documentId))
+    const data = await query(client.from('travel_documents').select(documentColumns).eq('trip_id', tripId).eq('id', documentId))
     const row = asRows(data)[0]
     return row === undefined ? null : mapDocument(row)
   },
@@ -84,14 +95,30 @@ const createStore = (client: SupabaseDocumentsClientLike): DocumentsStore => ({
     const data = await query(client.from('travel_documents').insert({
       id: document.id,
       trip_id: document.tripId,
+      stop_id: document.stopId ?? null,
       reservation_id: document.reservationId ?? null,
       storage_path: document.storagePath,
       mime_type: document.mimeType,
       byte_size: document.byteSize,
       checksum: document.checksum,
       original_filename: document.fileName ?? null,
-    }).select('id,trip_id,reservation_id,storage_path,mime_type,byte_size,checksum,original_filename,created_at').single())
+    }).select(documentColumns).single())
     if (!data) throw new Error('Supabase did not return the saved document')
+  },
+  async update(document) {
+    const data = await query(client.from('travel_documents').update({ stop_id: document.stopId ?? null }).eq('trip_id', document.tripId).eq('id', document.id).select(documentColumns).single())
+    if (!data) throw new Error('Supabase did not return the updated document')
+    return mapDocument(asRows([data])[0] ?? {})
+  },
+  async remove(tripId, documentId) {
+    const table = client.from('travel_documents')
+    if (!table.delete) throw new Error('Supabase document removal is unavailable')
+    const result = table.delete().eq('trip_id', tripId).eq('id', documentId)
+    await query(result)
+  },
+  async hasStop(tripId, stopId) {
+    const data = await query(client.from('stops').select('id').eq('trip_id', tripId).eq('id', stopId).single())
+    return data !== null
   },
 })
 

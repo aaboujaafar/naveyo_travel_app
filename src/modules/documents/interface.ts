@@ -6,6 +6,7 @@ export interface AddDocumentInput {
   tripId: UUID;
   kind: DocumentKind;
   fileName?: string;
+  stopId?: UUID;
   reservationId?: UUID;
   mimeType: string;
   byteSize: number;
@@ -31,13 +32,20 @@ export interface DocumentStorage {
 }
 
 export interface DocumentsStore {
-  list(tripId: UUID): Promise<TravelDocument[]>;
+  list(tripId: UUID, stopId?: UUID): Promise<TravelDocument[]>;
   get(tripId: UUID, documentId: UUID): Promise<TravelDocument | null>;
   save(document: TravelDocument): Promise<void>;
+  update?(document: TravelDocument): Promise<TravelDocument>;
+  remove?(tripId: UUID, documentId: UUID): Promise<void>;
+  hasStop?(tripId: UUID, stopId: UUID): Promise<boolean>;
+  listUnclassified?(tripId: UUID): Promise<TravelDocument[]>;
 }
 
 export interface DocumentsModule {
-  list(tripId: UUID): Promise<TravelDocument[]>;
+  list(tripId: UUID, stopId?: UUID): Promise<TravelDocument[]>;
+  listUnclassified?(tripId: UUID): Promise<TravelDocument[]>;
   add(input: AddDocumentInput): Promise<TravelDocument>;
+  assign?(tripId: UUID, documentId: UUID, stopId?: UUID): Promise<TravelDocument>;
+  remove?(tripId: UUID, documentId: UUID): Promise<void>;
   download(tripId: UUID, documentId: UUID): Promise<DownloadedDocumentFile>;
 }

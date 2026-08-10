@@ -491,6 +491,8 @@ export const parseTravelDocument = (value: unknown): TravelDocument => {
     candidate.storagePath,
     "document storagePath",
   );
+  if (candidate.stopId !== undefined)
+    result.stopId = uuidValue(candidate.stopId, "document stopId");
   if (
     candidate.byteSize !== undefined &&
     (typeof candidate.byteSize !== "number" ||
@@ -660,6 +662,16 @@ export const parseTripPack = (value: unknown): TripPack => {
     documents.map((item) => item.id),
     "trip pack document ids",
   );
+  const stopIds = new Set(stops.map((item) => item.id));
+  const reservationsById = new Map(reservations.map((item) => [item.id, item]));
+  for (const document of documents) {
+    if (document.stopId !== undefined && !stopIds.has(document.stopId))
+      throw new Error("Trip pack document references another trip stop");
+    if (document.reservationId !== undefined) {
+      const reservation = reservationsById.get(document.reservationId);
+      if (!reservation) throw new Error("Trip pack document references an unknown reservation");
+    }
+  }
   parseUniqueIds(
     expenses.map((item) => item.id),
     "trip pack expense ids",

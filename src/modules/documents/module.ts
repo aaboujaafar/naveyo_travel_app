@@ -1,6 +1,6 @@
 import { AuthorizationError } from '../trips'
 import { isUuid } from '../_shared/validation'
-import type { ISODateTime, UUID } from '../_shared/model'
+import type { ISODateTime, TravelDocument, UUID } from '../_shared/model'
 import type { AddDocumentInput, DocumentStorage, DocumentsModule, DocumentsStore, DownloadedDocumentFile } from './interface'
 import { documentMimeTypes } from './model'
 
@@ -28,13 +28,20 @@ export class Documents implements DocumentsModule {
     private readonly storage: DocumentStorage,
   ) {}
 
-  async list(tripId: UUID) {
+  async list(tripId: UUID, stopId?: UUID) {
     assertTripId(tripId)
-    return this.store.list(tripId)
+    if (stopId !== undefined && !isUuid(stopId)) throw new Error('Invalid stop id')
+    return this.store.list(tripId, stopId)
+  }
+
+  async listUnclassified(tripId: UUID): Promise<TravelDocument[]> {
+    assertTripId(tripId)
+    if (!this.store.listUnclassified) return (await this.store.list(tripId)).filter((document) => document.stopId === undefined)
+    return this.store.listUnclassified(tripId)
   }
 
   async add(input: AddDocumentInput) {
-    this.assertInput(input)
+    await this.assertInput(input)
     const documentId = makeId()
     const storagePath = `${input.tripId}/${documentId}/${input.kind}-${safeFileName(input.fileName)}`
     const stored = await this.storage.upload({
@@ -54,6 +61,7 @@ export class Documents implements DocumentsModule {
       storagePath: stored.storagePath,
       persistentUri: stored.persistentUri,
       checksum: stored.checksum,
+      stopId: input.stopId,
       reservationId: input.reservationId,
       createdAt: new Date().toISOString() as ISODateTime,
     }
@@ -66,6 +74,29 @@ export class Documents implements DocumentsModule {
     }
   }
 
+  async assign(tripId: UUID, documentId: UUID, stopId?: UUID): Promise<TravelDocument> {
+    assertTripId(tripId)
+    if (!isUuid(documentId)) throw new Error('Invalid document id')
+    if (stopId !== undefined) {
+      if (!isUuid(stopId)) throw new Error('Invalid stop id')
+      if (this.store.hasStop && !(await this.store.hasStop(tripId, stopId))) throw new Error('Document stop does not belong to this trip')
+    }
+    const document = await this.store.get(tripId, documentId)
+    if (!document) throw new AuthorizationError('Document is not available for this trip')
+    if (!this.store.update) throw new Error('Document association is not supported by this store')
+    return this.store.update({ ...document, stopId })
+  }
+
+  async remove(tripId: UUID, documentId: UUID): Promise<void> {
+    assertTripId(tripId)
+    if (!isUuid(documentId)) throw new Error('Invalid document id')
+    const document = await this.store.get(tripId, documentId)
+    if (!document) throw new AuthorizationError('Document is not available for this trip')
+    if (!this.store.remove) throw new Error('Document removal is not supported by this store')
+    await this.store.remove(tripId, documentId)
+    if (document.storagePath !== undefined) await this.storage.remove(document.storagePath)
+  }
+
   async download(tripId: UUID, documentId: UUID): Promise<DownloadedDocumentFile> {
     assertTripId(tripId)
     if (!isUuid(documentId)) throw new Error('Invalid document id')
@@ -75,13 +106,15 @@ export class Documents implements DocumentsModule {
     return this.storage.download(document.storagePath, document.fileName)
   }
 
-  private assertInput(input: AddDocumentInput): void {
+  private async assertInput(input: AddDocumentInput): Promise<void> {
     assertTripId(input.tripId)
     if (!allowedKinds.has(input.kind)) throw new Error('Invalid document kind')
     if (input.mimeType !== documentMimeTypes[input.kind]) throw new Error('Invalid document mime type')
     if (!Number.isSafeInteger(input.byteSize) || input.byteSize <= 0 || input.byteSize > maxDocumentBytes) throw new Error('Invalid document size')
     if (!input.checksum.trim()) throw new Error('Document checksum is required')
     if (input.reservationId !== undefined && !isUuid(input.reservationId)) throw new Error('Invalid reservation id')
+    if (input.stopId !== undefined && !isUuid(input.stopId)) throw new Error('Invalid stop id')
+    if (input.stopId !== undefined && this.store.hasStop && !(await this.store.hasStop(input.tripId, input.stopId))) throw new Error('Document stop does not belong to this trip')
   }
 }
 

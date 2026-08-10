@@ -28,6 +28,9 @@ class FakeStore implements DocumentsStore {
   async list(id: UUID) { return this.documents.filter((document) => document.tripId === id) }
   async get(trip: UUID, id: UUID) { return this.documents.find((document) => document.tripId === trip && document.id === id) ?? null }
   async save(document: TravelDocument) { if (this.failSave) throw new Error('metadata unavailable'); this.documents.push(document) }
+  async update(document: TravelDocument) { const index = this.documents.findIndex((item) => item.id === document.id); if (index < 0) throw new Error('missing'); this.documents[index] = document; return document }
+  async remove(_trip: UUID, id: UUID) { this.documents = this.documents.filter((document) => document.id !== id) }
+  async hasStop(_trip: UUID, stop: UUID) { return stop === '40000000-0000-4000-8000-000000000004' }
 }
 
 class FakeStorage implements DocumentStorage {
@@ -69,10 +72,31 @@ describe('DOC-001 documents module', () => {
     await expect(new Documents(new FakeStore(), storage).add({ ...input(), byteSize: 25 * 1024 * 1024 + 1 })).rejects.toThrow('size')
     expect(upload).not.toHaveBeenCalled()
   })
+
+  it('keeps an unclassified document movable and rejects a stop from another trip', async () => {
+    const store = new FakeStore()
+    const module = new Documents(store, new FakeStorage())
+    const document = await module.add(input())
+    expect(document.stopId).toBeUndefined()
+    const stopId = '40000000-0000-4000-8000-000000000004' as UUID
+    await expect(module.assign(tripId, document.id, stopId)).resolves.toMatchObject({ stopId })
+    await expect(module.assign(tripId, document.id, '50000000-0000-4000-8000-000000000005' as UUID)).rejects.toThrow('does not belong')
+    await expect(module.assign(tripId, document.id)).resolves.toMatchObject({ stopId: undefined })
+  })
+
+  it('removes metadata and private storage for a document in the same trip', async () => {
+    const store = new FakeStore()
+    const storage = new FakeStorage()
+    const module = new Documents(store, storage)
+    const document = await module.add(input())
+    await module.remove(tripId, document.id)
+    await expect(module.list(tripId)).resolves.toHaveLength(0)
+    expect(storage.removed).toContain(document.storagePath)
+  })
 })
 
 describe('DOC-001 Supabase private storage adapter', () => {
-  const row = { id: documentId, trip_id: tripId, reservation_id: null, storage_path: `${tripId}/${documentId}/pdf-pass.pdf`, mime_type: 'application/pdf', byte_size: 3, checksum: 'sha256:fixture', original_filename: 'pass.pdf', created_at: '2026-08-06T10:00:00.000Z' }
+  const row = { id: documentId, trip_id: tripId, stop_id: null, reservation_id: null, storage_path: `${tripId}/${documentId}/pdf-pass.pdf`, mime_type: 'application/pdf', byte_size: 3, checksum: 'sha256:fixture', original_filename: 'pass.pdf', created_at: '2026-08-06T10:00:00.000Z' }
 
   it('maps member metadata and downloads through storage without signed or public URLs', async () => {
     const download = vi.fn(async () => ({ data: new Blob(['pdf']), error: null }))
