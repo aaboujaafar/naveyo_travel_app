@@ -17,6 +17,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 - Correction de parsing : les champs optionnels `null` issus du pont natif sont traités comme absents. Une réponse OpenCode partiellement entourée de Markdown ou renvoyée en blocs texte est normalisée avant validation.
 - Validation locale après correction : `pnpm verify` passe avec 73 tests. La validation native finale exige encore une installation et un partage réel depuis Mail/Fichiers/Photos.
 - Décision utilisateur du 10 août 2026 : `DOC-001` est réactivé avec une timebox de 8 h. Chaque Document de voyage peut être associé à zéro ou une Étape, déplacé ultérieurement et rester visible sous « Non classés ». Lorsqu'il est lié à une Réservation, il utilise la même Étape que celle-ci. `DOC-001` redevient une dépendance de l'intégration avant `QA-001` et `REL-001`.
+- Décision utilisateur du 10 août 2026 : une vague UI dédiée est ajoutée après `INT-001` et avant la QA. `UI-001` appliquera sans interprétation libre le dossier template qui sera désigné par l'utilisateur. La tâche reste `BLOCKED` jusqu'à la fourniture de ce chemin et à l'inventaire complet de la spécification, des maquettes HTML, de la bibliothèque de composants, des icônes et des styles.
 
 ## Mode d'emploi
 
@@ -54,6 +55,7 @@ Chaque tâche possède sa branche. Les agents y créent de petits commits locaux
 | DOC-001 | `doc-001-private-documents` |
 | OCR-001 | `ocr-001-apple-document-analysis` |
 | INT-001 | `int-001-app-integration` |
+| UI-001 | `ui-001-template-implementation` |
 | QA-001 | `qa-001-release-qa` |
 | REL-001 | `rel-001-testflight-release` |
 
@@ -74,6 +76,8 @@ Gates :
 | Alpha complète | Alpha GPS + extraction PDFKit/Vision/DataDetection | ~123 h |
 
 Ces chiffres ne contiennent pas de marge. Ajouter 15 % de contingence donne environ 141 h pour l'alpha complète. Plusieurs agents réduisent le délai calendaire, pas le temps incompressible de build, de test appareil et d'intégration.
+
+La vague UI n'est pas incluse dans ces totaux. Sa timebox sera estimée après lecture du dossier template complet et inventaire écran par écran.
 
 Ligne de coupe recommandée à 100 h :
 
@@ -145,7 +149,8 @@ flowchart TD
     DOC --> INT
     OCR -. "si inclus" .-> INT
 
-    INT --> QA["QA-001 Répétition de voyage"]
+    INT --> UI["UI-001 Conformité au template"]
+    UI --> QA["QA-001 Répétition de voyage"]
     QA --> REL
 ```
 
@@ -161,7 +166,8 @@ Avec trois agents de réalisation au maximum :
 4. Vague 3 : `TRP-001`, `AI-001`, `GPS-001` si son gate passe.
 5. Vague 4 : `RSV-001`, `DOC-001`, `OCR-001` si conservé.
 6. Vague 5 : réactiver `DOC-001`, réaliser `GPS-002`, puis poursuivre `INT-001` (intégration fonctionnelle et stabilisation appareil).
-7. Vague 6 : `QA-001`, puis `REL-001`.
+7. Vague 6 : `UI-001` (application stricte du dossier template après stabilisation fonctionnelle).
+8. Vague 7 : `QA-001`, puis `REL-001`.
 
 Ne pas lancer deux tâches qui possèdent le même chemin. Les branches peuvent être développées en parallèle, mais sont intégrées dans l'ordre du graphe.
 
@@ -230,7 +236,8 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | DOC-001 | P0 | READY | 8 h | ARC-001, BCK-001, TRP-001 | documents, fichiers, association aux Étapes et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
 | INT-001 | P0 | IN_PROGRESS | 7 h | DOC-001, fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
-| QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
+| UI-001 | P0 | BLOCKED | À estimer | INT-001, dossier template fourni | écrans, `src/ui/`, thème et assets visuels |
+| QA-001 | P0 | TODO | 8 h | UI-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
 
 ## Tâches détaillées
@@ -744,12 +751,55 @@ Acceptation :
 - les scénarios des lots `INT-101` à `INT-106` sont consignés avec leur résultat et les risques restants ;
 - le parcours Document–Étape est validé depuis l'import jusqu'à la consultation par le second compte.
 
+### UI-001 — Conformité stricte au dossier template
+
+- Priorité : `P0`
+- État : `BLOCKED`
+- Timebox : à estimer après inventaire du template
+- Dépendances : `INT-001`, chemin du dossier template fourni par l'utilisateur
+- Possède : routes et écrans applicatifs, `src/ui/**`, thème, composants visuels et assets ; ces chemins sont exclus de toute autre tâche active pendant la vague UI
+
+Gate d'entrée :
+
+- l'utilisateur indique le chemin exact du dossier template ;
+- le coordinateur inventorie la spécification, toutes les maquettes HTML, la bibliothèque de composants, les icônes, les polices, les styles et les assets ;
+- une matrice associe chaque écran Naveyo à sa maquette de référence et signale toute référence manquante avant modification ;
+- la timebox est fixée après cet inventaire et la tâche passe à `READY` uniquement lorsque le template est complet et lisible.
+
+Livrables :
+
+- reproduction écran par écran des maquettes fournies dans l'application Expo/React Native ;
+- traduction des tokens CSS, composants de base, icônes, typographies, espacements, couleurs et états interactifs dans le thème et les primitives React Native ;
+- réutilisation systématique de la bibliothèque fournie, sans recréer un composant équivalent ni substituer une icône ;
+- couverture des états normal, chargement, vide, erreur, offline, désactivé et confirmation conformément à la spécification ;
+- conservation des parcours, règles métier, permissions, données et comportements livrés par les Modules ;
+- rapport de conformité listant chaque écran, sa référence HTML, son état d'implémentation et les éventuels écarts approuvés.
+
+Contraintes :
+
+- le dossier template est la source de vérité visuelle et interactionnelle ; `AGENTS.md`, `CONTEXT.md` et les invariants de sécurité restent prioritaires pour le métier et l'architecture ;
+- aucune interprétation libre, amélioration esthétique, remplacement d'asset ou extension fonctionnelle n'est autorisé sans décision explicite de l'utilisateur ;
+- les maquettes HTML servent de référence et ne sont pas embarquées dans une WebView ; l'implémentation reste native React Native ;
+- aucune logique métier, requête Supabase, synchronisation ou construction d'Adapter n'est ajoutée aux routes ;
+- toute impossibilité technique ou divergence entre deux références bloque l'écran concerné et fait l'objet d'une décision utilisateur documentée ;
+- la vague démarre après stabilisation fonctionnelle afin d'éviter que des changements métier concurrents modifient les mêmes écrans.
+
+Acceptation :
+
+- chaque écran possède une référence identifiée et une checklist de conformité validée ;
+- les composants, icônes, couleurs, typographies, espacements et interactions correspondent à la spécification fournie ;
+- aucun placeholder, asset improvisé ou style historique non prévu ne subsiste ;
+- les parcours existants et `pnpm verify` restent fonctionnels après la refonte ;
+- VoiceOver, tailles de texte, contrastes et zones tactiles sont validés sans altérer l'intention visuelle ;
+- des captures comparatives sont vérifiées sur les deux formats d'iPhone cibles et les écarts restants sont approuvés explicitement ;
+- une development build est installée et contrôlée sur les deux iPhone avant passage à `DONE`.
+
 ### QA-001 — Sécurité, offline et répétition de voyage
 
 - Priorité : `P0`
 - État : `TODO`
 - Timebox : 8 h
-- Dépendances : `INT-001`
+- Dépendances : `UI-001`
 - Possède : `tests/e2e/**`, `tests/security/**`, `docs/release/qa-report.md`
 
 Matrice minimale :
