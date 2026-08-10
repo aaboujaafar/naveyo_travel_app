@@ -51,6 +51,25 @@ Les scénarios suivants restent non exécutés ici :
 
 Je ne recommande pas `GO` sur la seule base des tests locaux.
 
+## Audit GPS-002 — 10 août 2026
+
+L'audit local confirme les garanties suivantes :
+
+- `STATIONARY → WALKING → FAST_MOVING` est confirmé par plusieurs mesures et une durée minimale ; le retour vers `STATIONARY` est plus lent pour éviter les bascules permanentes ;
+- la vitesse fournie par le fournisseur est utilisée lorsqu'elle est valide, sinon la vitesse est dérivée de la distance haversine et du temps écoulé ;
+- les seuils de conservation visent environ 25 m à pied, 75 m en déplacement rapide et un battement très espacé à l'arrêt ;
+- les horodatages non croissants et les positions trop imprécises sont ignorés ;
+- l'état adaptatif est persisté avec les points et conservé lorsqu'un lot différé contient plusieurs positions ;
+- le second démarrage d'une même trace ne réenregistre pas le task natif ; la configuration native reste stable pendant la session.
+
+Les tests locaux couvrent ces points dans `src/modules/trip-tracking/adaptive.test.ts`,
+`src/adapters/expo-location/options.test.ts` et `src/adapters/expo-location/normalize.test.ts`.
+
+Cette vérification reste une validation de code et de tests unitaires. Elle ne mesure ni la
+fidélité d'une trace réelle, ni la consommation de batterie, ni la continuité écran verrouillé,
+mode avion ou force-quit sur iPhone. Ces scénarios restent à exécuter sur les deux appareils
+réels avant de remplacer `BLOCKED` par une décision de validation terrain.
+
 Je ne recommande `FALLBACK` que si le coordinateur choisit explicitement une autre stratégie après ajout d’une vraie build device et d’un SDK de remplacement.
 
 ## Prochaine action utile

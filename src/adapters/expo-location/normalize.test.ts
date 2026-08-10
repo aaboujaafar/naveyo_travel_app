@@ -83,4 +83,34 @@ describe("Expo location normalization", () => {
     expect(state.points).toHaveLength(1);
     expect(state.adaptive).toEqual({ mode: "STATIONARY", candidateCount: 0 });
   });
+
+  it("restores an adaptive candidate and its observations from persisted state", () => {
+    const adaptive = {
+      mode: "WALKING",
+      candidateMode: "FAST_MOVING",
+      candidateCount: 2,
+      candidateSinceMs: 10_000,
+      lastObservation: {
+        latitude: 48,
+        longitude: 2,
+        recordedAtMs: 20_000,
+        accuracyMeters: 5,
+        speedMetersPerSecond: 8,
+      },
+      lastAccepted: {
+        latitude: 48,
+        longitude: 1.999,
+        recordedAtMs: 10_000,
+        accuracyMeters: 5,
+        speedMetersPerSecond: 8,
+      },
+    };
+
+    const state = parseStoredTrackingState(
+      JSON.stringify({ tripId, points: [], adaptive }),
+      tripId,
+    );
+
+    expect(state.adaptive).toEqual(adaptive);
+  });
 });
