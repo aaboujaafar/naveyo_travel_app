@@ -8,7 +8,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 
 - La branche `wave-4` est intégrée dans `main` par avance rapide jusqu'au commit `7440500`.
 - Les livrables applicatifs de la vague 4 sont présents dans `main`. Les états restent `IN_PROGRESS` lorsque le critère restant est une validation sur iPhone réel ; cette validation sera consommée par `INT-001` puis `QA-001`.
-- La vague 5 est lancée le 9 août 2026 : `INT-001` est `IN_PROGRESS`, avec les lots `INT-101` à `INT-105` distribués à des agents sur des chemins disjoints.
+- La vague 5 est lancée le 9 août 2026 : `INT-001` est `IN_PROGRESS`, avec les lots `INT-101` à `INT-106` sur des chemins coordonnés.
 
 - `RSV-001` est `IN_PROGRESS` : Share Extension iOS, App Group, association au Voyage, persistance et centre d’imports sont intégrés. Le parsing est exclusivement confié à OpenCode Go ; l’extraction locale ne produit plus de brouillon. Il reste le test appareil complet et la validation d’une réservation réelle.
 - `OCR-001` est `IN_PROGRESS` : le Module Swift extrait le texte PDF/OCR localement et transmet uniquement ce texte à l’Edge Function `document-analysis`, qui appelle OpenCode Go. Il reste la validation Xcode/iPhone et les fixtures réelles.
@@ -16,7 +16,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 - Les imports partagés sont persistants et idempotents côté interface : `new`, `seen`, `processing`, `failed`, `confirmed`. Un import déjà vu ne redirige plus vers l’écran à chaque démarrage ; le centre d’imports reste accessible depuis le tableau de bord.
 - Correction de parsing : les champs optionnels `null` issus du pont natif sont traités comme absents. Une réponse OpenCode partiellement entourée de Markdown ou renvoyée en blocs texte est normalisée avant validation.
 - Validation locale après correction : `pnpm verify` passe avec 73 tests. La validation native finale exige encore une installation et un partage réel depuis Mail/Fichiers/Photos.
-- Décision utilisateur du 9 août 2026 : `DOC-001` est mis en standby. Il reste planifié mais ne bloque pas la finalisation de la vague 4 ; `INT-001`, `QA-001` et `REL-001` ne pourront toutefois pas être clôturées avec le périmètre Documents complet tant que cette tâche restera en standby.
+- Décision utilisateur du 10 août 2026 : `DOC-001` est réactivé avec une timebox de 8 h. Chaque Document de voyage peut être associé à zéro ou une Étape, déplacé ultérieurement et rester visible sous « Non classés ». Lorsqu'il est lié à une Réservation, il utilise la même Étape que celle-ci. `DOC-001` redevient une dépendance de l'intégration avant `QA-001` et `REL-001`.
 
 ## Mode d'emploi
 
@@ -49,6 +49,7 @@ Chaque tâche possède sa branche. Les agents y créent de petits commits locaux
 | AI-001 | `ai-001-trip-assistant` |
 | EXP-001 | `exp-001-expenses` |
 | GPS-001 | `gps-001-trip-tracking` |
+| GPS-002 | `gps-002-adaptive-tracking` |
 | RSV-001 | `rsv-001-reservation-import` |
 | DOC-001 | `doc-001-private-documents` |
 | OCR-001 | `ocr-001-apple-document-analysis` |
@@ -68,11 +69,11 @@ Gates :
 
 | Profil | Contenu | Timebox cumulée |
 |---|---|---:|
-| Alpha cœur | Voyage, offline, carte, lieux, IA, Dépenses, partage direct, documents privés et QA | ~87 h |
-| Alpha GPS | Alpha cœur + spike et Trace de trajet continue | ~105 h |
-| Alpha complète | Alpha GPS + extraction PDFKit/Vision/DataDetection | ~113 h |
+| Alpha cœur | Voyage, offline, carte, lieux, IA, Dépenses, partage direct, documents privés et QA | ~91 h |
+| Alpha GPS | Alpha cœur + spike et Trace de trajet continue adaptative | ~115 h |
+| Alpha complète | Alpha GPS + extraction PDFKit/Vision/DataDetection | ~123 h |
 
-Ces chiffres ne contiennent pas de marge. Ajouter 15 % de contingence donne environ 130 h pour l'alpha complète. Plusieurs agents réduisent le délai calendaire, pas le temps incompressible de build, de test appareil et d'intégration.
+Ces chiffres ne contiennent pas de marge. Ajouter 15 % de contingence donne environ 141 h pour l'alpha complète. Plusieurs agents réduisent le délai calendaire, pas le temps incompressible de build, de test appareil et d'intégration.
 
 Ligne de coupe recommandée à 100 h :
 
@@ -125,9 +126,11 @@ flowchart TD
     PLS --> AI["AI-001 Suggestions IA"]
     SGPS --> GPS
     BCK --> GPS
+    GPS --> AGPS["GPS-002 Tracking adaptatif"]
 
     SSHARE --> RSV["RSV-001 Partage entrant"]
     BCK --> DOC["DOC-001 Documents privés"]
+    TRP --> DOC
     SSHARE --> OCR["OCR-001 Analyse locale"]
     PLS --> OCR
 
@@ -137,7 +140,7 @@ flowchart TD
     ITN --> INT
     AI --> INT
     EXP --> INT
-    GPS --> INT
+    AGPS --> INT
     RSV --> INT
     DOC --> INT
     OCR -. "si inclus" .-> INT
@@ -157,7 +160,7 @@ Avec trois agents de réalisation au maximum :
 3. Vague 2 : `BCK-001`, `PLS-001`, `ITN-001`; puis `OFF-001` et `EXP-001`.
 4. Vague 3 : `TRP-001`, `AI-001`, `GPS-001` si son gate passe.
 5. Vague 4 : `RSV-001`, `DOC-001`, `OCR-001` si conservé.
-6. Vague 5 : `INT-001` (intégration fonctionnelle et stabilisation appareil).
+6. Vague 5 : réactiver `DOC-001`, réaliser `GPS-002`, puis poursuivre `INT-001` (intégration fonctionnelle et stabilisation appareil).
 7. Vague 6 : `QA-001`, puis `REL-001`.
 
 Ne pas lancer deux tâches qui possèdent le même chemin. Les branches peuvent être développées en parallèle, mais sont intégrées dans l'ordre du graphe.
@@ -222,10 +225,11 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | AI-001 | P0 | DONE | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
+| GPS-002 | P0-Gate | IN_PROGRESS | 6 h | GPS-001 | classification du mouvement et échantillonnage adaptatif |
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
-| DOC-001 | P0 | TODO (STANDBY) | 5 h | ARC-001, BCK-001 | documents, fichiers et Storage |
+| DOC-001 | P0 | READY | 8 h | ARC-001, BCK-001, TRP-001 | documents, fichiers, association aux Étapes et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
-| INT-001 | P0 | IN_PROGRESS | 6 h | fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
+| INT-001 | P0 | IN_PROGRESS | 7 h | DOC-001, fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
 | QA-001 | P0 | TODO | 8 h | INT-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
 
@@ -576,6 +580,33 @@ Fallback si le gate échoue :
 - créer une tâche bornée d'import GPX ou de points manuels ;
 - ne pas présenter ce fallback comme du GPS continu.
 
+### GPS-002 — Tracking GPS adaptatif
+
+- Priorité : `P0-Gate`
+- État : `IN_PROGRESS`
+- Timebox : 6 h
+- Dépendances : `GPS-001`
+- Possède : moteur adaptatif du Module `trip-tracking`, Adapter `expo-location`, tests ciblés et mise à jour du rapport GPS
+
+Livrables :
+
+- états de mouvement `STATIONARY`, `WALKING` et `FAST_MOVING` déterminés principalement par la vitesse, la distance et le temps écoulé ;
+- transitions confirmées par plusieurs mesures consécutives, avec hystérésis et temporisation pour éviter les oscillations ;
+- conservation d'environ un point tous les 20–30 m à pied et 50–100 m en déplacement rapide ;
+- réduction forte des points à l'arrêt et reprise automatique de la fréquence lorsque le mouvement revient ;
+- configuration stable de la tâche native, sans arrêt/redémarrage à chaque point ;
+- pause automatique iOS et livraison différée utilisées pour réduire l'activité en arrière-plan ;
+- état adaptatif persisté avec les points afin de survivre aux lots différés et aux reprises du processus.
+
+Acceptation :
+
+- trois mesures cohérentes sont nécessaires pour accélérer le mode et une temporisation empêche un passage immédiat à `STATIONARY` ;
+- la vitesse absente ou invalide est remplacée par une vitesse dérivée de la distance et du temps ;
+- les erreurs de précision et les doublons ne provoquent ni transition ni point aberrant ;
+- la tâche `naveyo-trip-tracking` n'est enregistrée qu'au démarrage explicite et arrêtée uniquement à la demande de l'utilisateur ;
+- les tests couvrent immobilité prolongée, marche, voiture, changement de mode, GPS bruité et lots de positions différées ;
+- une journée réelle ou un scénario terrain représentatif consigne fidélité visuelle, nombre de points et consommation batterie avant passage à `DONE`.
+
 ### RSV-001 — Partage entrant et brouillon de Réservation
 
 - Priorité : `P0`
@@ -605,15 +636,21 @@ Audit du 9 août 2026 : le partage entrant, l’association au Voyage, la persis
 ### DOC-001 — Coffre de Documents privé et hors ligne
 
 - Priorité : `P0`
-- État : `TODO`
-- Timebox : 5 h
-- Dépendances : `ARC-001`, `BCK-001`
-- Possède : implementation `documents`, Adapters FileSystem et Supabase Storage, `app/(app)/trips/[tripId]/documents/**`
+- État : `READY`
+- Timebox : 8 h
+- Dépendances : `ARC-001`, `BCK-001`, `TRP-001`
+- Possède : implementation `documents`, Adapters FileSystem et Supabase Storage, `app/(app)/trips/[tripId]/documents/**`, écran détail d'une Étape pour ses Documents, migration corrective dédiée et tests associés
 
 Livrables :
 
 - upload dans un bucket privé ;
 - nom interne généré, MIME, taille, checksum, révision ;
+- association facultative d'un Document à une seule Étape ;
+- conservation des Documents sans Étape sous « Non classés » ;
+- filtrage des Documents par Étape ;
+- association, déplacement et retrait depuis l'Interface du Module Documents ;
+- cohérence entre Voyage, Étape, Réservation et Document côté Supabase ;
+- migration corrective ajoutant l'association sans modifier une migration intégrée ;
 - téléchargement/pinning sur le second iPhone ;
 - preview système ou fallback explicite ;
 - suppression locale et distante autorisée.
@@ -621,9 +658,18 @@ Livrables :
 Acceptation :
 
 - aucune URL publique persistante ;
+- un Document ne peut pas être associé à une Étape d'un autre Voyage ;
+- les Documents d'une Étape sont visibles depuis son écran détail ;
+- un Document non classé reste visible dans les Documents du Voyage ;
+- déplacer un Document lié à une Réservation déplace également cette Réservation et ses autres Documents ;
+- supprimer une Étape rend ses Documents non classés sans supprimer les fichiers ;
+- propriétaire et éditeur peuvent modifier l'association, un non-membre ne peut ni la lire ni la modifier ;
+- l'association et les métadonnées restent visibles hors ligne depuis le `TripPack` ;
 - fichiers consultables en mode avion après pinning ;
 - checksum et déduplication testés ;
 - cache système et dossier persistant ne sont jamais confondus.
+
+Validation supplémentaire : tests du Module Documents et du parcours d'import, tests RLS propriétaire/éditeur/non-membre, cohérence Étape/Voyage, partage Mail/Fichiers/Photos, consultation depuis le second compte, document téléchargé en mode avion, `pnpm verify`, tests Supabase et development build avant passage à `DONE`.
 
 ### OCR-001 — Analyse locale PDFKit, Vision et DataDetection
 
@@ -656,11 +702,11 @@ Audit du 9 août 2026 : l’API native `extractDocumentText` sépare désormais 
 
 - Priorité : `P0`
 - État : `READY`
-- Timebox : 6 h
-- Dépendances : fonctionnalités retenues à la ligne de coupe, installation iPhone de la wave 4
+- Timebox : 7 h
+- Dépendances : `DOC-001`, fonctionnalités retenues à la ligne de coupe, installation iPhone de la wave 4
 - Possède : `src/bootstrap/**`, wiring des routes racine, `tests/integration/**`
 
-Lots de travail de la vague 5, à réaliser dans cette tâche et sans réactiver `DOC-001` :
+Lots de travail de la vague 5 :
 
 | Lot | Objectif | Validation attendue |
 |---|---|---|
@@ -669,10 +715,13 @@ Lots de travail de la vague 5, à réaliser dans cette tâche et sans réactiver
 | INT-103 | Intégrer la Trace de trajet au parcours du Voyage | Démarrage/arrêt visibles, points conservés après reprise, test au minimum écran verrouillé ou perte réseau si le matériel le permet |
 | INT-104 | Vérifier les états de démarrage et de dégradation | Démarrage en ligne, démarrage sans réseau avec données déjà chargées, erreur OpenCode lisible et réessayable |
 | INT-105 | Ajouter les tests d'intégration des parcours retenus | Fakes aux Seams externes, doublons d'import couverts, permissions et compte extérieur couverts |
+| INT-106 | Intégrer l'association Document–Étape au détail d'une Étape et au parcours d'import | Choix de l'Étape à l'import, confirmation humaine, Document visible dans l'Étape, déplacement vers une autre Étape et visibilité sur le second iPhone |
 
 Contraintes de la vague 5 :
 
-- `DOC-001` reste `TODO (STANDBY)` ; aucune dépendance nouvelle ne doit supposer un coffre documentaire complet.
+- le fichier importé devient un Document privé uniquement après confirmation de la Réservation ;
+- « Non classé » reste toujours disponible pour les Documents sans Étape ;
+- aucune route ne modifie directement Supabase ;
 - Le parsing des réservations reste exclusivement confié à OpenCode Go ; l'extraction native ne produit que le texte et les preuves locales.
 - Les validations natives restantes de `SPI-002`, `RSV-001` et `OCR-001` doivent être consignées dans le compte rendu d'intégration, sans contourner les critères appareil.
 - Une réservation importée est toujours un brouillon jusqu'à confirmation humaine.
@@ -692,8 +741,8 @@ Acceptation :
 - démarrage online et offline vérifié ;
 - deep link de partage et reprise après fermeture vérifiés ;
 - `pnpm verify` passe après intégration de la vague.
-- les scénarios des lots `INT-101` à `INT-105` sont consignés avec leur résultat et les risques restants ;
-- la vague 5 ne bloque pas sur `DOC-001`, mais signale explicitement les capacités documentaires absentes.
+- les scénarios des lots `INT-101` à `INT-106` sont consignés avec leur résultat et les risques restants ;
+- le parcours Document–Étape est validé depuis l'import jusqu'à la consultation par le second compte.
 
 ### QA-001 — Sécurité, offline et répétition de voyage
 
