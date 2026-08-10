@@ -231,9 +231,9 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | AI-001 | P0 | DONE | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
-| GPS-002 | P0-Gate | IN_PROGRESS | 6 h | GPS-001 | classification du mouvement et échantillonnage adaptatif |
+| GPS-002 | P0-Gate | BLOCKED | 6 h | GPS-001 | classification du mouvement et échantillonnage adaptatif |
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
-| DOC-001 | P0 | READY | 8 h | ARC-001, BCK-001, TRP-001 | documents, fichiers, association aux Étapes et Storage |
+| DOC-001 | P0 | IN_PROGRESS | 8 h | ARC-001, BCK-001, TRP-001 | documents, fichiers, association aux Étapes et Storage |
 | OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
 | INT-001 | P0 | IN_PROGRESS | 7 h | DOC-001, fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
 | UI-001 | P0 | BLOCKED | À estimer | INT-001, dossier template fourni | écrans, `src/ui/`, thème et assets visuels |
@@ -590,7 +590,7 @@ Fallback si le gate échoue :
 ### GPS-002 — Tracking GPS adaptatif
 
 - Priorité : `P0-Gate`
-- État : `IN_PROGRESS`
+- État : `BLOCKED`
 - Timebox : 6 h
 - Dépendances : `GPS-001`
 - Possède : moteur adaptatif du Module `trip-tracking`, Adapter `expo-location`, tests ciblés et mise à jour du rapport GPS
@@ -613,6 +613,8 @@ Acceptation :
 - la tâche `naveyo-trip-tracking` n'est enregistrée qu'au démarrage explicite et arrêtée uniquement à la demande de l'utilisateur ;
 - les tests couvrent immobilité prolongée, marche, voiture, changement de mode, GPS bruité et lots de positions différées ;
 - une journée réelle ou un scénario terrain représentatif consigne fidélité visuelle, nombre de points et consommation batterie avant passage à `DONE`.
+
+Audit du 10 août 2026 : l'implémentation adaptative, sa persistance et ses tests locaux sont intégrés. `pnpm verify` passe ; la tâche reste bloquée jusqu'à la validation sur iPhone réel (écran verrouillé, mode avion, force-quit, fidélité du tracé et batterie).
 
 ### RSV-001 — Partage entrant et brouillon de Réservation
 
@@ -643,7 +645,7 @@ Audit du 9 août 2026 : le partage entrant, l’association au Voyage, la persis
 ### DOC-001 — Coffre de Documents privé et hors ligne
 
 - Priorité : `P0`
-- État : `READY`
+- État : `IN_PROGRESS`
 - Timebox : 8 h
 - Dépendances : `ARC-001`, `BCK-001`, `TRP-001`
 - Possède : implementation `documents`, Adapters FileSystem et Supabase Storage, `app/(app)/trips/[tripId]/documents/**`, écran détail d'une Étape pour ses Documents, migration corrective dédiée et tests associés
@@ -675,6 +677,8 @@ Acceptation :
 - fichiers consultables en mode avion après pinning ;
 - checksum et déduplication testés ;
 - cache système et dossier persistant ne sont jamais confondus.
+
+Audit du 10 août 2026 : l'association Document–Étape, le filtre « Non classés », le déplacement, l'écran détail d'une Étape, le TripPack, la migration corrective et les tests locaux sont intégrés. Il reste l'exécution de la migration Supabase et la validation sur les deux iPhone, notamment depuis Mail/Fichiers/Photos et en mode avion.
 
 Validation supplémentaire : tests du Module Documents et du parcours d'import, tests RLS propriétaire/éditeur/non-membre, cohérence Étape/Voyage, partage Mail/Fichiers/Photos, consultation depuis le second compte, document téléchargé en mode avion, `pnpm verify`, tests Supabase et development build avant passage à `DONE`.
 
@@ -708,7 +712,7 @@ Audit du 9 août 2026 : l’API native `extractDocumentText` sépare désormais 
 ### INT-001 — Composition et parcours intégré
 
 - Priorité : `P0`
-- État : `READY`
+- État : `IN_PROGRESS`
 - Timebox : 7 h
 - Dépendances : `DOC-001`, fonctionnalités retenues à la ligne de coupe, installation iPhone de la wave 4
 - Possède : `src/bootstrap/**`, wiring des routes racine, `tests/integration/**`
@@ -750,6 +754,8 @@ Acceptation :
 - `pnpm verify` passe après intégration de la vague.
 - les scénarios des lots `INT-101` à `INT-106` sont consignés avec leur résultat et les risques restants ;
 - le parcours Document–Étape est validé depuis l'import jusqu'à la consultation par le second compte.
+
+Audit du 10 août 2026 : le wiring des modules et les scénarios `INT-101` à `INT-106` sont intégrés ; `pnpm verify` passe avec 112 tests. La clôture reste conditionnée aux validations appareil de la Réservation, de l'OCR, du GPS, du Document hors ligne et du second iPhone.
 
 ### UI-001 — Conformité stricte au dossier template
 
