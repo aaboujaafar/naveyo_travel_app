@@ -5,7 +5,7 @@ import type { ItineraryModule } from '../modules/itinerary'
 import { OfflineTripPack } from '../modules/offline-trip-pack/module'
 import type { OfflineTripPackModule, OfflineTripPackStore, TripPackFileStore } from '../modules/offline-trip-pack'
 import type { PlacesModule } from '../modules/places'
-import type { ReservationsModule } from '../modules/reservations'
+import type { DocumentAnalyzer, ReservationsModule } from '../modules/reservations'
 import type { TripAssistantModule } from '../modules/trip-assistant'
 import type { TripTrackingModule } from '../modules/trip-tracking'
 import type { TripsModule } from '../modules/trips'
@@ -28,6 +28,8 @@ export interface NaveyoModules {
   expenses: ExpensesModule
   offlineTripPack: OfflineTripPackModule
   tripTracking: TripTrackingModule
+  /** Native analyzer is optional while OCR-001 is not available in a build. */
+  reservationAnalyzer?: DocumentAnalyzer
 }
 
 export interface NaveyoBootstrap {
@@ -57,5 +59,24 @@ export const createNaveyoBootstrap = (modules: NaveyoModules, currentTripId?: UU
 })
 
 export { NaveyoBootstrapProvider, useNaveyoBootstrap } from './context'
-export { loadItineraryView, loadPlacesView, loadTripWorkspace } from './integration'
-export type { ItineraryView, PlacesView, TripWorkspace } from './integration'
+export {
+  confirmReservationImport,
+  loadAppStart,
+  loadItineraryView,
+  loadPlacesView,
+  loadStopDocuments,
+  loadTrackingView,
+  loadTripWorkspace,
+  moveDocumentToStop,
+  startTripTracking,
+  stopTripTracking,
+} from './integration'
+export type {
+  AppStart,
+  ItineraryView,
+  PlacesView,
+  ReservationImportView,
+  StopDocumentsView,
+  TrackingView,
+  TripWorkspace,
+} from './integration'
