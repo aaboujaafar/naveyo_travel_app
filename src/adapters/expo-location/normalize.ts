@@ -4,10 +4,34 @@ import type {
   TrackPoint,
   UUID,
 } from "../../modules/_shared/model";
+import {
+  createAdaptiveTrackingState,
+  parseAdaptiveTrackingState,
+  type AdaptiveTrackingState,
+  type LocationObservation,
+} from "../../modules/trip-tracking/adaptive";
 
 export interface StoredTrackingState {
   readonly tripId: UUID;
   readonly points: readonly TrackPoint[];
+  readonly adaptive: AdaptiveTrackingState;
+}
+
+export function makeLocationObservation(location: LocationObject): LocationObservation {
+  const speed = location.coords.speed;
+  const accuracy = location.coords.accuracy;
+  const speedMetersPerSecond = typeof speed === "number" && Number.isFinite(speed) && speed >= 0
+    ? speed
+    : undefined;
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    recordedAtMs: location.timestamp,
+    accuracyMeters: typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0
+      ? accuracy
+      : Number.POSITIVE_INFINITY,
+    ...(speedMetersPerSecond !== undefined ? { speedMetersPerSecond } : {}),
+  };
 }
 
 export function makeTrackPoint(
@@ -46,7 +70,15 @@ export function parseStoredTrackingState(
   }
 
   const points = parsed.points.filter(isTrackPoint);
-  return { tripId, points };
+  return {
+    tripId,
+    points,
+    adaptive: parseAdaptiveTrackingState(parsed.adaptive),
+  };
+}
+
+export function emptyStoredTrackingState(tripId: UUID): StoredTrackingState {
+  return { tripId, points: [], adaptive: createAdaptiveTrackingState() };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
