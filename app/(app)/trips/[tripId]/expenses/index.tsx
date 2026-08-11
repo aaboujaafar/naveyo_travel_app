@@ -1,206 +1,105 @@
-import { useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { FakeExchangeRateProvider } from "../../../../../src/adapters/exchange-rates/fake";
-import {
-  Expenses,
-  InMemoryExpensesStore,
-  type ExpenseCategory,
-} from "../../../../../src/modules/expenses";
-import type { ISO4217 } from "../../../../../src/modules/_shared/model";
-import { uuid } from "../../../../../src/modules/_shared/fake";
-import {
-  Button,
-  Card,
-  Input,
-  ProgressBar,
-  ShellFrame,
-  StatusPanel,
-} from "../../../../../src/ui";
-import { colors } from "../../../../../src/theme/colors";
-import { spacing } from "../../../../../src/theme/spacing";
-import { typography } from "../../../../../src/theme/typography";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
+import type { BudgetSummary, Expense } from "../../../../../src/modules/expenses";
+import type { ISO4217, Trip, UUID } from "../../../../../src/modules/_shared/model";
+import { useTripsModule } from "../../../../../src/modules/trips";
+import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screens/TripBudgetScreen";
 
-const referenceCurrency = "EUR" as ISO4217;
-const defaultTripId = "00000000-0000-4000-8000-000000000001";
+const fallbackCurrency = "EUR" as ISO4217;
 
-export default function ExpensesScreen() {
-  const params = useLocalSearchParams<{ tripId: string }>();
-  const tripId = uuid(
-    typeof params.tripId === "string" ? params.tripId : defaultTripId,
-  );
-  const module = useMemo(
-    () =>
-      new Expenses(new InMemoryExpensesStore(), new FakeExchangeRateProvider()),
-    [],
-  );
-  const [budgetMinorUnits, setBudgetMinorUnits] = useState("");
-  const [label, setLabel] = useState("");
-  const [amountMinorUnits, setAmountMinorUnits] = useState("");
-  const [currency, setCurrency] = useState<ISO4217>(referenceCurrency);
-  const [category, setCategory] = useState<ExpenseCategory>("other");
-  const [note, setNote] = useState("");
-  const [payer, setPayer] = useState("");
-  const [date, setDate] = useState("2026-08-04");
+export default function ExpensesRoute() {
+  const router = useRouter();
+  const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
+  const tripId = rawTripId as UUID | undefined;
+  const bootstrap = useNaveyoBootstrap();
+  const trips = useTripsModule();
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [summary, setSummary] = useState<BudgetSummary | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] =
-    useState<Awaited<ReturnType<Expenses["summarize"]>>>(null);
 
-  useEffect(() => {
-    void module
-      .setBudget(tripId, { minorUnits: 0, currency: referenceCurrency })
-      .then(() => module.summarize(tripId).then(setSummary));
-  }, [module, tripId]);
-
-  const saveBudget = async () => {
-    try {
-      setError(null);
-      await module.setBudget(tripId, {
-        minorUnits: Number(budgetMinorUnits),
-        currency: referenceCurrency,
-      });
-      setSummary(await module.summarize(tripId));
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Impossible d’enregistrer le budget",
-      );
+  const load = useCallback(async () => {
+    if (!tripId || !trips) {
+      setError("Le Voyage n'est pas disponible.");
+      setLoading(false);
+      return;
     }
-  };
-
-  const addExpense = async () => {
+    setError(null);
     try {
-      setError(null);
-      await module.add({
+      setTrip(await trips.get(tripId));
+      if (!bootstrap) {
+        setError("Le Module Dépenses n'est pas encore exposé par la composition de l'application.");
+        return;
+      }
+      const [nextSummary, nextExpenses] = await Promise.all([
+        bootstrap.modules.expenses.summarize(tripId),
+        bootstrap.modules.expenses.list(tripId),
+      ]);
+      setSummary(nextSummary);
+      setExpenses(nextExpenses);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Impossible de charger le Budget global.");
+    } finally {
+      setLoading(false);
+    }
+  }, [bootstrap, tripId, trips]);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  async function saveBudget(minorUnits: number) {
+    if (!bootstrap || !tripId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await bootstrap.modules.expenses.setBudget(tripId, {
+        minorUnits,
+        currency: trip?.referenceCurrency ?? fallbackCurrency,
+      });
+      await load();
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Impossible d'enregistrer le Budget global.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addExpense(input: AddExpenseForm) {
+    if (!bootstrap || !tripId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await bootstrap.modules.expenses.add({
         tripId,
-        label,
-        category,
-        note: note || undefined,
-        original: { minorUnits: Number(amountMinorUnits), currency },
-        occurredOn: date,
-        paidBy: payer ? uuid(payer) : undefined,
+        label: input.label,
+        category: input.category,
+        original: { minorUnits: input.amountMinorUnits, currency: input.currency },
+        occurredOn: input.occurredOn,
+        paidBy: input.paidBy as UUID | undefined,
       });
-      setLabel("");
-      setAmountMinorUnits("");
-      setNote("");
-      setPayer("");
-      setSummary(await module.summarize(tripId));
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Impossible d’ajouter la dépense",
-      );
+      await load();
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Impossible d'ajouter la Dépense.");
+    } finally {
+      setSaving(false);
     }
-  };
+  }
 
   return (
-    <ShellFrame
-      title="Budget et dépenses"
-      subtitle="Montants suivis dans la devise de référence du Voyage."
-    >
-      {error ? (
-        <StatusPanel kind="error" title="Action impossible" message={error} />
-      ) : null}
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>Budget global · EUR</Text>
-        <Input
-          label="Budget en centimes"
-          value={budgetMinorUnits}
-          onChangeText={setBudgetMinorUnits}
-          keyboardType="number-pad"
-          placeholder="100000"
-          hint="Exemple : 100000 = 1 000,00 EUR"
-        />
-        <Button onPress={() => void saveBudget()} fullWidth>
-          Enregistrer le budget
-        </Button>
-      </Card>
-
-      {summary ? (
-        <Card style={styles.card}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.label}>Dépensé</Text>
-            <Text style={styles.value}>
-              {formatMoney(summary.spent.minorUnits)} EUR
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.label}>Restant</Text>
-            <Text style={styles.value}>
-              {formatMoney(summary.remaining.minorUnits)} EUR
-            </Text>
-          </View>
-          <ProgressBar progress={summary.progress} color="teal" />
-        </Card>
-      ) : null}
-
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>Ajouter une dépense</Text>
-        <Input
-          label="Libellé"
-          value={label}
-          onChangeText={setLabel}
-          placeholder="Billets de train"
-        />
-        <Input
-          label="Montant en unité mineure"
-          value={amountMinorUnits}
-          onChangeText={setAmountMinorUnits}
-          keyboardType="number-pad"
-          placeholder="2500"
-        />
-        <Input
-          label="Devise ISO 4217"
-          value={currency}
-          onChangeText={(value) => setCurrency(value as ISO4217)}
-          autoCapitalize="characters"
-          maxLength={3}
-        />
-        <Input
-          label="Catégorie"
-          value={category}
-          onChangeText={(value) => setCategory(value as ExpenseCategory)}
-          placeholder="transport, food, ..."
-        />
-        <Input
-          label="Date locale"
-          value={date}
-          onChangeText={setDate}
-          placeholder="AAAA-MM-JJ"
-        />
-        <Input
-          label="Note (facultatif)"
-          value={note}
-          onChangeText={setNote}
-          placeholder="Détail utile"
-        />
-        <Input
-          label="Payé par (UUID facultatif)"
-          value={payer}
-          onChangeText={setPayer}
-          placeholder="Compte du payeur"
-        />
-        <Button onPress={() => void addExpense()} fullWidth>
-          Ajouter la dépense
-        </Button>
-      </Card>
-    </ShellFrame>
+    <TripBudgetScreen
+      tripName={trip?.name ?? "Voyage"}
+      referenceCurrency={trip?.referenceCurrency ?? fallbackCurrency}
+      summary={summary}
+      expenses={expenses}
+      loading={loading}
+      saving={saving}
+      error={error}
+      onBack={() => router.back()}
+      onRetry={load}
+      onSaveBudget={saveBudget}
+      onAddExpense={addExpense}
+    />
   );
 }
-
-const formatMoney = (minorUnits: number): string =>
-  (minorUnits / 100).toFixed(2).replace(".", ",");
-
-const styles = StyleSheet.create({
-  card: { gap: spacing.md, padding: spacing.lg },
-  sectionTitle: { ...typography.h3, color: colors.fg },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  label: { ...typography.bodySmall, color: colors.muted },
-  value: { ...typography.label, color: colors.fg },
-});

@@ -1,0 +1,86 @@
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import type { TravelDocument, UUID } from "../modules/_shared/model";
+import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
+import { AppText, Badge, Button, Icon, InlineMessage, Skeleton } from "../ui";
+import { formatDocumentDate, formatDocumentSize, labelDocumentKind } from "./travel-records-model";
+
+export interface DocumentStopOption { id: UUID; name: string }
+export type DocumentFilter = UUID | "all" | "unclassified";
+
+export interface TripDocumentsScreenProps {
+  tripName: string;
+  items: TravelDocument[];
+  stops: DocumentStopOption[];
+  filter: DocumentFilter;
+  loading: boolean;
+  error: string | null;
+  downloadedId: string | null;
+  canAssign: boolean;
+  onBack: () => void;
+  onRetry: () => Promise<void>;
+  onSelectFilter: (filter: DocumentFilter) => void;
+  onDownload: (document: TravelDocument) => Promise<void>;
+  onAssign: (document: TravelDocument, stopId?: UUID) => Promise<void>;
+  onOpenReservations: () => void;
+  onImport: () => void;
+}
+
+export function TripDocumentsScreen(props: TripDocumentsScreenProps) {
+  return (
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <RecordsHeader title="Documents du Voyage" subtitle={props.tripName} onBack={props.onBack} />
+        <ComingSoon label="Packing list indépendante"><View style={[styles.countdown, shadows.md]}><View style={styles.flexOne}><AppText variant="h2" color="onAccent">Préparation du Voyage</AppText><AppText variant="bodySmall" color="onAccent">Packing list et progression à venir</AppText></View><Badge label="À venir" variant="gold" /></View></ComingSoon>
+        <RecordsTabs active="documents" onOpenDocuments={() => undefined} onOpenReservations={props.onOpenReservations} />
+
+        {props.error ? <View style={styles.message}><InlineMessage variant="error" title="Action impossible" message={props.error} /><Button variant="secondary" onPress={() => void props.onRetry()}>Réessayer</Button></View> : null}
+        {props.downloadedId ? <View style={styles.message}><InlineMessage variant="success" title="Document téléchargé" message="Une copie persistante a été préparée sur l'iPhone, sans URL publique." /></View> : null}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          <Filter label="Tous" active={props.filter === "all"} onPress={() => props.onSelectFilter("all")} />
+          <Filter label="Non classés" active={props.filter === "unclassified"} onPress={() => props.onSelectFilter("unclassified")} />
+          {props.stops.map((stop) => <Filter key={stop.id} label={stop.name} active={props.filter === stop.id} onPress={() => props.onSelectFilter(stop.id)} />)}
+        </ScrollView>
+
+        <View style={styles.panel}>
+          {props.loading ? <DocumentsLoading /> : props.items.length === 0 ? <InlineMessage title="Aucun Document de voyage" message="Importez un fichier, relisez les données extraites, puis confirmez-les explicitement." /> : props.items.map((document) => (
+            <View key={document.id} style={styles.documentCard}>
+              <View style={styles.documentIcon}><Icon name="file-text" size={20} color={colors.teal} /></View>
+              <View style={styles.documentInfo}>
+                <AppText variant="label" numberOfLines={1}>{document.fileName ?? "Document sans nom"}</AppText>
+                <AppText variant="caption" color="muted">{labelDocumentKind(document.kind)} · {formatDocumentSize(document.byteSize)}</AppText>
+                <AppText variant="caption" color="muted">Ajouté le {formatDocumentDate(document.createdAt)}</AppText>
+                <View style={styles.metaBadges}><Badge label="Privé" variant="teal" /><Badge label={document.stopId ? props.stops.find((stop) => stop.id === document.stopId)?.name ?? "Étape" : "Non classé"} variant="gold" /></View>
+              </View>
+              <Button size="sm" variant="secondary" onPress={() => void props.onDownload(document)}>Télécharger</Button>
+              {props.canAssign && props.stops.length > 0 ? (
+                <View style={styles.assignRow}>
+                  <Filter label="Non classé" active={!document.stopId} onPress={() => void props.onAssign(document, undefined)} />
+                  {props.stops.map((stop) => <Filter key={stop.id} label={stop.name} active={document.stopId === stop.id} onPress={() => void props.onAssign(document, stop.id)} />)}
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.security}><Icon name="info" size={20} color={colors.teal} /><AppText variant="bodySmall" color="muted" style={styles.flexOne}>{"Les fichiers restent privés et filtrés par Voyage. Les Documents d'identité sont exclus."}</AppText></View>
+        <Button fullWidth onPress={props.onImport} icon={<Icon name="plus" size={20} color={colors.white} />}>Importer un Document</Button>
+      </ScrollView>
+    </View>
+  );
+}
+
+export function RecordsHeader({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) { return <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={onBack} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}><Icon name="arrow-left" size={20} /></Pressable><View style={styles.flexOne}><AppText variant="h2">{title}</AppText><AppText variant="caption" color="muted">{subtitle}</AppText></View></View>; }
+
+export function RecordsTabs({ active, onOpenDocuments, onOpenReservations }: { active: "documents" | "reservations"; onOpenDocuments: () => void; onOpenReservations: () => void }) { return <View style={styles.tabs}><View style={styles.futureTab}><AppText variant="label" color="muted">Packing</AppText><Badge label="À venir" variant="gold" style={styles.miniBadge} /></View><Tab label="Documents" active={active === "documents"} onPress={onOpenDocuments} /><Tab label="Réservations" active={active === "reservations"} onPress={onOpenReservations} /></View>; }
+function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && styles.pressed]}><AppText variant="label" color={active ? "onAccent" : "muted"} align="center">{label}</AppText></Pressable>; }
+function Filter({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={({ pressed }) => [styles.filter, active && styles.filterActive, pressed && styles.pressed]}><AppText variant="caption" color={active ? "accent" : "muted"}>{label}</AppText></Pressable>; }
+function ComingSoon({ label, children }: { label: string; children: React.ReactNode }) { return <View accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={styles.futureWrap}><View pointerEvents="none" style={styles.futureContent}>{children}</View><Badge label="À venir" variant="gold" style={styles.futureBadge} /></View>; }
+function DocumentsLoading() { return <View style={styles.loading}><Skeleton height={spacing["2xl"] + spacing.lg} /><Skeleton height={spacing["2xl"] + spacing.lg} /></View>; }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg }, scrollContent: { width: "100%", maxWidth: layout.maxMobileWidth, alignSelf: "center", paddingBottom: spacing["2xl"] }, header: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg }, iconButton: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  countdown: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.accent, flexDirection: "row", alignItems: "center", gap: spacing.md }, tabs: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.md }, tab: { flex: 1, minHeight: spacing["2xl"] - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm }, tabActive: { backgroundColor: colors.fg, borderColor: colors.fg }, futureTab: { flex: 1, minHeight: spacing["2xl"] - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.border, alignItems: "center", justifyContent: "center", position: "relative", opacity: 0.5 }, miniBadge: { position: "absolute", top: -spacing.sm, right: -spacing.sm, transform: [{ scale: 0.7 }] },
+  message: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }, filters: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md }, filter: { minHeight: spacing["2xl"] - spacing.xs, paddingHorizontal: spacing.md - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, filterActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent }, panel: { paddingHorizontal: spacing.lg }, documentCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, marginBottom: spacing.sm }, documentIcon: { width: spacing["2xl"] - spacing.sm, height: spacing["2xl"] - spacing.sm, borderRadius: radius.sm, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }, documentInfo: { flex: 1, minWidth: "45%", gap: spacing.xs }, metaBadges: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, assignRow: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, security: { flexDirection: "row", gap: spacing.sm, margin: spacing.lg, padding: spacing.md, backgroundColor: colors.tealSoft, borderRadius: radius.sm },
+  futureWrap: { position: "relative" }, futureContent: { opacity: 0.5 }, futureBadge: { position: "absolute", top: spacing.xs, right: spacing.lg, zIndex: zIndex.sticky }, flexOne: { flex: 1 }, pressed: { transform: [{ scale: 0.97 }] }, loading: { gap: spacing.sm },
+});
