@@ -8,6 +8,7 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 import { Chip } from "./Chip";
 import { Input } from "./Input";
+import { Icon, type IconName } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 
 export function UiCatalogScreen() {
@@ -56,6 +57,19 @@ export function UiCatalogScreen() {
           <AppText variant="sectionTitle" color="muted">
             Prochaine étape
           </AppText>
+        </CatalogSection>
+
+        <CatalogSection title="Icônes">
+          <View style={styles.iconGrid}>
+            {catalogIcons.map((name) => (
+              <View key={name} style={styles.iconItem}>
+                <Icon name={name} color={colors.fg} />
+                <AppText variant="caption" color="muted" align="center">
+                  {name}
+                </AppText>
+              </View>
+            ))}
+          </View>
         </CatalogSection>
 
         <CatalogSection title="Actions">
@@ -173,6 +187,17 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
   },
+  iconGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  iconItem: {
+    width: "20%",
+    minHeight: layout.minimumTouchTarget,
+    alignItems: "center",
+    gap: spacing.xs,
+  },
 });
 
 const swatches = [
@@ -183,3 +208,18 @@ const swatches = [
   { label: "Teal", value: colors.teal, style: styles.swatchTeal },
   { label: "Or", value: colors.gold, style: styles.swatchGold },
 ] as const;
+
+const catalogIcons = [
+  "arrow-left",
+  "arrow-right",
+  "home",
+  "search",
+  "calendar",
+  "map-pin",
+  "users",
+  "sparkles",
+  "wallet",
+  "file-text",
+  "settings",
+  "refresh",
+] as const satisfies readonly IconName[];

@@ -1,10 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, ViewStyle } from "react-native";
+import { View, StyleSheet, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
-import { typography } from "../theme/typography";
 import { spacing } from "../theme/spacing";
+import { AppText } from "./AppText";
 import { IconButton } from "./Button";
+import { Icon } from "./Icon";
 
 export interface TopBarProps {
   title: string;
@@ -43,9 +44,9 @@ export function TopBar({
       ) : (
         <View style={styles.spacer} />
       )}
-      <Text style={styles.title} numberOfLines={1}>
+      <AppText variant="h2" align="center" style={styles.title} numberOfLines={1}>
         {title}
-      </Text>
+      </AppText>
       {actions ? (
         <View style={styles.actions}>{actions}</View>
       ) : (
@@ -56,11 +57,7 @@ export function TopBar({
 }
 
 function DefaultBackIcon() {
-  return (
-    <View style={styles.backArrow}>
-      <Text style={styles.backArrowText}>{"‹"}</Text>
-    </View>
-  );
+  return <Icon name="arrow-left" size={20} />;
 }
 
 const styles = StyleSheet.create({
@@ -76,10 +73,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   title: {
-    ...typography.h2,
-    color: colors.fg,
     flex: 1,
-    textAlign: "center",
   },
   actions: {
     flexDirection: "row",
@@ -87,14 +81,5 @@ const styles = StyleSheet.create({
   },
   spacer: {
     width: 44,
-  },
-  backArrow: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backArrowText: {
-    fontSize: 24,
-    color: colors.fg,
-    fontWeight: "300",
   },
 });
