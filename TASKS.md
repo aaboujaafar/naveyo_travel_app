@@ -788,6 +788,8 @@ Découpage :
 
 Les tâches d'un lot sont réalisées écran par écran. Les templates hors V0 ne réintroduisent ni social, ni chat, ni journal, ni gamification, ni eSIM, ni affiliation.
 
+Avancement du 11 août 2026 : les écrans `02` (création), `03` (invitation) et `04` (tableau de bord) du lot `UI-120` sont implémentés. Les sections compatibles V0 sont actives ; les autres restent visibles, désactivées et marquées « À venir ». `pnpm verify` passe avec 127 tests. La conformité pixel-perfect reste conditionnée aux captures comparatives 390/430 px et à la validation VoiceOver sur appareil.
+
 Livrables :
 
 - reproduction écran par écran des maquettes fournies dans l'application Expo/React Native ;

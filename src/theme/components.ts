@@ -26,4 +26,14 @@ export const componentMetrics = {
       violet: ["#8571c8", "#6552aa"],
     },
   },
+  inviteFamily: {
+    comingSoonOpacity: 0.48,
+    disabledOpacity: 0.4,
+  },
+  tripDashboard: {
+    thinBorderWidth: 1,
+    outlinedBorderWidth: 1.5,
+    mapGridOpacity: 0.16,
+    comingSoonOpacity: 0.5,
+  },
 } as const;
