@@ -18,6 +18,7 @@ export const colors = {
   danger: "#d94040",
 
   white: "#ffffff",
+  transparent: "transparent",
   overlay: "rgba(26, 26, 46, 0.4)",
 } as const;
 

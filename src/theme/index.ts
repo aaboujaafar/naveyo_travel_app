@@ -10,3 +10,4 @@ export { shadows } from "./shadows";
 export type { ShadowToken } from "./shadows";
 export { layout, zIndex } from "./layout";
 export { motion } from "./motion";
+export { componentMetrics } from "./components";
