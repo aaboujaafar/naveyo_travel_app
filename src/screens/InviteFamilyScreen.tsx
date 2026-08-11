@@ -33,6 +33,7 @@ import {
   buildInvitationDeepLink,
   describeMember,
   isInvitationEmailValid,
+  isInvitationShareReady,
   normalizeInvitationEmail,
 } from "./invite-family-model";
 
@@ -43,7 +44,10 @@ export interface InviteFamilyScreenProps {
   error?: string | null;
   onBack: () => void;
   onInvite: (email: string) => Promise<void>;
-  onShareInvitation: (channel: InvitationShareChannel) => Promise<void>;
+  onShareInvitation: (
+    channel: InvitationShareChannel,
+    email?: string,
+  ) => Promise<void>;
   onContinue: () => void;
 }
 
@@ -70,6 +74,8 @@ export function InviteFamilyScreen({
   const [email, setEmail] = useState("");
   const [attempted, setAttempted] = useState(false);
   const emailIsValid = isInvitationEmailValid(email);
+  const shareReady = isInvitationShareReady(invitation, email);
+  const shareEmail = invitation ? undefined : normalizeInvitationEmail(email);
   const deepLink = invitation ? buildInvitationDeepLink(invitation) : null;
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.lg) }),
@@ -140,9 +146,9 @@ export function InviteFamilyScreen({
           </AppText>
           <Button
             size="sm"
-            disabled={!deepLink}
+            disabled={!shareReady || loading}
             onPress={() => {
-              if (deepLink) void onShareInvitation("system");
+              if (shareReady) void onShareInvitation("system", shareEmail);
             }}
           >
             Partager
@@ -155,30 +161,37 @@ export function InviteFamilyScreen({
               icon="message-circle"
               label="WhatsApp"
               tone="teal"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation("whatsapp");
+                if (shareReady) void onShareInvitation("whatsapp", shareEmail);
               }}
             />
             <ShareChannel
               icon="message-circle"
               label="SMS"
               tone="accent"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation("sms");
+                if (shareReady) void onShareInvitation("sms", shareEmail);
               }}
             />
             <ShareChannel
               icon="copy"
               label="Partage"
               tone="gold"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation("system");
+                if (shareReady) void onShareInvitation("system", shareEmail);
               }}
             />
           </View>
+          <AppText variant="caption" color="muted" style={styles.shareHint}>
+            {shareReady
+              ? deepLink
+                ? "Choisissez un canal pour transmettre le lien privé."
+                : "Choisissez un canal pour créer l’invitation et transmettre le lien."
+              : "Saisissez une adresse e-mail valide pour activer les canaux."}
+          </AppText>
         </Section>
 
         <ComingSoonSection title="Contacts récents">
@@ -592,6 +605,7 @@ const styles = StyleSheet.create({
   },
   linkText: { flex: 1 },
   shareRow: { flexDirection: "row", gap: spacing.md },
+  shareHint: { marginTop: spacing.sm },
   shareButton: {
     flex: 1,
     minHeight: spacing["2xl"] * 2,

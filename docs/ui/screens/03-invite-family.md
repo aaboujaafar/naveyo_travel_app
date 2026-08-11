@@ -11,7 +11,7 @@ Route Naveyo : `app/(app)/trips/[tripId]/invite.tsx`
 | En-tête et introduction | Compatible | Reproduits avec le vocabulaire Naveyo (`Voyage`, `Compte`, `Membre du voyage`). |
 | Arbre familial | Hors V0 | Visible, désactivé et marqué « À venir ». |
 | Lien d'invitation | Compatible | Le deep link privé est affiché après création de l'invitation. |
-| WhatsApp, SMS et e-mail | Compatible via iOS | Ouvrent la feuille de partage native lorsque l'invitation existe. |
+| WhatsApp, SMS et Partage | Compatible via iOS | Un e-mail valide active les trois canaux ; le premier appui crée l’invitation puis ouvre WhatsApp, SMS ou la feuille de partage. |
 | Contacts récents | Hors V0 | Visible, désactivé et marqué « À venir ». Aucun accès au carnet d'adresses. |
 | Membres du voyage | Compatible | Affiche les comptes réellement présents dans le Voyage et l'invitation courante. |
 | Ajout d'un membre | Compatible | Limité à l'adresse e-mail du second Compte et au rôle `editor`, conformément au Module `trips`. |
@@ -25,7 +25,8 @@ Route Naveyo : `app/(app)/trips/[tripId]/invite.tsx`
 - création de l'invitation par `TripsModule.createInvitation` dans la route mince ;
 - affichage de l'état d'erreur et de l'invitation créée ;
 - génération du deep link `naveyo://invite/<token>` vers la route d'acceptation existante ;
-- partage explicite par la feuille iOS, sans envoi automatique ;
+- activation des canaux dès qu’une adresse e-mail valide est saisie ;
+- création de l’invitation puis partage explicite par WhatsApp, SMS ou la feuille iOS, sans envoi automatique ;
 - aucune fonctionnalité de contacts, notification ou permission personnalisée activée.
 
 ## Validation visuelle restante

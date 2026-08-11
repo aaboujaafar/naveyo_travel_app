@@ -10,6 +10,13 @@ export function isInvitationEmailValid(value: string): boolean {
   return invitationEmailPattern.test(normalizeInvitationEmail(value));
 }
 
+export function isInvitationShareReady(
+  invitation: Pick<TripInvitation, "token"> | null,
+  email: string,
+): boolean {
+  return invitation !== null || isInvitationEmailValid(email);
+}
+
 export function buildInvitationDeepLink(
   invitation: Pick<TripInvitation, "token">,
 ): string {

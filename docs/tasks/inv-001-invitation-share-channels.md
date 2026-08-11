@@ -12,7 +12,7 @@ Permettre au propriétaire d’un Voyage de transmettre le lien d’une invitati
 - SMS, via le composeur iOS ;
 - Partage, via la feuille de partage système et les autres applications disponibles.
 
-Le canal ne crée pas une nouvelle identité et n’envoie pas directement l’invitation. Il transporte le lien privé déjà généré par le Module Voyages. La vérification de l’adresse e-mail invitée et l’acceptation restent inchangées.
+Le canal ne crée pas une nouvelle identité et n’envoie pas directement l’invitation. Une adresse e-mail valide active les boutons ; au premier appui, Naveyo crée l’invitation puis transporte le lien privé généré par le Module Voyages. La vérification de l’adresse e-mail invitée et l’acceptation restent inchangées.
 
 ## Développement prévu
 
@@ -41,7 +41,7 @@ L’écran d’invitation propose désormais :
 | SMS | ouvre `sms:?&body=` avec le message encodé |
 | Partage | ouvre la feuille de partage iOS |
 
-Quand WhatsApp ou le canal sélectionné n’est pas disponible, l’écran conserve l’invitation et propose explicitement le partage générique ou le SMS.
+Avant la création de l’invitation, un e-mail valide suffit à activer les trois actions. Le premier appui crée l’invitation puis ouvre le canal choisi. Quand WhatsApp ou le canal sélectionné n’est pas disponible, l’écran conserve l’invitation et propose explicitement le partage générique ou le SMS.
 
 ## Fichiers principaux
 

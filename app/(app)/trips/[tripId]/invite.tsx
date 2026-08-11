@@ -39,10 +39,10 @@ export default function TripInviteScreen() {
     };
   }, [tripId, trips]);
 
-  const createInvitation = async (email: string) => {
+  const createInvitation = async (email: string): Promise<TripInvitation | null> => {
     if (!trips || !tripId) {
       setError("Le Module Voyages est indisponible.");
-      return;
+      return null;
     }
     setCreating(true);
     setError(null);
@@ -52,12 +52,14 @@ export default function TripInviteScreen() {
         email,
       });
       setInvitation(nextInvitation);
+      return nextInvitation;
     } catch (cause: unknown) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Impossible de créer l’invitation",
       );
+      return null;
     } finally {
       setCreating(false);
     }
@@ -70,9 +72,22 @@ export default function TripInviteScreen() {
       loading={creating}
       error={error}
       onBack={() => router.back()}
-      onInvite={createInvitation}
-      onShareInvitation={async (channel: InvitationShareChannel) => {
-        if (!invitation || !bootstrap?.modules.invitationSharing) {
+      onInvite={async (email) => {
+        await createInvitation(email);
+      }}
+      onShareInvitation={async (
+        channel: InvitationShareChannel,
+        email?: string,
+      ) => {
+        let shareInvitation = invitation;
+        if (!shareInvitation) {
+          if (!email) {
+            setError("Saisissez une adresse e-mail valide avant de partager.");
+            return;
+          }
+          shareInvitation = await createInvitation(email);
+        }
+        if (!shareInvitation || !bootstrap?.modules.invitationSharing) {
           setError("Le partage d’invitation est indisponible.");
           return;
         }
@@ -81,7 +96,7 @@ export default function TripInviteScreen() {
           const result = await bootstrap.modules.invitationSharing.share({
             channel,
             tripName: trip?.name ?? "mon Voyage",
-            invitationLink: buildInvitationDeepLink(invitation),
+            invitationLink: buildInvitationDeepLink(shareInvitation),
           });
           if (result.status === "unavailable") {
             setError(
