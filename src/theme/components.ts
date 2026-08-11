@@ -36,4 +36,14 @@ export const componentMetrics = {
     mapGridOpacity: 0.16,
     comingSoonOpacity: 0.5,
   },
+  tripAssistant: {
+    comingSoonOpacity: 0.48,
+    disabledOpacity: 0.44,
+  },
+  placeDetail: {
+    thinBorderWidth: 1,
+    outlinedBorderWidth: 1.5,
+    mapGridOpacity: 0.16,
+    comingSoonOpacity: 0.5,
+  },
 } as const;

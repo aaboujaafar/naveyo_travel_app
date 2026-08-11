@@ -3,7 +3,10 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { NaveyoBootstrapProvider } from "../src/bootstrap";
+import {
+  createNaveyoBootstrap,
+  NaveyoBootstrapProvider,
+} from "../src/bootstrap";
 import { createAppModules } from "../src/bootstrap/app-modules";
 import { DocumentsProvider } from "../src/modules/documents";
 import { TripAssistantProvider } from "../src/modules/trip-assistant";
@@ -13,11 +16,12 @@ import { colors } from "../src/theme/colors";
 
 export default function RootLayout() {
   const modules = useMemo(() => createAppModules(), []);
+  const bootstrap = useMemo(() => createNaveyoBootstrap(modules), [modules]);
 
   return (
     <SafeAreaProvider>
       <ShellSessionProvider identity={modules.identity}>
-        <NaveyoBootstrapProvider bootstrap={null}>
+        <NaveyoBootstrapProvider bootstrap={bootstrap}>
           <TripsModuleProvider module={modules.trips}>
             <TripAssistantProvider module={modules.tripAssistant}>
               <DocumentsProvider module={modules.documents}>

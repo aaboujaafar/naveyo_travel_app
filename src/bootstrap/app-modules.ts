@@ -15,6 +15,7 @@ import { InMemoryTripPackFileStore } from "../adapters/sqlite/in-memory-file-sto
 import { InMemoryTripPackStore } from "../adapters/sqlite/in-memory-trip-pack-store";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
+import type { TripTrackingModule } from "../modules/trip-tracking";
 import { createAppleReservationAnalyzer } from "../adapters/apple-document-analysis";
 import { sharedLocalReservations } from "./reservations";
 import { createSupabaseClient } from "./supabase";
@@ -47,7 +48,18 @@ export function createAppModules() {
     new InMemoryTripPackStore(),
     new InMemoryTripPackFileStore(),
   );
-  const tripTracking = createExpoLocationTrackingModule();
+  const nativeTripTracking = createExpoLocationTrackingModule();
+  const tripTracking: TripTrackingModule = {
+    tracker: nativeTripTracking.tracker,
+    list: nativeTripTracking.list,
+    async append(point) {
+      const status = await nativeTripTracking.tracker.getStatus();
+      if (!status.tripId) {
+        throw new Error("No active trip is available for this tracking point");
+      }
+      await nativeTripTracking.append(status.tripId, point);
+    },
+  };
   const documents = createSupabaseDocumentsModule(
     client as unknown as SupabaseDocumentsClientLike,
     persistDownloadedDocument,
