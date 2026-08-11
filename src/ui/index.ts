@@ -1,6 +1,10 @@
 export { Button, IconButton, Fab } from "./Button";
 export type { ButtonProps, IconButtonProps, FabProps } from "./Button";
 
+export { AppText } from "./AppText";
+export type { AppTextProps, AppTextColor, AppTextAlign } from "./AppText";
+export { UiCatalogScreen } from "./UiCatalogScreen";
+
 export { Card, CardImage, CardHorizontal, CardStat } from "./Card";
 export type {
   CardProps,
