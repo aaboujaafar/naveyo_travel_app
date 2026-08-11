@@ -1,13 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Share } from "react-native";
+import { useNaveyoBootstrap } from "../../../../src/bootstrap";
 import { useTripsModule } from "../../../../src/modules/trips";
 import type { Trip, TripInvitation } from "../../../../src/modules/_shared/model";
+import type { InvitationShareChannel } from "../../../../src/modules/invitation-sharing";
 import { InviteFamilyScreen } from "../../../../src/screens/InviteFamilyScreen";
+import { buildInvitationDeepLink } from "../../../../src/screens/invite-family-model";
 
 export default function TripInviteScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const bootstrap = useNaveyoBootstrap();
   const trips = useTripsModule();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [invitation, setInvitation] = useState<TripInvitation | null>(null);
@@ -68,11 +71,28 @@ export default function TripInviteScreen() {
       error={error}
       onBack={() => router.back()}
       onInvite={createInvitation}
-      onShareInvitation={async (deepLink) => {
-        await Share.share({
-          message: `Rejoins mon Voyage Naveyo : ${deepLink}`,
-          url: deepLink,
-        });
+      onShareInvitation={async (channel: InvitationShareChannel) => {
+        if (!invitation || !bootstrap?.modules.invitationSharing) {
+          setError("Le partage d’invitation est indisponible.");
+          return;
+        }
+        setError(null);
+        try {
+          const result = await bootstrap.modules.invitationSharing.share({
+            channel,
+            tripName: trip?.name ?? "mon Voyage",
+            invitationLink: buildInvitationDeepLink(invitation),
+          });
+          if (result.status === "unavailable") {
+            setError(
+              channel === "whatsapp"
+                ? "WhatsApp n’est pas disponible sur cet iPhone. Utilisez Partage ou SMS."
+                : "Le canal sélectionné n’est pas disponible sur cet iPhone. Utilisez Partage.",
+            );
+          }
+        } catch {
+          setError("Impossible d’ouvrir le canal de partage sélectionné.");
+        }
       }}
       onContinue={() => {
         if (tripId) router.replace(`/(app)/trips/${tripId}`);

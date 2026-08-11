@@ -114,6 +114,7 @@ class FakeDocuments implements DocumentsModule {
 
 const emptyModules = (identity: IdentityModule, trips: TripsModule, reservations: ReservationsModule, documents: DocumentsModule): NaveyoModules => ({
   identity,
+  invitationSharing: { share: async () => ({ channel: 'system', status: 'opened' }) },
   trips,
   reservations,
   documents,

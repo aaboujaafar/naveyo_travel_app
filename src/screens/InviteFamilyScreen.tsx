@@ -10,6 +10,7 @@ import type {
   TripInvitation,
   TripMember,
 } from "../modules/_shared/model";
+import type { InvitationShareChannel } from "../modules/invitation-sharing";
 import {
   colors,
   componentMetrics,
@@ -42,7 +43,7 @@ export interface InviteFamilyScreenProps {
   error?: string | null;
   onBack: () => void;
   onInvite: (email: string) => Promise<void>;
-  onShareInvitation: (deepLink: string) => Promise<void>;
+  onShareInvitation: (channel: InvitationShareChannel) => Promise<void>;
   onContinue: () => void;
 }
 
@@ -141,7 +142,7 @@ export function InviteFamilyScreen({
             size="sm"
             disabled={!deepLink}
             onPress={() => {
-              if (deepLink) void onShareInvitation(deepLink);
+              if (deepLink) void onShareInvitation("system");
             }}
           >
             Partager
@@ -156,7 +157,7 @@ export function InviteFamilyScreen({
               tone="teal"
               disabled={!deepLink}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (deepLink) void onShareInvitation("whatsapp");
               }}
             />
             <ShareChannel
@@ -165,16 +166,16 @@ export function InviteFamilyScreen({
               tone="accent"
               disabled={!deepLink}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (deepLink) void onShareInvitation("sms");
               }}
             />
             <ShareChannel
-              icon="mail"
-              label="Email"
+              icon="copy"
+              label="Partage"
               tone="gold"
               disabled={!deepLink}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (deepLink) void onShareInvitation("system");
               }}
             />
           </View>
@@ -433,7 +434,7 @@ function ShareChannel({
   disabled,
   onPress,
 }: {
-  icon: "message-circle" | "mail";
+  icon: "message-circle" | "mail" | "copy";
   label: string;
   tone: Tone;
   disabled: boolean;

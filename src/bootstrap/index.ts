@@ -1,6 +1,7 @@
 import type { DocumentsModule } from '../modules/documents'
 import type { ExpensesModule } from '../modules/expenses'
 import type { IdentityModule } from '../modules/identity'
+import type { InvitationSharingModule } from '../modules/invitation-sharing'
 import type { ItineraryModule } from '../modules/itinerary'
 import { OfflineTripPack } from '../modules/offline-trip-pack/module'
 import type { OfflineTripPackModule, OfflineTripPackStore, TripPackFileStore } from '../modules/offline-trip-pack'
@@ -19,6 +20,7 @@ import type { UUID } from '../modules/_shared/model'
  */
 export interface NaveyoModules {
   identity: IdentityModule
+  invitationSharing: InvitationSharingModule
   trips: TripsModule
   itinerary: ItineraryModule
   places: PlacesModule
