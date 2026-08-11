@@ -15,8 +15,15 @@ export const v0TemplateContracts = [
     label: "Création de Voyage",
     routes: ["/(app)/trips/new"],
     template: "02-create-trip.html",
-    coverage: "exact",
-    excludedSections: [],
+    coverage: "scoped",
+    excludedSections: [
+      "photo de couverture",
+      "modèles rapides",
+      "type de voyage",
+      "notes",
+      "packing list",
+      "documents d'identité",
+    ],
   },
   {
     id: "trip-invite",

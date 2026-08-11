@@ -8,6 +8,17 @@ export { Icon } from "./Icon";
 export type { IconName, IconProps } from "./Icon";
 export { Screen } from "./Screen";
 export type { ScreenProps } from "./Screen";
+export { Surface } from "./Surface";
+export type { SurfaceProps, SurfaceVariant } from "./Surface";
+export { Divider } from "./Divider";
+export { Checkbox } from "./Checkbox";
+export type { CheckboxProps } from "./Checkbox";
+export { Switch } from "./Switch";
+export type { SwitchProps } from "./Switch";
+export { InlineMessage } from "./InlineMessage";
+export type { InlineMessageProps, InlineMessageVariant } from "./InlineMessage";
+export { ListItem } from "./ListItem";
+export type { ListItemProps } from "./ListItem";
 
 export { Card, CardImage, CardHorizontal, CardStat } from "./Card";
 export type {

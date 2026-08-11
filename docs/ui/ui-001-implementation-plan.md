@@ -24,7 +24,7 @@ Les templates restent en lecture seule. `templates/ui/design-system.md` tranche 
 
 | Zone Naveyo | Template | Couverture | Décision |
 |---|---|---|---|
-| Création de Voyage | `02-create-trip.html` | 1:1 | Reproduction exacte, avec le modèle Naveyo existant |
+| Création de Voyage | `02-create-trip.html` | 1:1 partiel | Géométrie exacte des sections compatibles ; couverture, modèles rapides, type, notes, checklist et documents d'identité exigent une décision de périmètre |
 | Invitation | `03-invite-family.html` | 1:1 partiel | Reproduction exacte, limitée aux rôles propriétaire/éditeur |
 | Tableau de bord et détail du Voyage | `04-trip-dashboard.html` | 1:1 pour le dashboard | Le détail réutilise les sections du dashboard sans inventer de nouveau style |
 | Suggestions IA | `05-ai-explore.html` | 1:1 partiel | Reproduction exacte, sans chatbot générique |
@@ -66,7 +66,7 @@ Gate : toutes les primitives V0 sont visibles et testées avant le premier écra
 
 Une tâche par écran, dans cet ordre :
 
-1. création du Voyage — template `02` ;
+1. création du Voyage — template `02`, après décision sur les sections absentes du contrat V0 ;
 2. invitation — template `03` ;
 3. tableau de bord — template `04` ;
 4. liste des Voyages et authentification seulement après validation de leurs références manquantes.

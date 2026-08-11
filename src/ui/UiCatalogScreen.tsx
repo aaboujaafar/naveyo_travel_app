@@ -6,14 +6,21 @@ import { AppText } from "./AppText";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { Checkbox } from "./Checkbox";
 import { Chip } from "./Chip";
+import { Divider } from "./Divider";
 import { Input } from "./Input";
+import { InlineMessage } from "./InlineMessage";
 import { Icon, type IconName } from "./Icon";
+import { ListItem } from "./ListItem";
 import { ProgressBar } from "./ProgressBar";
+import { Switch } from "./Switch";
 
 export function UiCatalogScreen() {
   const [inputValue, setInputValue] = useState("");
   const [selectedChip, setSelectedChip] = useState("Tous");
+  const [checked, setChecked] = useState(true);
+  const [enabled, setEnabled] = useState(true);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -115,6 +122,31 @@ export function UiCatalogScreen() {
             64 % du Voyage est prêt
           </AppText>
         </CatalogSection>
+
+        <CatalogSection title="Sélection et messages">
+          <Checkbox checked={checked} label="Document disponible hors ligne" onChange={setChecked} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingText}>
+              <AppText variant="label">Synchronisation automatique</AppText>
+              <AppText variant="caption" color="muted">
+                Uniquement lorsque le réseau est disponible
+              </AppText>
+            </View>
+            <Switch value={enabled} label="Synchronisation automatique" onChange={setEnabled} />
+          </View>
+          <InlineMessage
+            title="Voyage disponible hors ligne"
+            message="Dernière synchronisation aujourd’hui à 08:30."
+            variant="success"
+          />
+          <Divider />
+          <ListItem
+            title="Documents du Voyage"
+            subtitle="3 documents téléchargés"
+            leading={<Icon name="file-text" color={colors.teal} />}
+            onPress={() => undefined}
+          />
+        </CatalogSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -196,6 +228,15 @@ const styles = StyleSheet.create({
     width: "20%",
     minHeight: layout.minimumTouchTarget,
     alignItems: "center",
+    gap: spacing.xs,
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  settingText: {
+    flex: 1,
     gap: spacing.xs,
   },
 });
