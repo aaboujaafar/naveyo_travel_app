@@ -1,48 +1,14 @@
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { AppState, StyleSheet, View } from "react-native";
+import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import { colors } from "../../src/theme/colors";
 import { spacing } from "../../src/theme/spacing";
-import { Button, ConnectivityBanner, useShellSession } from "../../src/ui";
+import { Button, useShellSession } from "../../src/ui";
 import { createAppleShareInbox } from "../../src/adapters/apple-document-analysis";
 
 export default function AppLayout() {
   const router = useRouter();
   const { signOut } = useShellSession();
-  const lastSyncedAt = "2026-07-29T08:30:00.000Z";
-  const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const checkConnectivity = async () => {
-      const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      if (!url) return;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      try {
-        const response = await fetch(`${url}/auth/v1/health`, {
-          method: "GET",
-          headers: {
-            apikey: process.env.EXPO_PUBLIC_SUPABASE_KEY ?? "",
-          },
-          signal: controller.signal,
-        });
-        if (mounted) setIsOffline(!response.ok);
-      } catch {
-        if (mounted) setIsOffline(true);
-      } finally {
-        clearTimeout(timeout);
-      }
-    };
-    void checkConnectivity();
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void checkConnectivity();
-    });
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
 
   useEffect(() => {
     void createAppleShareInbox()
@@ -59,8 +25,7 @@ export default function AppLayout() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.bannerWrap}>
-        <ConnectivityBanner isOffline={isOffline} lastSyncedAt={lastSyncedAt} />
+      <View style={styles.actionsWrap}>
         <View style={styles.actions}>
           <Button
             variant="secondary"
@@ -92,7 +57,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  bannerWrap: {
+  actionsWrap: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
