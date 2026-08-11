@@ -64,7 +64,7 @@ export function TripAssistantScreen({
 }: TripAssistantScreenProps) {
   const insets = useSafeAreaInsets();
   const [values, setValues] = useState<AssistantSearchValues>({
-    query: "pastéis de nata près de Belém",
+    query: "",
     category: "Restaurants",
   });
   const ready = isAssistantSearchReady(values);

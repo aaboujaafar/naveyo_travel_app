@@ -1,53 +1,59 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Button, Input, ShellFrame, StatusPanel } from "../../../../../src/ui";
-import { useTripsModule } from "../../../../../src/modules/trips";
 import type { Trip } from "../../../../../src/modules/_shared/model";
+import { useTripsModule } from "../../../../../src/modules/trips";
+import { TripSettingsScreen } from "../../../../../src/screens/TripSettingsScreen";
+import {
+  normalizeTripSettings,
+  type TripSettingsValues,
+} from "../../../../../src/screens/trip-settings-model";
 
-export default function TripSettingsScreen() {
+export default function TripSettingsRoute() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const trips = useTripsModule();
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [name, setName] = useState("");
-  const [startsOn, setStartsOn] = useState("");
-  const [endsOn, setEndsOn] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     if (!trips || !tripId) return;
-    void trips
+    let active = true;
+    trips
       .get(tripId as Trip["id"])
       .then((loaded) => {
-        if (loaded) {
-          setTrip(loaded);
-          setName(loaded.name);
-          setStartsOn(loaded.startsOn ?? "");
-          setEndsOn(loaded.endsOn ?? "");
-        }
+        if (active) setTrip(loaded);
       })
-      .catch((cause: unknown) =>
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Impossible de charger le Voyage",
-        ),
-      );
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Impossible de charger le Voyage",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [trips, tripId]);
-  const updateTrip = async () => {
-    if (!trips || !tripId) return;
+
+  const updateTrip = async (values: TripSettingsValues) => {
+    if (!trips || !tripId) {
+      setError("Le Module Voyages est indisponible.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const updated = await trips.update(tripId as Trip["id"], {
-        name,
-        startsOn: startsOn || undefined,
-        endsOn: endsOn || undefined,
-      });
+      const updated = await trips.update(
+        tripId as Trip["id"],
+        normalizeTripSettings(values),
+      );
       setTrip(updated);
-      setMessage("Le Voyage a été enregistré.");
+      setMessage("Les informations du Voyage ont été mises à jour.");
     } catch (cause: unknown) {
       setError(
         cause instanceof Error ? cause.message : "Modification impossible",
@@ -56,62 +62,19 @@ export default function TripSettingsScreen() {
       setSaving(false);
     }
   };
+
   return (
-    <ShellFrame
-      title="Réglages du Voyage"
-      subtitle="Les mutations ordinaires sont désactivées hors connexion"
-    >
-      <Input
-        label="Nom du Voyage"
-        value={name}
-        onChangeText={setName}
-        placeholder="Portugal 2026"
-      />
-      <Input
-        label="Date de début (AAAA-MM-JJ)"
-        value={startsOn}
-        onChangeText={setStartsOn}
-        placeholder="2026-09-04"
-      />
-      <Input
-        label="Date de fin (AAAA-MM-JJ)"
-        value={endsOn}
-        onChangeText={setEndsOn}
-        placeholder="2026-09-12"
-      />
-      <Button
-        fullWidth
-        loading={saving}
-        disabled={!trips || !trip || !name.trim()}
-        onPress={() => void updateTrip()}
-      >
-        Enregistrer le Voyage
-      </Button>
-      <Button
-        fullWidth
-        variant="secondary"
-        disabled={!tripId || !trips || saving}
-        onPress={() => router.push(`/(app)/trips/${tripId}/invite`)}
-      >
-        Inviter un membre
-      </Button>
-      {message ? (
-        <StatusPanel
-          kind="info"
-          title="Modification enregistrée"
-          message={message}
-        />
-      ) : null}
-      {error ? (
-        <StatusPanel
-          kind="error"
-          title="Modification refusée"
-          message={error}
-        />
-      ) : null}
-      <Button fullWidth variant="secondary" onPress={() => router.back()}>
-        Retour au Voyage
-      </Button>
-    </ShellFrame>
+    <TripSettingsScreen
+      key={trip?.id ?? "loading"}
+      trip={trip}
+      saving={saving}
+      message={message}
+      error={error}
+      onBack={() => router.back()}
+      onSave={updateTrip}
+      onOpenInvitation={() => {
+        if (tripId) router.push(`/(app)/trips/${tripId}/invite`);
+      }}
+    />
   );
 }

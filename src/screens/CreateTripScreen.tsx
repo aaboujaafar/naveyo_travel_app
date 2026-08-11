@@ -43,9 +43,9 @@ export interface CreateTripScreenProps {
 }
 
 const initialValues: CreateTripFormValues = {
-  name: "Lisbonne, Portugal",
-  startsOn: "2026-08-10",
-  endsOn: "2026-08-17",
+  name: "",
+  startsOn: "",
+  endsOn: "",
 };
 
 export function CreateTripScreen({

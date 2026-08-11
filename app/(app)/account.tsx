@@ -1,36 +1,95 @@
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import {
-  Button,
-  Card,
-  ShellFrame,
-  StatusPanel,
-  useShellSession,
-} from "../../src/ui";
+import { useEffect, useState } from "react";
+import { useNaveyoBootstrap } from "../../src/bootstrap";
+import type { OfflineTripPackLoad } from "../../src/modules/offline-trip-pack";
+import { useTripsModule, type Trip } from "../../src/modules/trips";
+import { AccountScreen } from "../../src/screens/AccountScreen";
+import { useShellSession } from "../../src/ui";
+import { currentTripForAccount } from "../../src/screens/account-screen-model";
 
-export default function AccountScreen() {
+export default function AccountRoute() {
   const router = useRouter();
   const { account, signOut } = useShellSession();
+  const tripsModule = useTripsModule();
+  const bootstrap = useNaveyoBootstrap();
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [countryCount, setCountryCount] = useState(0);
+  const [offline, setOffline] = useState<OfflineTripPackLoad | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
-  async function changeAccount() {
-    await signOut();
-    router.replace("/(auth)/sign-in");
-  }
+  useEffect(() => {
+    if (!tripsModule || !bootstrap) return;
+    let active = true;
+    tripsModule
+      .list()
+      .then(async (nextTrips) => {
+        const stopsByTrip = await Promise.all(
+          nextTrips.map((trip) => tripsModule.listStops(trip.id)),
+        );
+        const countries = new Set(
+          stopsByTrip.flat().map((stop) => stop.countryCode),
+        );
+        const currentTrip = currentTripForAccount(nextTrips);
+        const nextOffline = currentTrip
+          ? await bootstrap.modules.offlineTripPack.load(currentTrip.id)
+          : null;
+        if (!active) return;
+        setTrips(nextTrips);
+        setCountryCount(countries.size);
+        setOffline(nextOffline);
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Impossible de charger les Voyages du Compte",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, tripsModule]);
+
+  const changeAccount = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/(auth)/sign-in");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
-    <ShellFrame title="Compte" subtitle="Accès privé Naveyo">
-      <Card>
-        <StatusPanel
-          kind="info"
-          title="Compte connecté"
-          message={account?.email || "Adresse e-mail indisponible"}
-        />
-        <Button fullWidth onPress={() => void changeAccount()}>
-          Changer de compte
-        </Button>
-      </Card>
-      <Button variant="secondary" fullWidth onPress={() => router.back()}>
-        Retour
-      </Button>
-    </ShellFrame>
+    <AccountScreen
+      account={account}
+      trips={trips}
+      countryCount={countryCount}
+      offline={offline}
+      version={Constants.expoConfig?.version ?? "0.1.0"}
+      loading={loading}
+      error={error}
+      signingOut={signingOut}
+      onBack={() => router.back()}
+      onOpenTrip={(tripId) => router.push(`/(app)/trips/${tripId}`)}
+      onOpenTripSettings={(tripId) =>
+        router.push(`/(app)/trips/${tripId}/settings`)
+      }
+      onOpenInvitation={(tripId) =>
+        router.push(`/(app)/trips/${tripId}/invite`)
+      }
+      onOpenExpenses={(tripId) =>
+        router.push(`/(app)/trips/${tripId}/expenses`)
+      }
+      onSignOut={changeAccount}
+    />
   );
 }
