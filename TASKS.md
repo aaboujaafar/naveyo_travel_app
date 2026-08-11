@@ -760,17 +760,33 @@ Audit du 10 août 2026 : le wiring des modules et les scénarios `INT-101` à `I
 ### UI-001 — Conformité stricte au dossier template
 
 - Priorité : `P0`
-- État : `BLOCKED`
-- Timebox : à estimer après inventaire du template
+- État : `IN_PROGRESS`
+- Timebox : 39 h estimées, hors validations appareil incompressibles
 - Dépendances : `INT-001`, chemin du dossier template fourni par l'utilisateur
 - Possède : routes et écrans applicatifs, `src/ui/**`, thème, composants visuels et assets ; ces chemins sont exclus de toute autre tâche active pendant la vague UI
 
 Gate d'entrée :
 
-- l'utilisateur indique le chemin exact du dossier template ;
-- le coordinateur inventorie la spécification, toutes les maquettes HTML, la bibliothèque de composants, les icônes, les polices, les styles et les assets ;
-- une matrice associe chaque écran Naveyo à sa maquette de référence et signale toute référence manquante avant modification ;
-- la timebox est fixée après cet inventaire et la tâche passe à `READY` uniquement lorsque le template est complet et lisible.
+- le dossier de référence est `templates/ui/` ;
+- l'inventaire du 11 août 2026 confirme 19 maquettes HTML, le design system, les styles, les assets, la carte des routes et le plan de composants ;
+- la matrice et les lots sont consignés dans `docs/ui/ui-001-implementation-plan.md` ;
+- les écrans sans maquette 1:1 restent bloqués individuellement et ne sont pas stylés librement ;
+- l'implémentation démarre par les garde-fous et fondations avant les écrans.
+
+Découpage :
+
+| Lot | Contenu | Estimation |
+|---|---|---:|
+| UI-100 | Références, garde-fous et mesures | 3 h |
+| UI-110 | Fondations visuelles et catalogue | 7 h |
+| UI-120 | Création, invitation et dashboard | 7 h |
+| UI-130 | Suggestions IA et lieux | 5 h |
+| UI-140 | Itinéraire, carte et Trace | 5 h |
+| UI-150 | Budget, Documents et Réservations | 7 h |
+| UI-160 | Compte, shell et écrans approuvés sans référence directe | 3 h |
+| UI-170 | QA visuelle et validation appareil | 2 h + temps appareil |
+
+Les tâches d'un lot sont réalisées écran par écran. Les templates hors V0 ne réintroduisent ni social, ni chat, ni journal, ni gamification, ni eSIM, ni affiliation.
 
 Livrables :
 
