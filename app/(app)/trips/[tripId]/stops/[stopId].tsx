@@ -1,62 +1,120 @@
-import { useLocalSearchParams } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useDocuments } from '../../../../../src/modules/documents'
-import { useTripsModule } from '../../../../../src/modules/trips'
-import type { Stop, TravelDocument, UUID } from '../../../../../src/modules/_shared/model'
-import { Button, Card, EmptyState, ScreenNote, ShellFrame, StatusPanel } from '../../../../../src/ui'
-import { colors } from '../../../../../src/theme/colors'
-import { spacing } from '../../../../../src/theme/spacing'
-import { typography } from '../../../../../src/theme/typography'
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
+import { useDocuments } from "../../../../../src/modules/documents";
+import { useTripsModule } from "../../../../../src/modules/trips";
+import type {
+  ItineraryItem,
+  Reservation,
+  Stop,
+  TravelDocument,
+  UUID,
+} from "../../../../../src/modules/_shared/model";
+import { StopDetailScreen } from "../../../../../src/screens/StopDetailScreen";
+import {
+  filterItineraryForStop,
+  filterReservationsForStop,
+} from "../../../../../src/screens/stop-detail-model";
 
-export default function StopDetailScreen() {
-  const { tripId, stopId } = useLocalSearchParams<{ tripId: string; stopId: string }>()
-  const trips = useTripsModule()
-  const documents = useDocuments()
-  const [stop, setStop] = useState<Stop | null>(null)
-  const [items, setItems] = useState<TravelDocument[]>([])
-  const [error, setError] = useState<string | null>(null)
+export default function StopDetailRoute() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    tripId?: string | string[];
+    stopId?: string | string[];
+  }>();
+  const tripId = singleParam(params.tripId) as UUID | null;
+  const stopId = singleParam(params.stopId) as UUID | null;
+  const bootstrap = useNaveyoBootstrap();
+  const trips = useTripsModule();
+  const documentsModule = useDocuments();
+  const [tripName, setTripName] = useState("Voyage");
+  const [stop, setStop] = useState<Stop | null>(null);
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
+  const [documents, setDocuments] = useState<TravelDocument[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [downloadedDocumentId, setDownloadedDocumentId] = useState<UUID | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!trips || !documents || !tripId || !stopId) return
-    try {
-      const [stops, documentsForStop] = await Promise.all([
-        trips.listStops(tripId as UUID),
-        documents.list(tripId as UUID, stopId as UUID),
-      ])
-      setStop(stops.find((candidate) => candidate.id === stopId) ?? null)
-      setItems(documentsForStop)
-      setError(null)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossible de charger l’Étape')
+    setLoading(true);
+    setError(null);
+    if (!tripId || !stopId) {
+      setError("L'identifiant du Voyage ou de l'Étape est absent.");
+      setLoading(false);
+      return;
     }
-  }, [documents, stopId, tripId, trips])
+    if (!bootstrap || !trips || !documentsModule) {
+      setError("Les Modules du Voyage ne sont pas disponibles.");
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => { void Promise.resolve().then(refresh) }, [refresh])
+    try {
+      const [trip, stops, allItinerary, stopDocuments, allReservations] = await Promise.all([
+        trips.get(tripId),
+        trips.listStops(tripId),
+        bootstrap.modules.itinerary.list(tripId),
+        documentsModule.list(tripId, stopId),
+        bootstrap.modules.reservations.list(tripId),
+      ]);
+      if (!trip) throw new Error("Voyage introuvable ou inaccessible.");
+      const selectedStop = stops.find((candidate) => candidate.id === stopId) ?? null;
+      if (!selectedStop) throw new Error("Étape introuvable dans ce Voyage.");
+
+      setTripName(trip.name);
+      setStop(selectedStop);
+      setItinerary(filterItineraryForStop(allItinerary, selectedStop));
+      setDocuments(stopDocuments);
+      setReservations(filterReservationsForStop(allReservations, stopDocuments));
+    } catch (cause: unknown) {
+      setStop(null);
+      setItinerary([]);
+      setDocuments([]);
+      setReservations([]);
+      setError(cause instanceof Error ? cause.message : "Impossible de charger l'Étape.");
+    } finally {
+      setLoading(false);
+    }
+  }, [bootstrap, documentsModule, stopId, tripId, trips]);
+
+  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+
+  async function download(document: TravelDocument) {
+    if (!documentsModule || !tripId) return;
+    setError(null);
+    try {
+      await documentsModule.download(tripId, document.id);
+      setDownloadedDocumentId(document.id);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Impossible de télécharger le Document.");
+    }
+  }
+
+  const routeTripId = tripId ?? "";
+  const routeStopId = stopId ?? "";
 
   return (
-    <ShellFrame title={stop?.name ?? 'Étape'} subtitle="Documents associés à cette Étape">
-      {error ? <StatusPanel kind="error" title="Étape indisponible" message={error} actionLabel="Réessayer" onAction={() => void refresh()} /> : null}
-      {!error && !stop ? <StatusPanel kind="loading" title="Chargement de l’Étape" message="Lecture du Voyage et de ses Documents." /> : null}
-      {stop && items.length === 0 ? <EmptyState title="Aucun document associé" message="Les Documents peuvent rester Non classés ou être associés depuis le Module Documents." /> : null}
-      <View style={styles.list}>
-        {items.map((document) => <Card key={document.id} style={styles.card}>
-          <Text style={styles.title}>{document.fileName ?? 'Document sans nom'}</Text>
-          <Text style={styles.meta}>{document.kind.toUpperCase()} · {formatSize(document.byteSize)}</Text>
-          <Text style={styles.meta}>Document privé disponible après téléchargement.</Text>
-        </Card>)}
-      </View>
-      <ScreenNote>Supprimer l’Étape rend ses Documents Non classés sans supprimer leurs fichiers privés.</ScreenNote>
-      <Button variant="secondary" fullWidth onPress={() => void refresh()}>Actualiser</Button>
-    </ShellFrame>
-  )
+    <StopDetailScreen
+      tripName={tripName}
+      stop={stop}
+      itinerary={itinerary}
+      documents={documents}
+      reservations={reservations}
+      loading={loading}
+      error={error}
+      downloadedDocumentId={downloadedDocumentId}
+      onBack={() => router.back()}
+      onRetry={refresh}
+      onDownload={download}
+      onOpenItinerary={() => router.push(`/(app)/trips/${routeTripId}/itinerary`)}
+      onOpenDocuments={() => router.push(`/(app)/trips/${routeTripId}/documents?stopId=${routeStopId}`)}
+      onOpenReservations={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
+    />
+  );
 }
 
-const formatSize = (bytes?: number): string => bytes === undefined ? 'taille inconnue' : bytes < 1024 ? `${bytes} o` : `${(bytes / 1024 / 1024).toFixed(1)} Mo`
-
-const styles = StyleSheet.create({
-  list: { gap: spacing.md },
-  card: { gap: spacing.xs, padding: spacing.lg },
-  title: { ...typography.h3, color: colors.fg },
-  meta: { ...typography.bodySmall, color: colors.muted },
-})
+function singleParam(value?: string | string[]): string | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate?.trim() ? candidate : null;
+}

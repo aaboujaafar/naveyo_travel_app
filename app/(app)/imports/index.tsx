@@ -1,30 +1,19 @@
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, StyleSheet, Text } from "react-native";
-import {
-  Badge,
-  Button,
-  Card,
-  ScreenNote,
-  ShellFrame,
-  StatusPanel,
-  TextArea,
-} from "../../../src/ui";
+import { AppState } from "react-native";
 import type { ReservationDraft, Trip, UUID } from "../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../src/modules/trips";
-import type { ReservationImportResult } from "../../../src/modules/reservations";
+import { validateImportSource, type ReservationImportResult } from "../../../src/modules/reservations";
 import { sharedLocalReservations } from "../../../src/bootstrap/reservations";
 import { createAppleDocumentTextExtractor, createAppleShareInbox, type PendingShareImport } from "../../../src/adapters/apple-document-analysis";
 import { createOpenCodeDocumentAnalyzer } from "../../../src/adapters/opencode-document-analysis";
 import { createSupabaseClient } from "../../../src/bootstrap/supabase";
-import { colors } from "../../../src/theme/colors";
-import { spacing } from "../../../src/theme/spacing";
-import { typography } from "../../../src/theme/typography";
 import { describeAnalysisFailure, recoverPendingImport } from "../../../src/modules/reservations/import-state";
 import { selectPendingImport } from "../../../src/modules/reservations/import-selection";
+import { ReservationImportScreen as ReservationImportView } from "../../../src/screens/ReservationImportScreen";
 
-export default function ReservationImportScreen() {
+export default function ReservationImportRoute() {
   const router = useRouter();
   const { tripId: rawTripId, pendingId: rawPendingId } = useLocalSearchParams<{ tripId?: string; pendingId?: string }>();
   const tripId = rawTripId as UUID | undefined;
@@ -44,6 +33,7 @@ export default function ReservationImportScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const [availableTrips, setAvailableTrips] = useState<Trip[]>([]);
   const [pendingImports, setPendingImports] = useState<PendingShareImport[]>([]);
+  const [isLoadingInbox, setIsLoadingInbox] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -57,12 +47,16 @@ export default function ReservationImportScreen() {
             .filter((item) => item.status === "processing")
             .map((item) => inbox.updateStatus(item.id, "seen")),
         );
-        if (mounted) setPendingImports(recovered);
+        if (mounted) {
+          setPendingImports(recovered);
+          setIsLoadingInbox(false);
+        }
       } catch (cause: unknown) {
         if (!mounted) return;
         const failure = describeAnalysisFailure(cause);
         setIsOffline(failure.isOffline);
         setError(failure.message || "Impossible de charger l’import");
+        setIsLoadingInbox(false);
       }
     };
     void loadPendingImports();
@@ -124,7 +118,8 @@ export default function ReservationImportScreen() {
       }
       let draft: ReservationDraft;
       if (selectedSource) {
-        const extractedText = await createAppleDocumentTextExtractor().extract(selectedSource.uri);
+        validateImportSource(selectedSource);
+        const extractedText = await createAppleDocumentTextExtractor().extract(selectedSource.uri, { maxPages: 50 });
         draft = await createOpenCodeDocumentAnalyzer(createSupabaseClient()).analyze({
           tripId,
           extractedText,
@@ -176,16 +171,23 @@ export default function ReservationImportScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    setSelectedSource({
+    const source = {
       uri: asset.uri,
-      kind: asset.mimeType === "application/pdf" ? "pdf" : "image",
+      kind: asset.mimeType === "application/pdf" ? "pdf" as const : "image" as const,
       fileName: asset.name,
       sizeBytes: asset.size,
-    });
+    };
+    try {
+      validateImportSource(source);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Document non pris en charge");
+      return;
+    }
+    setSelectedSource(source);
     setSourceText("");
   }
 
-  async function confirm(draft: ReservationDraft) {
+  async function confirm(draft: ReservationDraft, confirmedFields: string[]) {
     if (!tripId) return;
     setIsSaving(true);
     setError(null);
@@ -193,7 +195,7 @@ export default function ReservationImportScreen() {
       await sharedLocalReservations.confirm({
         tripId,
         draft,
-        confirmedFields: draft.fieldsRequiringConfirmation,
+        confirmedFields,
       });
       if (pendingId) {
         const inbox = createAppleShareInbox();
@@ -221,154 +223,38 @@ export default function ReservationImportScreen() {
   };
 
   return (
-    <ShellFrame
-      title="Importer une réservation"
-      subtitle="Un brouillon est toujours vérifié avant l’enregistrement."
-      headerAction={
-        <Button size="sm" variant="secondary" onPress={goBackOrHome}>
-          Fermer
-        </Button>
-      }
-    >
-      <Card style={styles.card}>
-        {!tripId ? <TripPicker trips={availableTrips} pending={activePending} onSelect={(selectedTripId) => {
-          const pending = activePending;
-          router.replace(pending ? `/(app)/imports?tripId=${selectedTripId}&pendingId=${pending.id}` : `/(app)/imports?tripId=${selectedTripId}`);
-        }} /> : null}
-        {tripId ? <>
-        <Badge label="ANALYSE OPENCODE" variant="teal" />
-        <Text style={styles.cardTitle}>Coller une confirmation</Text>
-        <Text style={styles.cardMessage}>
-          Le texte est extrait localement si nécessaire, puis analysé par OpenCode avant confirmation.
-        </Text>
-        <Button fullWidth variant="secondary" onPress={() => void chooseDocument()}>
-          Choisir un PDF ou une image
-        </Button>
-        {selectedSource ? <Text style={styles.selectedFile}>Fichier : {selectedSource.fileName ?? selectedSource.uri}</Text> : null}
-        <TextArea
-          label="Contenu"
-          value={sourceText}
-          onChangeText={(value) => {
-            setSourceText(value);
-            setSelectedSource(null);
-          }}
-          placeholder={'type=flight\ntitle=Vol Paris Athènes\nprovider=Aegean\nreference=AB123'}
-          autoCapitalize="none"
-          returnKeyType="done"
-        />
-        <Button fullWidth onPress={() => void analyze()} loading={isAnalyzing}>
-          Analyser le brouillon
-        </Button>
-        </> : null}
-      </Card>
-
-      {isOffline ? (
-        <StatusPanel
-          kind="info"
-          title="Mode hors ligne"
-          message="Les imports déjà reçus restent disponibles sur cet appareil. L’analyse OpenCode reprendra dès que la connexion sera rétablie."
-        />
-      ) : null}
-      <ImportCenter
-        items={pendingImports}
-        tripId={tripId}
-        onRetry={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
-        onSelect={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
-      />
-
-      {error ? <StatusPanel kind="error" title="Import impossible" message={error} actionLabel="Réessayer" onAction={() => void analyze()} /> : null}
-      {result?.state === "error" ? (
-        <StatusPanel kind="error" title="Brouillon invalide" message={result.message} />
-      ) : null}
-      {result?.state === "duplicate" ? (
-        <StatusPanel
-          kind="error"
-          title="Réservation déjà importée"
-          message={`Cette confirmation correspond à « ${result.existing.title} ». Rien n’a été modifié.`}
-          actionLabel="Voir les réservations"
-          onAction={() => router.replace(`/(app)/trips/${tripId}/reservations`)}
-        />
-      ) : null}
-      {result?.state === "needs-confirmation" ? (
-        <DraftCard draft={result.draft} onConfirm={confirm} loading={isSaving} />
-      ) : null}
-      <ScreenNote>
-        Une analyse ne crée jamais une Réservation confirmée automatiquement. Les champs
-        identifiés doivent être relus avant validation.
-      </ScreenNote>
-    </ShellFrame>
+    <ReservationImportView
+      key={pendingId ?? "manual-import"}
+      tripId={tripId}
+      trips={availableTrips}
+      pendingImports={pendingImports}
+      activePending={activePending}
+      input={{ text: sourceText, file: selectedSource }}
+      loadingInbox={isLoadingInbox}
+      result={result}
+      analyzing={isAnalyzing}
+      saving={isSaving}
+      error={error}
+      offline={isOffline}
+      onClose={goBackOrHome}
+      onInputChange={(input) => {
+        setSourceText(input.text);
+        setSelectedSource(input.file);
+      }}
+      onChooseDocument={chooseDocument}
+      onAnalyze={analyze}
+      onConfirm={confirm}
+      onSelectTrip={(selectedTripId) => {
+        const pending = activePending;
+        router.replace(pending ? `/(app)/imports?tripId=${selectedTripId}&pendingId=${pending.id}` : `/(app)/imports?tripId=${selectedTripId}`);
+      }}
+      onOpenImport={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
+      onOpenDocuments={() => {
+        if (tripId) router.replace(`/(app)/trips/${tripId}/documents`);
+      }}
+      onOpenReservations={() => {
+        if (tripId) router.replace(`/(app)/trips/${tripId}/reservations`);
+      }}
+    />
   );
 }
-
-function ImportCenter({
-  items,
-  tripId,
-  onRetry,
-  onSelect,
-}: {
-  items: PendingShareImport[];
-  tripId?: UUID;
-  onRetry: (id: string) => void;
-  onSelect: (id: string) => void;
-}) {
-  if (items.length === 0) return null;
-  return <Card style={styles.card}>
-    <Badge label="CENTRE D’IMPORT" variant="gold" />
-    <Text style={styles.cardTitle}>Documents partagés</Text>
-    {items.map((item) => <Card key={item.id} style={styles.importItem}>
-      <Text style={styles.detail}>
-        {item.fileName ?? "Texte partagé"} · {item.status === "confirmed" ? "traité" : item.status === "failed" ? "échec" : item.status === "processing" ? "en analyse" : "à traiter"}
-      </Text>
-      {item.error ? <Text style={styles.errorDetail}>{item.error}</Text> : null}
-      {item.status === "failed" || item.status === "seen" ? <Button size="sm" variant="secondary" onPress={() => onRetry(item.id)}>{tripId ? "Analyser cet import" : "Associer ce document"}</Button> : null}
-      {item.status === "processing" ? <Button size="sm" variant="secondary" onPress={() => onSelect(item.id)}>Ouvrir cet import</Button> : null}
-    </Card>)}
-  </Card>;
-}
-
-function TripPicker({ trips, pending, onSelect }: { trips: Trip[]; pending?: PendingShareImport; onSelect: (tripId: UUID) => void }) {
-  return <>
-    <Badge label="NOUVEL IMPORT" variant="teal" />
-    <Text style={styles.cardTitle}>Associer au Voyage</Text>
-    <Text style={styles.cardMessage}>{pending ? `Document en attente : ${pending.fileName ?? pending.id}` : "Choisissez le Voyage auquel rattacher ce document."}</Text>
-    {trips.length === 0 ? <StatusPanel kind="info" title="Aucun Voyage disponible" message="Créez ou rejoignez un Voyage avant d’importer cette réservation." /> : null}
-    {trips.map((trip) => <Button key={trip.id} fullWidth variant="secondary" onPress={() => onSelect(trip.id)}>{trip.name}</Button>)}
-  </>;
-}
-
-function DraftCard({
-  draft,
-  onConfirm,
-  loading,
-}: {
-  draft: ReservationDraft;
-  onConfirm: (draft: ReservationDraft) => Promise<void>;
-  loading: boolean;
-}) {
-  return (
-    <Card style={styles.card}>
-      <Badge label="À CONFIRMER" variant="teal" />
-      <Text style={styles.cardTitle}>{draft.title ?? "Titre manquant"}</Text>
-      <Text style={styles.detail}>Type : {draft.type ?? "À préciser"}</Text>
-      <Text style={styles.detail}>Prestataire : {draft.provider ?? "À préciser"}</Text>
-      <Text style={styles.detail}>Référence : {draft.reference ?? "À préciser"}</Text>
-      <Text style={styles.confirmationLabel}>
-        Champs à relire : {draft.fieldsRequiringConfirmation.join(", ") || "aucun"}
-      </Text>
-      <Button fullWidth onPress={() => void onConfirm(draft)} loading={loading}>
-        Confirmer la réservation
-      </Button>
-    </Card>
-  );
-}
-
-const styles = StyleSheet.create({
-  card: { padding: spacing.md, gap: spacing.sm },
-  cardTitle: { ...typography.h3, color: colors.fg },
-  cardMessage: { ...typography.bodySmall, color: colors.muted },
-  detail: { ...typography.bodySmall, color: colors.fg },
-  confirmationLabel: { ...typography.caption, color: colors.accent },
-  selectedFile: { ...typography.caption, color: colors.teal },
-  importItem: { padding: spacing.sm, gap: spacing.xs },
-  errorDetail: { ...typography.caption, color: colors.danger },
-});
