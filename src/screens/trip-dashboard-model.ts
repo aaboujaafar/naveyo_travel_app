@@ -1,4 +1,5 @@
-import type { Stop, Trip } from "../modules/_shared/model";
+import type { Coordinates, ItineraryItem, Stop, Trip } from "../modules/_shared/model";
+import type { MapModel } from "../adapters/map";
 
 const frenchMonths = [
   "janvier",
@@ -62,6 +63,65 @@ export function sortStopsByLocalDate(stops: readonly Stop[]): Stop[] {
 
 export function formatStopDates(stop: Stop): string {
   return formatTripDateRange(stop.startDate, stop.endDate);
+}
+
+export interface DashboardMapPresentation {
+  model: MapModel;
+  confirmedPlaceCount: number;
+  locatedPlaceCount: number;
+  unlocatedPlaceCount: number;
+}
+
+export function buildDashboardMapPresentation(
+  stops: readonly Stop[],
+  items: readonly ItineraryItem[],
+): DashboardMapPresentation {
+  const stopOrder = new Map(stops.map((stop, index) => [stop.id, index + 1]));
+  const points = [];
+  let confirmedPlaceCount = 0;
+  let unlocatedPlaceCount = 0;
+
+  for (const item of items) {
+    const place = item.place;
+    const stopNumber = stopOrder.get(item.stopId);
+    if (place === undefined || stopNumber === undefined) continue;
+
+    confirmedPlaceCount += 1;
+    if (!isValidCoordinates(place.coordinates)) {
+      unlocatedPlaceCount += 1;
+      continue;
+    }
+
+    points.push({
+      id: item.id,
+      label: `Étape ${stopNumber} · ${place.label || item.title}`,
+      coordinates: place.coordinates,
+    });
+  }
+
+  return {
+    model: { points },
+    confirmedPlaceCount,
+    locatedPlaceCount: points.length,
+    unlocatedPlaceCount,
+  };
+}
+
+function isValidCoordinates(value: Coordinates | null | undefined): value is Coordinates {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    "latitude" in value &&
+    "longitude" in value &&
+    typeof value.latitude === "number" &&
+    typeof value.longitude === "number" &&
+    Number.isFinite(value.latitude) &&
+    Number.isFinite(value.longitude) &&
+    value.latitude >= -90 &&
+    value.latitude <= 90 &&
+    value.longitude >= -180 &&
+    value.longitude <= 180
+  );
 }
 
 function parseLocalDate(value: string): DateParts | null {

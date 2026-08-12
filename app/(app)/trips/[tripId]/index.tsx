@@ -1,7 +1,9 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
+import { useNaveyoBootstrap } from "../../../../src/bootstrap";
 import { sharedLocalReservations } from "../../../../src/bootstrap/reservations";
 import type {
+  ItineraryItem,
   Reservation,
   Stop,
   Trip,
@@ -14,18 +16,22 @@ export default function TripDetailRoute() {
   const router = useRouter();
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
   const trips = useTripsModule();
+  const bootstrap = useNaveyoBootstrap();
   const tripId = rawTripId as UUID | undefined;
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
+  const [itineraryItems, setItineraryItems] = useState<ItineraryItem[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!trips || !tripId) {
+    if (!trips || !bootstrap || !tripId) {
       setError(
         !trips
           ? "Le Module Trips n'est pas disponible."
+          : !bootstrap
+            ? "Les Modules du Voyage ne sont pas disponibles."
           : "L'identifiant du Voyage est absent.",
       );
       setLoading(false);
@@ -40,6 +46,14 @@ export default function TripDetailRoute() {
       ]);
       setTrip(nextTrip);
       setStops(nextStops);
+      try {
+        setItineraryItems(await bootstrap.modules.itinerary.list(tripId));
+      } catch {
+        setItineraryItems([]);
+        setError(
+          "Le Voyage et ses Étapes sont chargés, mais les lieux de la carte sont temporairement indisponibles.",
+        );
+      }
       try {
         setReservations(await sharedLocalReservations.list(tripId));
       } catch {
@@ -57,7 +71,7 @@ export default function TripDetailRoute() {
     } finally {
       setLoading(false);
     }
-  }, [tripId, trips]);
+  }, [bootstrap, tripId, trips]);
 
   useFocusEffect(
     useCallback(() => {
@@ -71,6 +85,7 @@ export default function TripDetailRoute() {
     <TripDashboardScreen
       trip={trip}
       stops={stops}
+      itineraryItems={itineraryItems}
       reservations={reservations}
       loading={loading}
       error={error}

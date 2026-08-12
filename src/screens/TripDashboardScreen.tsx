@@ -9,7 +9,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
-import type { Reservation, Stop, Trip } from "../modules/_shared/model";
+import { ExpoMapsView } from "../adapters/map/expo-maps-view";
+import type { ItineraryItem, Reservation, Stop, Trip } from "../modules/_shared/model";
 import {
   colors,
   componentMetrics,
@@ -24,6 +25,7 @@ import {
   countTripDays,
   formatStopDates,
   formatTripDateRange,
+  buildDashboardMapPresentation,
   getTravelerCount,
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
@@ -33,6 +35,7 @@ type DashboardTab = "today" | "map" | "photos" | "addresses" | "budget";
 export interface TripDashboardScreenProps {
   trip: Trip | null;
   stops: Stop[];
+  itineraryItems: ItineraryItem[];
   reservations: Reservation[];
   loading: boolean;
   error: string | null;
@@ -257,7 +260,11 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
           />
         ) : null}
         {activeTab === "map" ? (
-          <MapPanel stopCount={sortedStops.length} onOpen={props.onOpenItinerary} />
+          <MapPanel
+            stops={sortedStops}
+            itineraryItems={props.itineraryItems}
+            onOpen={props.onOpenItinerary}
+          />
         ) : null}
         {activeTab === "addresses" ? (
           <AddressesPanel onOpenAssistant={props.onOpenAssistant} />
@@ -474,14 +481,46 @@ function TodayPanel({
   );
 }
 
-function MapPanel({ stopCount, onOpen }: { stopCount: number; onOpen: () => void }) {
+function MapPanel({
+  stops,
+  itineraryItems,
+  onOpen,
+}: {
+  stops: Stop[];
+  itineraryItems: ItineraryItem[];
+  onOpen: () => void;
+}) {
+  const presentation = buildDashboardMapPresentation(stops, itineraryItems);
+
   return (
     <Section title="Carte du séjour">
-      <View style={styles.mapPreview}>
-        <View style={styles.mapGrid} />
-        <View style={styles.mapMarker}><Icon name="map-pin" size={24} color={colors.accent} /></View>
-        <View style={styles.mapLabel}><AppText variant="caption" color="teal">{stopCount} Étape{stopCount > 1 ? "s" : ""}</AppText></View>
-      </View>
+      {presentation.model.points.length > 0 ? (
+        <ExpoMapsView
+          model={presentation.model}
+          style={styles.mapPreview}
+          testID="dashboard-map-preview"
+        />
+      ) : (
+        <View style={styles.mapUnavailable} testID="dashboard-map-unavailable">
+          <InlineMessage
+            title={stops.length === 0 ? "Aucune Étape" : "Aucun lieu géolocalisé"}
+            message={
+              stops.length === 0
+                ? "Ajoutez une Étape pour afficher les lieux du Voyage."
+                : "Les lieux confirmés sans coordonnées restent visibles dans l’itinéraire."
+            }
+          />
+        </View>
+      )}
+      {presentation.unlocatedPlaceCount > 0 ? (
+        <View style={styles.mapDataNotice} testID="dashboard-map-partial-data">
+          <AppText variant="caption" color="muted">
+            {presentation.unlocatedPlaceCount} lieu
+            {presentation.unlocatedPlaceCount > 1 ? "x" : ""} confirmé
+            {presentation.unlocatedPlaceCount > 1 ? "s" : ""} sans coordonnées · liste conservée
+          </AppText>
+        </View>
+      ) : null}
       <TextLink label="Ouvrir la carte complète de l'itinéraire" onPress={onOpen} icon="map" />
     </Section>
   );
@@ -634,10 +673,9 @@ const styles = StyleSheet.create({
   linkRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
   activityItem: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md },
   activityAvatar: { width: spacing.xl + spacing.xs, height: spacing.xl + spacing.xs, borderRadius: radius.full, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" },
-  mapPreview: { height: spacing.xl * 10, borderRadius: radius.md, backgroundColor: colors.tealSoft, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, overflow: "hidden", position: "relative", marginBottom: spacing.md },
-  mapGrid: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, opacity: componentMetrics.tripDashboard.mapGridOpacity, backgroundColor: colors.teal },
-  mapMarker: { position: "absolute", top: "38%", left: "48%", width: spacing["2xl"], height: spacing["2xl"], borderRadius: radius.full, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  mapLabel: { position: "absolute", right: spacing.md - spacing.xs, bottom: spacing.md - spacing.xs, paddingHorizontal: spacing.md - spacing.xs, paddingVertical: spacing.sm - spacing.xs / 2, borderRadius: radius.full, backgroundColor: colors.surface },
+  mapPreview: { height: spacing.xl * 10, borderRadius: radius.md, backgroundColor: colors.tealSoft, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, overflow: "hidden", marginBottom: spacing.md },
+  mapUnavailable: { minHeight: spacing.xl * 10, borderRadius: radius.md, backgroundColor: colors.tealSoft, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, justifyContent: "center", marginBottom: spacing.md, padding: spacing.md },
+  mapDataNotice: { marginBottom: spacing.md },
   budgetCard: { padding: spacing.lg, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md, gap: spacing.xs, marginBottom: spacing.md },
   budgetTrack: { height: spacing.sm, borderRadius: radius.full, backgroundColor: colors.border, overflow: "hidden", marginTop: spacing.md },
   budgetFillEmpty: { width: "0%", height: "100%", backgroundColor: colors.teal },
