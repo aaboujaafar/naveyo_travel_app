@@ -39,7 +39,7 @@ export default function TripInviteScreen() {
     };
   }, [tripId, trips]);
 
-  const createInvitation = async (email: string): Promise<TripInvitation | null> => {
+  const createInvitation = async (email?: string): Promise<TripInvitation | null> => {
     if (!trips || !tripId) {
       setError("Le Module Voyages est indisponible.");
       return null;
@@ -49,7 +49,7 @@ export default function TripInviteScreen() {
     try {
       const nextInvitation = await trips.createInvitation({
         tripId: tripId as Trip["id"],
-        email,
+        ...(email ? { email } : {}),
       });
       setInvitation(nextInvitation);
       return nextInvitation;
@@ -81,10 +81,6 @@ export default function TripInviteScreen() {
       ) => {
         let shareInvitation = invitation;
         if (!shareInvitation) {
-          if (!email) {
-            setError("Saisissez une adresse e-mail valide avant de partager.");
-            return;
-          }
           shareInvitation = await createInvitation(email);
         }
         if (!shareInvitation || !bootstrap?.modules.invitationSharing) {

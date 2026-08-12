@@ -12,7 +12,7 @@ Permettre au propriétaire d’un Voyage de transmettre le lien d’une invitati
 - SMS, via le composeur iOS ;
 - Partage, via la feuille de partage système et les autres applications disponibles.
 
-Le canal ne crée pas une nouvelle identité et n’envoie pas directement l’invitation. Une adresse e-mail valide active les boutons ; au premier appui, Naveyo crée l’invitation puis transporte le lien privé généré par le Module Voyages. La vérification de l’adresse e-mail invitée et l’acceptation restent inchangées.
+Le canal ne crée pas une nouvelle identité et n’envoie pas directement l’invitation. Les boutons sont actifs sans e-mail : au premier appui, Naveyo crée une Invitation de Voyage libre puis transporte son lien privé. Une adresse e-mail facultative peut être fournie pour limiter l’acceptation au Compte correspondant. Dans les deux cas, l’acceptation exige un Compte authentifié.
 
 ## Développement prévu
 
@@ -20,8 +20,9 @@ Le canal ne crée pas une nouvelle identité et n’envoie pas directement l’i
 2. Construire un message commun à partir du nom du Voyage et du lien `naveyo://invite/<token>`.
 3. Ajouter un Adapter iOS pour les URL schemes WhatsApp/SMS et pour `Share.share`.
 4. Relier le Module au bootstrap afin que la route d’invitation n’assemble aucun URL scheme.
-5. Remplacer les faux boutons « Email » par « Partage » et gérer les canaux indisponibles.
-6. Couvrir les URL, l’encodage, l’annulation de la feuille système et l’absence d’application par des tests de Module.
+5. Remplacer les faux boutons « Email » par « Partage », activer le lien sans e-mail et gérer les canaux indisponibles.
+6. Rendre l’e-mail facultatif côté Module Voyages, Supabase et écran d’acceptation.
+7. Couvrir les URL, l’encodage, l’annulation de la feuille système et l’absence d’application par des tests de Module.
 
 ## Réalisation
 
@@ -41,7 +42,7 @@ L’écran d’invitation propose désormais :
 | SMS | ouvre `sms:?&body=` avec le message encodé |
 | Partage | ouvre la feuille de partage iOS |
 
-Avant la création de l’invitation, un e-mail valide suffit à activer les trois actions. Le premier appui crée l’invitation puis ouvre le canal choisi. Quand WhatsApp ou le canal sélectionné n’est pas disponible, l’écran conserve l’invitation et propose explicitement le partage générique ou le SMS.
+Les trois actions sont actives sans e-mail. Le premier appui crée l’invitation libre puis ouvre le canal choisi. Un e-mail facultatif reste disponible pour lier l’invitation à un Compte précis. Quand WhatsApp ou le canal sélectionné n’est pas disponible, l’écran conserve l’invitation et propose explicitement le partage générique ou le SMS.
 
 ## Fichiers principaux
 
@@ -54,10 +55,12 @@ Avant la création de l’invitation, un e-mail valide suffit à activer les tro
 - `app/(app)/trips/[tripId]/invite.tsx`
 - `src/screens/InviteFamilyScreen.tsx`
 - `app.config.ts`
+- `supabase/migrations/20260811000700_optional_trip_invitation_email.sql`
+- `CONTEXT.md`
 
 ## Validation exécutée
 
-- `pnpm test -- src/modules/invitation-sharing/module.test.ts src/screens/invite-family-model.test.ts` — 169 tests passent ; le script actuel exécute toute la suite Vitest.
+- `pnpm test -- src/modules/invitation-sharing/module.test.ts src/screens/invite-family-model.test.ts` — 171 tests passent ; le script actuel exécute toute la suite Vitest.
 - `pnpm typecheck` — passe.
 - `pnpm lint` — passe, avec un warning préexistant dans `.expo/types/router.d.ts`.
 - `git diff --check` — les seuls espaces finaux signalés sont préexistants dans `src/adapters/supabase/trip-assistant/index.ts`.
@@ -71,5 +74,6 @@ La validation native reste nécessaire dans une development build sur les deux i
 - feuille Partage vers Messages, WhatsApp et une autre application ;
 - lien reçu, ouverture de Naveyo et acceptation avec le Compte correspondant à l’adresse invitée ;
 - VoiceOver et zone tactile des trois boutons.
+- migration `20260811000700_optional_trip_invitation_email.sql` appliquée et testée avec les deux membres et un Compte extérieur.
 
 Cette branche ne prétend pas confirmer qu’un message a été envoyé : elle confirme seulement l’ouverture du composeur ou de la feuille de partage. Aucun fournisseur WhatsApp/SMS, backend supplémentaire ou journalisation du lien n’est ajouté.

@@ -43,7 +43,7 @@ export interface InviteFamilyScreenProps {
   loading: boolean;
   error?: string | null;
   onBack: () => void;
-  onInvite: (email: string) => Promise<void>;
+  onInvite: (email?: string) => Promise<void>;
   onShareInvitation: (
     channel: InvitationShareChannel,
     email?: string,
@@ -75,7 +75,8 @@ export function InviteFamilyScreen({
   const [attempted, setAttempted] = useState(false);
   const emailIsValid = isInvitationEmailValid(email);
   const shareReady = isInvitationShareReady(invitation, email);
-  const shareEmail = invitation ? undefined : normalizeInvitationEmail(email);
+  const shareEmail =
+    invitation || !emailIsValid ? undefined : normalizeInvitationEmail(email);
   const deepLink = invitation ? buildInvitationDeepLink(invitation) : null;
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.lg) }),
@@ -88,8 +89,8 @@ export function InviteFamilyScreen({
 
   const submitInvitation = async () => {
     setAttempted(true);
-    if (!emailIsValid) return;
-    await onInvite(normalizeInvitationEmail(email));
+    if (email.trim().length > 0 && !emailIsValid) return;
+    await onInvite(email.trim() ? normalizeInvitationEmail(email) : undefined);
   };
 
   const visibleMembers = members.length > 0 ? members : [];
@@ -190,7 +191,7 @@ export function InviteFamilyScreen({
               ? deepLink
                 ? "Choisissez un canal pour transmettre le lien privé."
                 : "Choisissez un canal pour créer l’invitation et transmettre le lien."
-              : "Saisissez une adresse e-mail valide pour activer les canaux."}
+              : "Saisissez une adresse e-mail valide ou laissez le champ vide pour créer un lien libre."}
           </AppText>
         </Section>
 
@@ -239,15 +240,17 @@ export function InviteFamilyScreen({
             {invitation ? (
               <View style={styles.memberItem}>
                 <AvatarBubble
-                  initials={invitation.invitedEmail.slice(0, 2).toUpperCase()}
+                  initials={(invitation.invitedEmail?.slice(0, 2) ?? "LI").toUpperCase()}
                   tone="gold"
                 />
                 <View style={styles.memberInfo}>
                   <AppText variant="label" numberOfLines={1}>
-                    {invitation.invitedEmail}
+                    {invitation.invitedEmail ?? "Lien libre"}
                   </AppText>
                   <AppText variant="caption" color="muted">
-                    Compte éditeur invité
+                    {invitation.invitedEmail
+                      ? "Compte éditeur invité"
+                      : "Le prochain Compte authentifié pourra rejoindre"}
                   </AppText>
                 </View>
                 <Badge
@@ -264,14 +267,14 @@ export function InviteFamilyScreen({
             <Input
               value={email}
               onChangeText={setEmail}
-              placeholder="Adresse e-mail du second Compte…"
+              placeholder="Adresse e-mail (facultative)…"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="send"
               onSubmitEditing={() => void submitInvitation()}
               error={
-                attempted && !emailIsValid
+                attempted && email.trim().length > 0 && !emailIsValid
                   ? "Saisissez une adresse e-mail valide."
                   : undefined
               }
@@ -280,7 +283,7 @@ export function InviteFamilyScreen({
             <IconButton
               icon={<Icon name="plus" size={22} color={colors.white} />}
               onPress={() => void submitInvitation()}
-              disabled={loading || !emailIsValid}
+              disabled={loading || (email.trim().length > 0 && !emailIsValid)}
               accessibilityLabel="Créer l’invitation"
               style={styles.addMemberButton}
             />
@@ -296,7 +299,11 @@ export function InviteFamilyScreen({
             <InlineMessage
               variant="success"
               title="Invitation prête"
-              message="Le lien privé expire après 7 jours et donne uniquement le rôle éditeur."
+              message={
+                invitation.invitedEmail
+                  ? "Le lien privé expire après 7 jours et donne uniquement le rôle éditeur."
+                  : "Le lien privé expire après 7 jours et sera accepté par le premier Compte authentifié."
+              }
             />
           ) : null}
         </View>

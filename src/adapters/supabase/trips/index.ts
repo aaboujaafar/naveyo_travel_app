@@ -76,7 +76,9 @@ const mapMember = (row: Row): TripMember => ({
 const mapInvitation = (row: Row): TripInvitation => ({
   id: assertStableId(stringField(row, "id")),
   tripId: assertStableId(stringField(row, "trip_id")),
-  invitedEmail: stringField(row, "invited_email"),
+  ...(typeof row.invited_email === "string"
+    ? { invitedEmail: row.invited_email }
+    : {}),
   role: "editor",
   token: assertStableId(stringField(row, "token")),
   status:
@@ -85,8 +87,9 @@ const mapInvitation = (row: Row): TripInvitation => ({
       : "pending",
   expiresAt: utcIsoDateTime(stringField(row, "expires_at")) as TripInvitation["expiresAt"],
 });
-const normalizeInvitationEmail = (value: string): string => {
-  const email = value.trim().toLowerCase();
+const normalizeInvitationEmail = (value?: string): string | null => {
+  const email = value?.trim().toLowerCase() ?? "";
+  if (!email) return null;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("Enter a valid invitation email");
   }

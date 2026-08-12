@@ -14,7 +14,7 @@ export function isInvitationShareReady(
   invitation: Pick<TripInvitation, "token"> | null,
   email: string,
 ): boolean {
-  return invitation !== null || isInvitationEmailValid(email);
+  return invitation !== null || email.trim().length === 0 || isInvitationEmailValid(email);
 }
 
 export function buildInvitationDeepLink(

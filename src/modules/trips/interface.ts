@@ -22,7 +22,7 @@ export interface AddTripMemberInput {
 
 export interface CreateTripInvitationInput {
   tripId: UUID;
-  email: string;
+  email?: string;
 }
 
 export interface TripsModule {

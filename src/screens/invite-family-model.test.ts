@@ -39,6 +39,7 @@ describe("invite family presentation model", () => {
 
   it("activates share channels once a valid invitation email is ready", () => {
     expect(isInvitationShareReady(null, "not-an-email")).toBe(false);
+    expect(isInvitationShareReady(null, "")).toBe(true);
     expect(isInvitationShareReady(null, "sophie@example.com")).toBe(true);
     expect(isInvitationShareReady({ token: "invite-token" as UUID }, "")).toBe(
       true,
