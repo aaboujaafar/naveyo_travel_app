@@ -15,8 +15,9 @@ export {
   UnavailableMapAdapter,
 } from "./unavailable";
 export {
-  ReactNativeMapsAdapter,
-  type ReactNativeMapsAdapterOptions,
-  type ReactNativeMapsAvailability,
-} from "./react-native-adapter";
-export type { ReactNativeMapsViewProps } from "./react-native-maps-view";
+  ExpoMapsAdapter,
+  type ExpoMapsAdapterOptions,
+  type ExpoMapsAvailability,
+  cameraPositionForRegion,
+} from "./expo-maps-adapter";
+export type { ExpoMapsViewProps } from "./expo-maps-view";

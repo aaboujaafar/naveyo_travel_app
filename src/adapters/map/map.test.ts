@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  cameraPositionForRegion,
+  ExpoMapsAdapter,
   mapStatusMessage,
-  ReactNativeMapsAdapter,
   regionForCoordinates,
   regionForPoints,
 } from "./index";
@@ -12,9 +13,9 @@ const point = (id: string, latitude: number, longitude: number) => ({
   coordinates: { latitude, longitude },
 });
 
-describe("ReactNativeMapsAdapter", () => {
+describe("ExpoMapsAdapter", () => {
   it("serializes an empty map and has no region", () => {
-    const adapter = new ReactNativeMapsAdapter();
+    const adapter = new ExpoMapsAdapter();
     const model = { points: [] };
 
     expect(adapter.status(model)).toBe("empty");
@@ -22,7 +23,7 @@ describe("ReactNativeMapsAdapter", () => {
   });
 
   it("centers a single point with a non-zero region", () => {
-    const adapter = new ReactNativeMapsAdapter();
+    const adapter = new ExpoMapsAdapter();
     const model = { points: [point("one", 48.8566, 2.3522)] };
 
     expect(adapter.status(model)).toBe("ready");
@@ -52,7 +53,7 @@ describe("ReactNativeMapsAdapter", () => {
   });
 
   it("includes a route polyline when computing the visible region", () => {
-    const adapter = new ReactNativeMapsAdapter();
+    const adapter = new ExpoMapsAdapter();
     const model = {
       points: [point("one", 48.8566, 2.3522)],
       polyline: [
@@ -71,16 +72,38 @@ describe("ReactNativeMapsAdapter", () => {
     });
   });
 
+  it("converts the stable region contract to an expo-maps camera position", () => {
+    expect(
+      cameraPositionForRegion({
+        latitude: 48.8566,
+        longitude: 2.3522,
+        latitudeDelta: 0.028,
+        longitudeDelta: 0.028,
+      }),
+    ).toMatchObject({
+      coordinates: { latitude: 48.8566, longitude: 2.3522 },
+      zoom: expect.any(Number),
+    });
+    expect(
+      cameraPositionForRegion({
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 360,
+        longitudeDelta: 360,
+      }).zoom,
+    ).toBe(1);
+  });
+
   it("serializes permission-denied and tiles-unavailable states", () => {
     const model = { points: [point("one", 48.8566, 2.3522)] };
 
     expect(
-      new ReactNativeMapsAdapter({ availability: "permission-denied" }).status(
+      new ExpoMapsAdapter({ availability: "permission-denied" }).status(
         model,
       ),
     ).toBe("permission-denied");
     expect(
-      new ReactNativeMapsAdapter({ availability: "tiles-unavailable" }).status(
+      new ExpoMapsAdapter({ availability: "tiles-unavailable" }).status(
         model,
       ),
     ).toBe("tiles-unavailable");
