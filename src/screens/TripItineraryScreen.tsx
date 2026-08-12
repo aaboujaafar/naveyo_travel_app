@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { MapAdapter } from "../adapters/map/interface";
+import { ExpoMapsAdapter } from "../adapters/map/expo-maps-adapter";
+import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
   ItineraryItem,
   Stop,
@@ -20,9 +23,9 @@ import {
   Skeleton,
 } from "../ui";
 import {
+  buildItineraryMapModel,
   formatDistance,
   formatLocalItineraryDate,
-  itineraryPointCount,
   trackDistanceMeters,
 } from "./trip-map-model";
 
@@ -37,6 +40,7 @@ export interface TripItineraryScreenProps {
   onOpenTrip: () => void;
   onOpenAssistant: (stopId: Stop["id"]) => void;
   onOpenTracking: () => void;
+  mapAdapter?: MapAdapter;
 }
 
 type MapFilter = "Tous" | "Restos" | "Visites" | "Hôtels" | "Transport";
@@ -54,18 +58,36 @@ export function TripItineraryScreen({
   onOpenTrip,
   onOpenAssistant,
   onOpenTracking,
+  mapAdapter,
 }: TripItineraryScreenProps) {
   const insets = useSafeAreaInsets();
   const days = useMemo(() => buildItineraryDays(items, stops), [items, stops]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<MapFilter>("Tous");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const activeDay =
     days.find((day) => day.date === selectedDate) ?? days[0] ?? null;
-  const visibleItems = activeDay
-    ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter))
-    : [];
-  const coordinateCount = itineraryPointCount(items);
+  const visibleItems = useMemo(
+    () =>
+      activeDay
+        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter))
+        : [],
+    [activeDay, selectedFilter],
+  );
+  const mapModel = useMemo(
+    () => buildItineraryMapModel(visibleItems, trackPoints),
+    [trackPoints, visibleItems],
+  );
+  const resolvedMapAdapter = useMemo(
+    () => mapAdapter ?? new ExpoMapsAdapter(),
+    [mapAdapter],
+  );
+  const visibleSelectedPointId = mapModel.points.some(
+    (point) => point.id === selectedPointId,
+  )
+    ? selectedPointId ?? undefined
+    : undefined;
   const distance = trackDistanceMeters(trackPoints);
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
@@ -145,20 +167,17 @@ export function TripItineraryScreen({
         ) : null}
 
         <View style={styles.mapContainer}>
-          <View style={styles.mapBackground}>
-            <Icon name="map" size={32} color={colors.teal} />
-            <AppText variant="label" align="center">
-              {coordinateCount === 0
-                ? "Aucun lieu géolocalisé"
-                : "Fond cartographique indisponible"}
-            </AppText>
-            <AppText variant="caption" color="muted" align="center">
-              {coordinateCount === 0
-                ? "Les coordonnées confirmées apparaîtront ici."
-                : `${coordinateCount} lieu${coordinateCount > 1 ? "x" : ""} avec coordonnées reste${coordinateCount > 1 ? "nt" : ""} disponible${coordinateCount > 1 ? "s" : ""} dans la liste.`}
-            </AppText>
-            <Badge label="Mode dégradé" variant="gold" />
-          </View>
+          <ExpoMapsView
+            adapter={resolvedMapAdapter}
+            model={mapModel}
+            onPointSelected={(point) => {
+              setSelectedPointId(point.id);
+              setExpandedItemId(point.id);
+            }}
+            selectedPointId={visibleSelectedPointId}
+            style={styles.mapView}
+            testID="itinerary-map"
+          />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -173,20 +192,6 @@ export function TripItineraryScreen({
               />
             ))}
           </ScrollView>
-          <View style={styles.mapControls}>
-            <IconButton
-              icon={<Icon name="plus" size={20} />}
-              onPress={() => undefined}
-              disabled
-              accessibilityLabel="Zoom avant, à venir"
-            />
-            <IconButton
-              icon={<AppText variant="h3">−</AppText>}
-              onPress={() => undefined}
-              disabled
-              accessibilityLabel="Zoom arrière, à venir"
-            />
-          </View>
         </View>
 
         <View style={styles.itinerarySection}>
@@ -210,9 +215,16 @@ export function TripItineraryScreen({
                   key={item.id}
                   item={item}
                   expanded={expandedItemId === item.id}
-                  onPress={() =>
-                    setExpandedItemId((current) => current === item.id ? null : item.id)
-                  }
+                  onPress={() => {
+                    setSelectedPointId(
+                      mapModel.points.some((point) => point.id === item.id)
+                        ? item.id
+                        : null,
+                    );
+                    setExpandedItemId((current) =>
+                      current === item.id ? null : item.id,
+                    );
+                  }}
                 />
               ))}
             </View>
@@ -454,9 +466,8 @@ const styles = StyleSheet.create({
   dayPillActive: { borderColor: colors.accent, backgroundColor: colors.accent, ...shadows.accent },
   horizontalSection: { paddingHorizontal: spacing.lg, marginVertical: spacing.md },
   mapContainer: { position: "relative", minHeight: spacing["2xl"] * 7, marginHorizontal: spacing.md, borderRadius: radius.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.tealSoft, ...shadows.md },
-  mapBackground: { flex: 1, minHeight: spacing["2xl"] * 7, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.xl },
+  mapView: { height: spacing["2xl"] * 7, width: "100%" },
   mapFilters: { position: "absolute", left: spacing.md, top: spacing.md, gap: spacing.xs, paddingRight: spacing.xl },
-  mapControls: { position: "absolute", right: spacing.md, bottom: spacing.xl, gap: spacing.sm },
   itinerarySection: { padding: spacing.lg },
   itineraryHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.md },
   itineraryHeaderText: { flex: 1, gap: spacing.xs },
