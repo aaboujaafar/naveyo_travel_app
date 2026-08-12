@@ -90,12 +90,24 @@ export default function PlaceDetailRoute() {
   );
 
   const openDirections = useCallback(async () => {
-    if (!place) return;
+    const coordinates = place?.coordinates;
+    if (
+      !coordinates ||
+      !Number.isFinite(coordinates.latitude) ||
+      !Number.isFinite(coordinates.longitude) ||
+      coordinates.latitude < -90 ||
+      coordinates.latitude > 90 ||
+      coordinates.longitude < -180 ||
+      coordinates.longitude > 180
+    ) {
+      return;
+    }
+
     const query = encodeURIComponent(
       place.address ? `${place.name}, ${place.address}` : place.name,
     );
     await Linking.openURL(
-      `http://maps.apple.com/?ll=${place.coordinates.latitude},${place.coordinates.longitude}&q=${query}`,
+      `http://maps.apple.com/?ll=${coordinates.latitude},${coordinates.longitude}&q=${query}`,
     );
   }, [place]);
 
