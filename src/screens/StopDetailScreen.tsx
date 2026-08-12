@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import type { MapModel, MapPoint } from "../adapters/map";
+import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
   ItineraryItem,
   Reservation,
@@ -52,13 +54,27 @@ export interface StopDetailScreenProps {
   onOpenReservations: () => void;
 }
 
+export function buildStopMapModel(itinerary: ItineraryItem[]): MapModel {
+  const points: MapPoint[] = [];
+
+  for (const item of itinerary) {
+    const place = item.place;
+    if (!place?.coordinates) continue;
+
+    points.push({
+      id: item.id,
+      label: place.label,
+      coordinates: place.coordinates,
+    });
+  }
+
+  return { points };
+}
+
 export function StopDetailScreen(props: StopDetailScreenProps) {
   const [tab, setTab] = useState<StopDetailTab>("itinerary");
   const [expandedItemId, setExpandedItemId] = useState<UUID | null>(null);
-  const coordinateCount = useMemo(
-    () => props.itinerary.filter((item) => item.place?.coordinates !== undefined).length,
-    [props.itinerary],
-  );
+  const mapModel = useMemo(() => buildStopMapModel(props.itinerary), [props.itinerary]);
 
   if (props.loading && !props.stop) return <StopDetailLoading onBack={props.onBack} />;
 
@@ -122,13 +138,26 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
               <View style={styles.section}>
                 <SectionTitle title="Itinéraire de l’Étape" />
                 <View style={styles.mapPreview}>
-                  <Icon name="map" size={32} color={colors.teal} />
-                  <AppText variant="label" align="center">
-                    {coordinateCount > 0 ? `${coordinateCount} lieu${coordinateCount > 1 ? "x" : ""} géolocalisé${coordinateCount > 1 ? "s" : ""}` : "Aucun lieu géolocalisé"}
-                  </AppText>
-                  <AppText variant="caption" color="muted" align="center">
-                    Le fond cartographique complet reste sur l’écran Carte & Itinéraire.
-                  </AppText>
+                  {mapModel.points.length > 0 ? (
+                    <ExpoMapsView
+                      model={mapModel}
+                      style={styles.mapSurface}
+                      testID="stop-detail-map"
+                    />
+                  ) : (
+                    <View style={styles.mapEmpty} testID="stop-detail-map-empty">
+                      <Icon name="map" size={32} color={colors.teal} />
+                      <AppText variant="label" align="center">Aucun lieu géolocalisé</AppText>
+                      <AppText variant="caption" color="muted" align="center">
+                        Les éléments de l’Étape restent disponibles dans la timeline ci-dessous.
+                      </AppText>
+                    </View>
+                  )}
+                  {mapModel.points.length > 0 ? (
+                    <AppText variant="caption" color="muted" align="center" style={styles.mapSummary}>
+                      {mapModel.points.length} lieu{mapModel.points.length > 1 ? "x" : ""} géolocalisé{mapModel.points.length > 1 ? "s" : ""} dans cette Étape.
+                    </AppText>
+                  ) : null}
                   <Button size="sm" variant="secondary" onPress={props.onOpenItinerary} icon={<Icon name="map" size={16} color={colors.teal} />}>Ouvrir la carte</Button>
                 </View>
 
@@ -301,7 +330,10 @@ const styles = StyleSheet.create({
   tab: { flex: 1, minHeight: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xs, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   tabActive: { backgroundColor: colors.fg, borderColor: colors.fg },
   section: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
-  mapPreview: { minHeight: spacing["2xl"] * 3, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.tealSoft },
+  mapPreview: { overflow: "hidden", gap: spacing.sm, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
+  mapSurface: { width: "100%", height: spacing["2xl"] * 5 },
+  mapEmpty: { minHeight: spacing["2xl"] * 3, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.tealSoft },
+  mapSummary: { paddingHorizontal: spacing.md },
   timeline: { position: "relative", paddingLeft: spacing.lg },
   timelineLine: { position: "absolute", left: spacing.sm, top: spacing.md, bottom: spacing.md, width: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   timelineItem: { position: "relative", minHeight: layout.minimumTouchTarget, gap: spacing.xs, paddingLeft: spacing.md, paddingVertical: spacing.md },
