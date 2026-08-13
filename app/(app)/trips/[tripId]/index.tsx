@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../src/bootstrap";
 import { sharedLocalReservations } from "../../../../src/bootstrap/reservations";
 import type {
+  Coordinates,
   ItineraryItem,
   Reservation,
   Stop,
@@ -12,6 +13,7 @@ import type {
 import { useTripsModule } from "../../../../src/modules/trips";
 import { TripDashboardScreen } from "../../../../src/screens/TripDashboardScreen";
 import type { DashboardWeatherState } from "../../../../src/screens/TripDashboardScreen";
+import { dashboardRouteCoordinates } from "../../../../src/screens/trip-dashboard-model";
 
 export default function TripDetailRoute() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function TripDetailRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
+  const [routePolyline, setRoutePolyline] = useState<Coordinates[]>([]);
 
   const load = useCallback(async () => {
     if (!trips || !bootstrap || !tripId) {
@@ -52,6 +55,25 @@ export default function TripDetailRoute() {
       try {
         loadedItinerary = await bootstrap.modules.itinerary.list(tripId);
         setItineraryItems(loadedItinerary);
+        if (bootstrap.modules.routing) {
+          const routeCoordinates = dashboardRouteCoordinates(nextStops, loadedItinerary);
+          if (routeCoordinates.length >= 2) {
+            try {
+              const route = await bootstrap.modules.routing.calculate({
+                tripId,
+                coordinates: routeCoordinates,
+                mode: "drive",
+              });
+              setRoutePolyline(route?.geometry ?? []);
+            } catch {
+              setRoutePolyline([]);
+            }
+          } else {
+            setRoutePolyline([]);
+          }
+        } else {
+          setRoutePolyline([]);
+        }
       } catch {
         setItineraryItems([]);
         setError(
@@ -60,7 +82,14 @@ export default function TripDetailRoute() {
       }
       const itineraryItem = loadedItinerary.find((item) => item.place?.coordinates);
       const stop = itineraryItem ? nextStops.find((candidate) => candidate.id === itineraryItem.stopId) : nextStops[0];
-      const coordinates = itineraryItem?.place?.coordinates ?? (stop ? (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates : undefined);
+      let coordinates = itineraryItem?.place?.coordinates ?? stop?.coordinates;
+      if (!coordinates && stop) {
+        try {
+          coordinates = (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
+        } catch {
+          coordinates = undefined;
+        }
+      }
       if (!coordinates || !stop) {
         setWeather({ status: "empty", message: "Ajoutez une Étape géolocalisable pour afficher la météo." });
       } else {
@@ -123,6 +152,9 @@ export default function TripDetailRoute() {
       onOpenStop={(stop) =>
         router.push(`/(app)/trips/${routeTripId}/stops/${stop.id}`)
       }
+      onOpenCreateStop={() =>
+        router.push(`/(app)/trips/${routeTripId}/stops/new`)
+      }
       onOpenExpenses={() =>
         router.push(`/(app)/trips/${routeTripId}/expenses`)
       }
@@ -133,6 +165,7 @@ export default function TripDetailRoute() {
         router.push(`/(app)/trips/${routeTripId}/documents`)
       }
       weather={weather}
+      routePolyline={routePolyline}
     />
   );
 }

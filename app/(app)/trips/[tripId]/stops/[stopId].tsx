@@ -70,7 +70,14 @@ export default function StopDetailRoute() {
       setDocuments(stopDocuments);
       setReservations(filterReservationsForStop(allReservations, stopDocuments));
       const itineraryPlace = filterItineraryForStop(allItinerary, selectedStop).find((item) => item.place?.coordinates)?.place;
-      const coordinates = itineraryPlace?.coordinates ?? (await bootstrap.modules.places.search({ query: selectedStop.name, countryCode: selectedStop.countryCode, stopId: selectedStop.id, tripId })).at(0)?.coordinates;
+      let coordinates = itineraryPlace?.coordinates ?? selectedStop.coordinates;
+      if (!coordinates) {
+        try {
+          coordinates = (await bootstrap.modules.places.search({ query: selectedStop.name, countryCode: selectedStop.countryCode, stopId: selectedStop.id, tripId })).at(0)?.coordinates;
+        } catch {
+          coordinates = undefined;
+        }
+      }
       if (!coordinates) {
         setWeather({ status: "unavailable", errorMessage: "Impossible de géolocaliser cette Étape pour afficher la météo." });
       } else {
@@ -125,6 +132,7 @@ export default function StopDetailRoute() {
       onOpenItinerary={() => router.push(`/(app)/trips/${routeTripId}/itinerary`)}
       onOpenDocuments={() => router.push(`/(app)/trips/${routeTripId}/documents?stopId=${routeStopId}`)}
       onOpenReservations={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
+      onEditLocation={() => router.push(`/(app)/trips/${routeTripId}/stops/${routeStopId}/edit`)}
     />
   );
 }
