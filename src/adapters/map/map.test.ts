@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   cameraPositionForRegion,
   ExpoMapsAdapter,
+  isValidCoordinate,
   mapStatusMessage,
   regionForCoordinates,
   regionForPoints,
+  validCoordinates,
 } from "./index";
+import { UnavailableMapAdapter } from "./unavailable";
 
 const point = (id: string, latitude: number, longitude: number) => ({
   id,
@@ -44,7 +47,7 @@ describe("ExpoMapsAdapter", () => {
 
     expect(region).toEqual({
       latitude: -0.5,
-      longitude: -0.5,
+      longitude: 0.5,
       latitudeDelta: 180,
       longitudeDelta: 360,
     });
@@ -70,6 +73,32 @@ describe("ExpoMapsAdapter", () => {
       latitudeDelta: expect.any(Number),
       longitudeDelta: expect.any(Number),
     });
+  });
+
+  it("keeps a valid route visible when every marker coordinate is invalid", () => {
+    const adapter = new ExpoMapsAdapter();
+    const model = {
+      points: [point("invalid", Number.NaN, 2.3522)],
+      polyline: [
+        { latitude: 48.8566, longitude: 2.3522 },
+        { latitude: 48.857, longitude: 2.353 },
+        { latitude: 91, longitude: 2.354 },
+      ],
+    };
+
+    expect(adapter.status(model)).toBe("ready");
+    expect(adapter.polyline(model)).toHaveLength(2);
+    expect(adapter.region(model)).not.toBeNull();
+  });
+
+  it("fits points across the international date line using the short arc", () => {
+    const region = regionForCoordinates([
+      { latitude: 35, longitude: 179 },
+      { latitude: 35.2, longitude: -179 },
+    ]);
+
+    expect(region?.longitude).toBe(180);
+    expect(region?.longitudeDelta).toBeCloseTo(2.8, 8);
   });
 
   it("converts the stable region contract to an expo-maps camera position", () => {
@@ -112,6 +141,16 @@ describe("ExpoMapsAdapter", () => {
   });
 
   it("ignores invalid coordinates while computing a safe region", () => {
+    expect(isValidCoordinate({ latitude: 48.8566, longitude: 2.3522 })).toBe(
+      true,
+    );
+    expect(isValidCoordinate({ latitude: 91, longitude: 2.3522 })).toBe(false);
+    expect(
+      validCoordinates([
+        { latitude: Number.NaN, longitude: 0 },
+        { latitude: 48.8566, longitude: 2.3522 },
+      ]),
+    ).toEqual([{ latitude: 48.8566, longitude: 2.3522 }]);
     expect(
       regionForCoordinates([
         { latitude: Number.NaN, longitude: 0 },
@@ -122,5 +161,18 @@ describe("ExpoMapsAdapter", () => {
     expect(
       regionForCoordinates([{ latitude: Number.NaN, longitude: Number.NaN }]),
     ).toBeNull();
+  });
+
+  it("reports a tile fallback for a route without valid markers", () => {
+    const model = {
+      points: [point("invalid", 91, 2.3522)],
+      polyline: [
+        { latitude: 48.8566, longitude: 2.3522 },
+        { latitude: 48.857, longitude: 2.353 },
+      ],
+    };
+
+    expect(new UnavailableMapAdapter().status(model)).toBe("tiles-unavailable");
+    expect(mapStatusMessage("native-unavailable")).toContain("disponible");
   });
 });
