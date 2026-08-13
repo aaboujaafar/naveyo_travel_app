@@ -1,11 +1,14 @@
 import type {
+  Coordinates,
   ItineraryItem,
   TrackPoint,
   TrackingStatus,
   UUID,
 } from "../modules/_shared/model";
+import type { MapModel } from "../adapters/map/interface";
 
 const earthRadiusMeters = 6_371_000;
+const maxPolylinePoints = 1_000;
 
 export function formatLocalItineraryDate(date: string): string {
   const parsed = new Date(`${date}T12:00:00.000Z`);
@@ -19,7 +22,32 @@ export function formatLocalItineraryDate(date: string): string {
 }
 
 export function itineraryPointCount(items: ItineraryItem[]): number {
-  return items.filter((item) => item.place?.coordinates !== undefined).length;
+  return items.filter((item) => isValidCoordinates(item.place?.coordinates)).length;
+}
+
+export function buildItineraryMapModel(
+  items: ItineraryItem[],
+  trackPoints: TrackPoint[],
+): MapModel {
+  const points = items.flatMap((item) => {
+    const coordinates = item.place?.coordinates;
+    return isValidCoordinates(coordinates)
+      ? [{ id: item.id, label: item.title, coordinates }]
+      : [];
+  });
+  const polyline = samplePolyline(
+    trackPoints
+      .filter((point) => isValidCoordinateValues(point.latitude, point.longitude))
+      .map((point) => ({
+        latitude: point.latitude,
+        longitude: point.longitude,
+      })),
+  );
+
+  return {
+    points,
+    polyline: polyline.length > 1 ? polyline : undefined,
+  };
 }
 
 export function trackDistanceMeters(points: TrackPoint[]): number {
@@ -27,7 +55,17 @@ export function trackDistanceMeters(points: TrackPoint[]): number {
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const current = points[index];
-    if (!previous || !current) continue;
+    if (
+      !previous ||
+      !current ||
+      !isValidCoordinateValues(
+        previous.latitude,
+        previous.longitude,
+      ) ||
+      !isValidCoordinateValues(current.latitude, current.longitude)
+    ) {
+      continue;
+    }
     distance += haversineMeters(
       previous.latitude,
       previous.longitude,
@@ -36,6 +74,37 @@ export function trackDistanceMeters(points: TrackPoint[]): number {
     );
   }
   return distance;
+}
+
+function samplePolyline(points: Coordinates[]): Coordinates[] {
+  if (points.length <= maxPolylinePoints) return points;
+
+  return Array.from({ length: maxPolylinePoints }, (_, index) => {
+    const sourceIndex = Math.round(
+      (index * (points.length - 1)) / (maxPolylinePoints - 1),
+    );
+    return points[sourceIndex];
+  }).filter((point): point is Coordinates => point !== undefined);
+}
+
+function isValidCoordinates(
+  coordinates: Coordinates | undefined,
+): coordinates is Coordinates {
+  return (
+    coordinates !== undefined &&
+    isValidCoordinateValues(coordinates.latitude, coordinates.longitude)
+  );
+}
+
+function isValidCoordinateValues(latitude: number, longitude: number): boolean {
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
 }
 
 export function formatDistance(meters: number): string {
