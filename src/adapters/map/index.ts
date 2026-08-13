@@ -6,9 +6,12 @@ export type {
   MapStatus,
 } from "./interface";
 export {
+  isValidCoordinate,
   mapStatusMessage,
   regionForCoordinates,
   regionForPoints,
+  validCoordinates,
+  validMapPoints,
 } from "./interface";
 export {
   PermissionDeniedMapAdapter,

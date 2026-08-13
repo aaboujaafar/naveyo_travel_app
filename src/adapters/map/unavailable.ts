@@ -1,16 +1,26 @@
 import type { Coordinates } from "../../modules/_shared/model";
 import type { MapAdapter, MapModel, MapRegion, MapStatus } from "./interface";
-import { regionForPoints } from "./interface";
+import {
+  regionForCoordinates,
+  validCoordinates,
+  validMapPoints,
+} from "./interface";
 
 export class UnavailableMapAdapter implements MapAdapter {
   readonly supportsPolyline = false;
 
   status(model: MapModel): MapStatus {
-    return model.points.length === 0 ? "empty" : "tiles-unavailable";
+    return validMapPoints(model.points).length === 0 &&
+      validCoordinates(model.polyline ?? []).length === 0
+      ? "empty"
+      : "tiles-unavailable";
   }
 
   region(model: MapModel): MapRegion | null {
-    return regionForPoints(model.points);
+    return regionForCoordinates([
+      ...validMapPoints(model.points).map((point) => point.coordinates),
+      ...validCoordinates(model.polyline ?? []),
+    ]);
   }
 
   polyline(_model: MapModel): Coordinates[] {

@@ -5,9 +5,16 @@ import type {
   MapRegion,
   MapStatus,
 } from "./interface";
-import { regionForCoordinates } from "./interface";
+import {
+  regionForCoordinates,
+  validCoordinates,
+  validMapPoints,
+} from "./interface";
 
-export type ExpoMapsAvailability = Exclude<MapStatus, "empty">;
+export type ExpoMapsAvailability = Exclude<
+  MapStatus,
+  "empty" | "native-unavailable"
+>;
 
 export interface ExpoMapsAdapterOptions {
   availability?: ExpoMapsAvailability;
@@ -37,7 +44,10 @@ export class ExpoMapsAdapter implements MapAdapter {
     if (this.availability === "permission-denied") {
       return "permission-denied";
     }
-    if (model.points.length === 0 && this.polyline(model).length === 0) {
+    if (
+      validMapPoints(model.points).length === 0 &&
+      validCoordinates(model.polyline ?? []).length === 0
+    ) {
       return "empty";
     }
     return this.availability;
@@ -45,13 +55,13 @@ export class ExpoMapsAdapter implements MapAdapter {
 
   region(model: MapModel): MapRegion | null {
     return regionForCoordinates([
-      ...model.points.map((point) => point.coordinates),
+      ...validMapPoints(model.points).map((point) => point.coordinates),
       ...this.polyline(model),
     ]);
   }
 
   polyline(model: MapModel): Coordinates[] {
-    return model.polyline === undefined ? [] : [...model.polyline];
+    return validCoordinates(model.polyline ?? []);
   }
 }
 
