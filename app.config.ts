@@ -9,6 +9,7 @@ const config: ExpoConfig = {
   scheme: 'naveyo',
   userInterfaceStyle: 'automatic',
   ios: {
+    deploymentTarget: '18.0',
     supportsTablet: false,
     bundleIdentifier: 'com.naveyo.app',
     infoPlist: {
