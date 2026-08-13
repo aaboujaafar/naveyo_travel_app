@@ -8,7 +8,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
-import type { PlaceCandidate } from "../modules/_shared/model";
+import type { Coordinates, PlaceCandidate } from "../modules/_shared/model";
+import { ExpoMapsView } from "../adapters/map/expo-maps-view";
+import type { MapModel } from "../adapters/map";
 import {
   colors,
   componentMetrics,
@@ -49,11 +51,53 @@ export interface PlaceDetailScreenProps {
   onAddToItinerary: (selection: PlaceScheduleDate) => Promise<void>;
 }
 
-const photoSources = [
-  require("../../assets/restaurant-detail.png"),
-  require("../../assets/photo-album-3.png"),
-  require("../../assets/photo-album-2.png"),
-] as const;
+export interface PlaceMapPresentation {
+  model: MapModel | null;
+  coordinateLabel: string | null;
+}
+
+export function buildPlaceMapPresentation(
+  place: Pick<PlaceCandidate, "id" | "name" | "coordinates">,
+): PlaceMapPresentation {
+  const coordinates = isValidCoordinates(place.coordinates)
+    ? place.coordinates
+    : null;
+
+  if (coordinates === null) {
+    return { model: null, coordinateLabel: null };
+  }
+
+  return {
+    model: {
+      points: [
+        {
+          id: place.id,
+          label: place.name,
+          coordinates,
+        },
+      ],
+    },
+    coordinateLabel: formatCoordinates(coordinates),
+  };
+}
+
+function isValidCoordinates(
+  value: Coordinates | null | undefined,
+): value is Coordinates {
+  return (
+    value != null &&
+    Number.isFinite(value.latitude) &&
+    Number.isFinite(value.longitude) &&
+    value.latitude >= -90 &&
+    value.latitude <= 90 &&
+    value.longitude >= -180 &&
+    value.longitude <= 180
+  );
+}
+
+function formatCoordinates(coordinates: Coordinates): string {
+  return `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`;
+}
 
 export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   const insets = useSafeAreaInsets();
@@ -62,6 +106,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
     props.scheduleDates[0] ?? null,
   );
   const [toast, setToast] = useState<ToastData | null>(null);
+  const photoSources = getPhotoSources();
   const heroNavStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
     [insets.top],
@@ -89,6 +134,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   }
 
   const place = props.place;
+  const mapPresentation = buildPlaceMapPresentation(place);
   const category = formatPlaceCategory(place.category);
   const selected =
     selectedDate ?? props.scheduleDates[0] ?? null;
@@ -208,18 +254,32 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
         </ComingSoonFrame>
 
         <Section title="Localisation">
-          <View style={styles.mapThumb}>
-            <View style={styles.mapGrid} />
-            <View style={styles.mapPin}>
-              <Icon name="map-pin" size={24} color={colors.accent} />
+          {mapPresentation.model ? (
+            <ExpoMapsView
+              model={mapPresentation.model}
+              selectedPointId={place.id}
+              style={styles.mapPreview}
+              testID="place-map-preview"
+            />
+          ) : (
+            <View style={styles.mapUnavailable} testID="place-map-unavailable">
+              <InlineMessage
+                title="Carte indisponible"
+                message="Ce lieu ne possède pas de coordonnées vérifiées."
+              />
             </View>
-            <View style={styles.coordinateLabel}>
-              <AppText variant="caption" color="teal">
-                {place.coordinates.latitude.toFixed(4)}, {place.coordinates.longitude.toFixed(4)}
-              </AppText>
-            </View>
-          </View>
-          <LinkAction icon="map" label="Ouvrir dans la carte" onPress={props.onOpenMap} />
+          )}
+          <InfoRow
+            icon="map-pin"
+            label="Coordonnées"
+            value={mapPresentation.coordinateLabel ?? "Non fournies"}
+          />
+          <LinkAction
+            icon="map"
+            label="Ouvrir dans la carte"
+            onPress={props.onOpenMap}
+            disabled={mapPresentation.model === null}
+          />
         </Section>
 
         <ComingSoonFrame label="Horaires détaillés">
@@ -293,8 +353,14 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
         <Section title="S'y rendre">
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: mapPresentation.model === null }}
+            disabled={mapPresentation.model === null}
             onPress={props.onOpenDirections}
-            style={({ pressed }) => [styles.transportOption, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.transportOption,
+              mapPresentation.model === null && styles.disabledAction,
+              pressed && styles.pressed,
+            ]}
           >
             <View style={styles.transportIcon}><Icon name="map-pin" size={20} color={colors.teal} /></View>
             <View style={styles.flexOne}>
@@ -386,6 +452,14 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   );
 }
 
+function getPhotoSources() {
+  return [
+    require("../../assets/restaurant-detail.png"),
+    require("../../assets/photo-album-3.png"),
+    require("../../assets/photo-album-2.png"),
+  ] as const;
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return <View style={styles.section}><SectionTitle title={title} />{children}</View>;
 }
@@ -427,8 +501,8 @@ function VoteButton({ icon, label }: { icon: string; label: string }) {
   return <View style={styles.voteButton}><AppText variant="h3">{icon}</AppText><AppText variant="caption" color="muted">{label}</AppText></View>;
 }
 
-function LinkAction({ icon, label, onPress }: { icon: "map"; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="link" onPress={onPress} style={({ pressed }) => [styles.linkAction, pressed && styles.pressed]}><Icon name={icon} size={16} color={colors.teal} /><AppText variant="caption" color="teal">{label}</AppText></Pressable>;
+function LinkAction({ icon, label, onPress, disabled = false }: { icon: "map"; label: string; onPress: () => void; disabled?: boolean }) {
+  return <Pressable accessibilityRole="link" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.linkAction, disabled && styles.disabledAction, pressed && styles.pressed]}><Icon name={icon} size={16} color={disabled ? colors.muted : colors.teal} /><AppText variant="caption" color={disabled ? "muted" : "teal"}>{label}</AppText></Pressable>;
 }
 
 function PlaceDetailLoading() {
@@ -462,10 +536,8 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   photoStrip: { gap: spacing.sm, paddingBottom: spacing.sm },
   photoThumb: { width: spacing.xl * 4 + spacing.md - spacing.xs, height: spacing.xl * 3 + spacing.xs, borderRadius: radius.sm },
-  mapThumb: { height: spacing.xl * 4 + spacing.md - spacing.xs, borderRadius: radius.md, backgroundColor: colors.tealSoft, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, position: "relative", overflow: "hidden", marginBottom: spacing.sm },
-  mapGrid: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, opacity: componentMetrics.placeDetail.mapGridOpacity, backgroundColor: colors.teal },
-  mapPin: { position: "absolute", top: "35%", left: "44%", width: spacing["2xl"], height: spacing["2xl"], borderRadius: radius.full, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  coordinateLabel: { position: "absolute", right: spacing.sm, bottom: spacing.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.md - spacing.xs, paddingVertical: spacing.sm - spacing.xs / 2, borderRadius: radius.full },
+  mapPreview: { height: spacing.xl * 4 + spacing.md - spacing.xs, borderRadius: radius.md, overflow: "hidden", marginBottom: spacing.sm },
+  mapUnavailable: { minHeight: spacing.xl * 4 + spacing.md - spacing.xs, justifyContent: "center", marginBottom: spacing.sm },
   infoRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.sm },
   menuItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.sm },
   tipCard: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.md, backgroundColor: colors.goldSoft, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.gold, borderRadius: radius.md },
@@ -481,6 +553,7 @@ const styles = StyleSheet.create({
   reviewHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   reviewAvatar: { width: spacing.xl, height: spacing.xl, borderRadius: radius.full, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" },
   linkAction: { minHeight: spacing["2xl"] - spacing.xs, flexDirection: "row", alignItems: "center", gap: spacing.sm - spacing.xs / 2, alignSelf: "flex-start" },
+  disabledAction: { opacity: 0.6 },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, maxWidth: layout.maxMobileWidth, alignSelf: "center", flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: componentMetrics.placeDetail.thinBorderWidth, borderTopColor: colors.border, zIndex: zIndex.sticky },
   footerPrimary: { flex: 1 },
   futureReserve: { position: "relative" },
