@@ -17,12 +17,17 @@ import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
 import { createAppleReservationAnalyzer } from "../adapters/apple-document-analysis";
+import { createReactNativeInvitationShareAdapter } from "../adapters/invitation-sharing";
+import { createInvitationSharingModule } from "../modules/invitation-sharing";
 import { sharedLocalReservations } from "./reservations";
 import { createSupabaseClient } from "./supabase";
 
 export function createAppModules() {
   const client = createSupabaseClient();
   const identity = createSupabaseIdentityModule(client);
+  const invitationSharing = createInvitationSharingModule(
+    createReactNativeInvitationShareAdapter(),
+  );
   const trips = createSupabaseTripsModule(client, () => true);
   const tripAssistant = createSupabaseTripAssistant(client);
   const placesProvider = createGeoapifyPlacesProvider(
@@ -66,6 +71,7 @@ export function createAppModules() {
   );
   return {
     identity,
+    invitationSharing,
     trips,
     itinerary,
     places,

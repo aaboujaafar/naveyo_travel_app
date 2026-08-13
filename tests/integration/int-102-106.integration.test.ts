@@ -72,6 +72,7 @@ function makeModules(overrides: Partial<NaveyoModules> = {}): NaveyoModules {
   }
   const modules = {
     identity: { currentAccount: async () => account, signIn: vi.fn(), signUp: vi.fn(), signOut: async () => undefined },
+    invitationSharing: { share: vi.fn(async () => ({ channel: 'system', status: 'opened' })) },
     trips,
     itinerary: { list: async () => [], add: vi.fn(), addConfirmedPlace: vi.fn() },
     places: { search: async () => [], getById: async () => null, createManual: vi.fn() },

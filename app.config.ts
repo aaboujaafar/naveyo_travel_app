@@ -10,7 +10,10 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     supportsTablet: false,
-    bundleIdentifier: 'com.naveyo.app'
+    bundleIdentifier: 'com.naveyo.app',
+    infoPlist: {
+      LSApplicationQueriesSchemes: ['whatsapp']
+    }
   },
   plugins: [
     'expo-router',

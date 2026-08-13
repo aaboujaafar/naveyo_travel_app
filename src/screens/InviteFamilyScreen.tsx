@@ -10,6 +10,7 @@ import type {
   TripInvitation,
   TripMember,
 } from "../modules/_shared/model";
+import type { InvitationShareChannel } from "../modules/invitation-sharing";
 import {
   colors,
   componentMetrics,
@@ -32,6 +33,7 @@ import {
   buildInvitationDeepLink,
   describeMember,
   isInvitationEmailValid,
+  isInvitationShareReady,
   normalizeInvitationEmail,
 } from "./invite-family-model";
 
@@ -41,8 +43,11 @@ export interface InviteFamilyScreenProps {
   loading: boolean;
   error?: string | null;
   onBack: () => void;
-  onInvite: (email: string) => Promise<void>;
-  onShareInvitation: (deepLink: string) => Promise<void>;
+  onInvite: (email?: string) => Promise<void>;
+  onShareInvitation: (
+    channel: InvitationShareChannel,
+    email?: string,
+  ) => Promise<void>;
   onContinue: () => void;
 }
 
@@ -69,6 +74,9 @@ export function InviteFamilyScreen({
   const [email, setEmail] = useState("");
   const [attempted, setAttempted] = useState(false);
   const emailIsValid = isInvitationEmailValid(email);
+  const shareReady = isInvitationShareReady(invitation, email);
+  const shareEmail =
+    invitation || !emailIsValid ? undefined : normalizeInvitationEmail(email);
   const deepLink = invitation ? buildInvitationDeepLink(invitation) : null;
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.lg) }),
@@ -81,8 +89,8 @@ export function InviteFamilyScreen({
 
   const submitInvitation = async () => {
     setAttempted(true);
-    if (!emailIsValid) return;
-    await onInvite(normalizeInvitationEmail(email));
+    if (email.trim().length > 0 && !emailIsValid) return;
+    await onInvite(email.trim() ? normalizeInvitationEmail(email) : undefined);
   };
 
   const visibleMembers = members.length > 0 ? members : [];
@@ -139,9 +147,9 @@ export function InviteFamilyScreen({
           </AppText>
           <Button
             size="sm"
-            disabled={!deepLink}
+            disabled={!shareReady || loading}
             onPress={() => {
-              if (deepLink) void onShareInvitation(deepLink);
+              if (shareReady) void onShareInvitation("system", shareEmail);
             }}
           >
             Partager
@@ -154,30 +162,37 @@ export function InviteFamilyScreen({
               icon="message-circle"
               label="WhatsApp"
               tone="teal"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (shareReady) void onShareInvitation("whatsapp", shareEmail);
               }}
             />
             <ShareChannel
               icon="message-circle"
               label="SMS"
               tone="accent"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (shareReady) void onShareInvitation("sms", shareEmail);
               }}
             />
             <ShareChannel
-              icon="mail"
-              label="Email"
+              icon="copy"
+              label="Partage"
               tone="gold"
-              disabled={!deepLink}
+              disabled={!shareReady || loading}
               onPress={() => {
-                if (deepLink) void onShareInvitation(deepLink);
+                if (shareReady) void onShareInvitation("system", shareEmail);
               }}
             />
           </View>
+          <AppText variant="caption" color="muted" style={styles.shareHint}>
+            {shareReady
+              ? deepLink
+                ? "Choisissez un canal pour transmettre le lien privé."
+                : "Choisissez un canal pour créer l’invitation et transmettre le lien."
+              : "Saisissez une adresse e-mail valide ou laissez le champ vide pour créer un lien libre."}
+          </AppText>
         </Section>
 
         <ComingSoonSection title="Contacts récents">
@@ -225,15 +240,17 @@ export function InviteFamilyScreen({
             {invitation ? (
               <View style={styles.memberItem}>
                 <AvatarBubble
-                  initials={invitation.invitedEmail.slice(0, 2).toUpperCase()}
+                  initials={(invitation.invitedEmail?.slice(0, 2) ?? "LI").toUpperCase()}
                   tone="gold"
                 />
                 <View style={styles.memberInfo}>
                   <AppText variant="label" numberOfLines={1}>
-                    {invitation.invitedEmail}
+                    {invitation.invitedEmail ?? "Lien libre"}
                   </AppText>
                   <AppText variant="caption" color="muted">
-                    Compte éditeur invité
+                    {invitation.invitedEmail
+                      ? "Compte éditeur invité"
+                      : "Le prochain Compte authentifié pourra rejoindre"}
                   </AppText>
                 </View>
                 <Badge
@@ -250,14 +267,14 @@ export function InviteFamilyScreen({
             <Input
               value={email}
               onChangeText={setEmail}
-              placeholder="Adresse e-mail du second Compte…"
+              placeholder="Adresse e-mail (facultative)…"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="send"
               onSubmitEditing={() => void submitInvitation()}
               error={
-                attempted && !emailIsValid
+                attempted && email.trim().length > 0 && !emailIsValid
                   ? "Saisissez une adresse e-mail valide."
                   : undefined
               }
@@ -266,7 +283,7 @@ export function InviteFamilyScreen({
             <IconButton
               icon={<Icon name="plus" size={22} color={colors.white} />}
               onPress={() => void submitInvitation()}
-              disabled={loading || !emailIsValid}
+              disabled={loading || (email.trim().length > 0 && !emailIsValid)}
               accessibilityLabel="Créer l’invitation"
               style={styles.addMemberButton}
             />
@@ -282,7 +299,11 @@ export function InviteFamilyScreen({
             <InlineMessage
               variant="success"
               title="Invitation prête"
-              message="Le lien privé expire après 7 jours et donne uniquement le rôle éditeur."
+              message={
+                invitation.invitedEmail
+                  ? "Le lien privé expire après 7 jours et donne uniquement le rôle éditeur."
+                  : "Le lien privé expire après 7 jours et sera accepté par le premier Compte authentifié."
+              }
             />
           ) : null}
         </View>
@@ -433,7 +454,7 @@ function ShareChannel({
   disabled,
   onPress,
 }: {
-  icon: "message-circle" | "mail";
+  icon: "message-circle" | "mail" | "copy";
   label: string;
   tone: Tone;
   disabled: boolean;
@@ -591,6 +612,7 @@ const styles = StyleSheet.create({
   },
   linkText: { flex: 1 },
   shareRow: { flexDirection: "row", gap: spacing.md },
+  shareHint: { marginTop: spacing.sm },
   shareButton: {
     flex: 1,
     minHeight: spacing["2xl"] * 2,

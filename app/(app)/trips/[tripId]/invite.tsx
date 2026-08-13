@@ -1,13 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Share } from "react-native";
+import { useNaveyoBootstrap } from "../../../../src/bootstrap";
 import { useTripsModule } from "../../../../src/modules/trips";
 import type { Trip, TripInvitation } from "../../../../src/modules/_shared/model";
+import type { InvitationShareChannel } from "../../../../src/modules/invitation-sharing";
 import { InviteFamilyScreen } from "../../../../src/screens/InviteFamilyScreen";
+import { buildInvitationDeepLink } from "../../../../src/screens/invite-family-model";
 
 export default function TripInviteScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const bootstrap = useNaveyoBootstrap();
   const trips = useTripsModule();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [invitation, setInvitation] = useState<TripInvitation | null>(null);
@@ -36,25 +39,27 @@ export default function TripInviteScreen() {
     };
   }, [tripId, trips]);
 
-  const createInvitation = async (email: string) => {
+  const createInvitation = async (email?: string): Promise<TripInvitation | null> => {
     if (!trips || !tripId) {
       setError("Le Module Voyages est indisponible.");
-      return;
+      return null;
     }
     setCreating(true);
     setError(null);
     try {
       const nextInvitation = await trips.createInvitation({
         tripId: tripId as Trip["id"],
-        email,
+        ...(email ? { email } : {}),
       });
       setInvitation(nextInvitation);
+      return nextInvitation;
     } catch (cause: unknown) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Impossible de créer l’invitation",
       );
+      return null;
     } finally {
       setCreating(false);
     }
@@ -67,12 +72,38 @@ export default function TripInviteScreen() {
       loading={creating}
       error={error}
       onBack={() => router.back()}
-      onInvite={createInvitation}
-      onShareInvitation={async (deepLink) => {
-        await Share.share({
-          message: `Rejoins mon Voyage Naveyo : ${deepLink}`,
-          url: deepLink,
-        });
+      onInvite={async (email) => {
+        await createInvitation(email);
+      }}
+      onShareInvitation={async (
+        channel: InvitationShareChannel,
+        email?: string,
+      ) => {
+        let shareInvitation = invitation;
+        if (!shareInvitation) {
+          shareInvitation = await createInvitation(email);
+        }
+        if (!shareInvitation || !bootstrap?.modules.invitationSharing) {
+          setError("Le partage d’invitation est indisponible.");
+          return;
+        }
+        setError(null);
+        try {
+          const result = await bootstrap.modules.invitationSharing.share({
+            channel,
+            tripName: trip?.name ?? "mon Voyage",
+            invitationLink: buildInvitationDeepLink(shareInvitation),
+          });
+          if (result.status === "unavailable") {
+            setError(
+              channel === "whatsapp"
+                ? "WhatsApp n’est pas disponible sur cet iPhone. Utilisez Partage ou SMS."
+                : "Le canal sélectionné n’est pas disponible sur cet iPhone. Utilisez Partage.",
+            );
+          }
+        } catch {
+          setError("Impossible d’ouvrir le canal de partage sélectionné.");
+        }
       }}
       onContinue={() => {
         if (tripId) router.replace(`/(app)/trips/${tripId}`);

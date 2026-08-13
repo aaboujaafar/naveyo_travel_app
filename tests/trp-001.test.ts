@@ -20,6 +20,39 @@ const request = <T>(response: SupabaseResponse<T>): SupabaseQuery<T> => ({
 });
 
 describe("TRP-001 Supabase trips adapter", () => {
+  it("creates a link-only invitation when no email is provided", async () => {
+    const tripId = "10000000-0000-4000-8000-000000000001";
+    const client = {
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: "10000000-0000-4000-8000-000000000003" } },
+          error: null,
+        })),
+      },
+      from: vi.fn(() =>
+        request({
+          data: {
+            id: "10000000-0000-4000-8000-000000000004",
+            trip_id: tripId,
+            invited_email: null,
+            role: "editor",
+            token: "10000000-0000-4000-8000-000000000005",
+            status: "pending",
+            expires_at: "2026-08-18T10:00:00+00:00",
+          },
+          error: null,
+        }),
+      ),
+    } as unknown as SupabaseClientLike;
+    const trips = createSupabaseTripsModule(client);
+
+    const invitation = await trips.createInvitation({
+      tripId: tripId as Trip["id"],
+    });
+    expect(invitation).toMatchObject({ tripId, status: "pending" });
+    expect(invitation.invitedEmail).toBeUndefined();
+  });
+
   it("does not write ordinary trip mutations while offline", async () => {
     const from = vi.fn(() => request({ data: null, error: null }));
     const client = {

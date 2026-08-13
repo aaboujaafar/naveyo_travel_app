@@ -17,7 +17,8 @@ describe("shell helpers", () => {
     expect(resolveShellRedirect(true, "(auth)")).toBe("/(app)");
     expect(resolveShellRedirect(false, "(app)")).toBe("/(auth)/sign-in");
     expect(resolveShellRedirect(true, "(app)")).toBeNull();
-    expect(resolveShellRedirect(false, "unknown")).toBeNull();
+    expect(resolveShellRedirect(false, "unknown")).toBe("/(auth)");
+    expect(resolveShellRedirect(true, "unknown")).toBe("/(app)");
   });
 
   it("describes offline connectivity with a sync label", () => {

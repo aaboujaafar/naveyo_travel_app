@@ -18,8 +18,9 @@ export default function InvitationCodeScreen() {
       <Card style={styles.card}>
         <Text style={styles.title}>Une invitation t’attend</Text>
         <Text style={styles.message}>
-          Utilise le code exact reçu et connecte-toi avec l’adresse e-mail qui
-          a été invitée.
+          Utilise le code exact reçu. Si l’invitation ciblait une adresse,
+          connecte-toi avec le Compte correspondant ; sinon ton Compte
+          authentifié pourra rejoindre le Voyage.
         </Text>
       </Card>
       <Input

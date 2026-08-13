@@ -36,7 +36,7 @@ export interface TripMember {
 export interface TripInvitation {
   id: UUID;
   tripId: UUID;
-  invitedEmail: string;
+  invitedEmail?: string;
   role: "editor";
   token: UUID;
   status: "pending" | "accepted" | "expired";

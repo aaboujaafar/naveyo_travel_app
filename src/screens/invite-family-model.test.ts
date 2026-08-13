@@ -3,6 +3,7 @@ import type { TripMember, UUID } from "../modules/_shared/model";
 import {
   buildInvitationDeepLink,
   describeMember,
+  isInvitationShareReady,
   isInvitationEmailValid,
   normalizeInvitationEmail,
 } from "./invite-family-model";
@@ -34,5 +35,14 @@ describe("invite family presentation model", () => {
 
     expect(describeMember(owner, 0).status).toBe("Propriétaire");
     expect(describeMember(editor, 1).status).toBe("Éditeur");
+  });
+
+  it("activates share channels once a valid invitation email is ready", () => {
+    expect(isInvitationShareReady(null, "not-an-email")).toBe(false);
+    expect(isInvitationShareReady(null, "")).toBe(true);
+    expect(isInvitationShareReady(null, "sophie@example.com")).toBe(true);
+    expect(isInvitationShareReady({ token: "invite-token" as UUID }, "")).toBe(
+      true,
+    );
   });
 });
