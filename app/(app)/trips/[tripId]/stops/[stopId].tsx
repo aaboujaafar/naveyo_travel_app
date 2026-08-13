@@ -11,6 +11,7 @@ import type {
   UUID,
 } from "../../../../../src/modules/_shared/model";
 import { StopDetailScreen } from "../../../../../src/screens/StopDetailScreen";
+import type { StopWeatherViewModel } from "../../../../../src/screens/StopDetailScreen";
 import {
   filterItineraryForStop,
   filterReservationsForStop,
@@ -35,6 +36,7 @@ export default function StopDetailRoute() {
   const [downloadedDocumentId, setDownloadedDocumentId] = useState<UUID | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [weather, setWeather] = useState<StopWeatherViewModel>({ status: "loading" });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,6 +69,18 @@ export default function StopDetailRoute() {
       setItinerary(filterItineraryForStop(allItinerary, selectedStop));
       setDocuments(stopDocuments);
       setReservations(filterReservationsForStop(allReservations, stopDocuments));
+      const itineraryPlace = filterItineraryForStop(allItinerary, selectedStop).find((item) => item.place?.coordinates)?.place;
+      const coordinates = itineraryPlace?.coordinates ?? (await bootstrap.modules.places.search({ query: selectedStop.name, countryCode: selectedStop.countryCode, stopId: selectedStop.id, tripId })).at(0)?.coordinates;
+      if (!coordinates) {
+        setWeather({ status: "unavailable", errorMessage: "Impossible de géolocaliser cette Étape pour afficher la météo." });
+      } else {
+        try {
+          const forecast = await bootstrap.modules.weather.forecast({ coordinates, timeZone: selectedStop.timeZone, startDate: selectedStop.startDate, endDate: selectedStop.endDate });
+          setWeather({ status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.map((day) => ({ date: day.date, weatherCode: day.weatherCode, temperatureMinC: day.temperatureMinC, temperatureMaxC: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax, precipitationSumMm: day.precipitationSumMm, uvIndexMax: day.uvIndexMax, windGustsMaxKmh: day.windGustsMaxKmh })) });
+        } catch (cause) {
+          setWeather({ status: "error", errorMessage: cause instanceof Error ? cause.message : "Météo indisponible" });
+        }
+      }
     } catch (cause: unknown) {
       setStop(null);
       setItinerary([]);
@@ -103,6 +117,7 @@ export default function StopDetailRoute() {
       reservations={reservations}
       loading={loading}
       error={error}
+      weather={weather}
       downloadedDocumentId={downloadedDocumentId}
       onBack={() => router.back()}
       onRetry={refresh}

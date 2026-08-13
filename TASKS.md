@@ -215,6 +215,13 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 
 ## Vue synthétique
 
+### WEATHER-002 — Rendre la météo visible dans l’application
+
+- État : `IN_PROGRESS`
+- Cause identifiée : les routes attendaient un Lieu d’itinéraire géolocalisé ; sans élément d’itinéraire, aucune requête Open-Meteo n’était lancée et l’écran restait vide.
+- Correction : ajout du module météo au bootstrap, rendu explicite des états UI et géocodage de secours du nom de l’Étape via le Module Places.
+- Validation locale : `pnpm typecheck` passe. Validation appareil et requête réseau réelle restent à exécuter.
+
 | ID | Priorité | État | Timebox | Dépendances | Chemins possédés principaux |
 |---|---|---|---:|---|---|
 | DEC-001 | Gate | READY | 1 h | — | décisions dans ce fichier, par le coordinateur |

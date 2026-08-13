@@ -21,6 +21,8 @@ import { createReactNativeInvitationShareAdapter } from "../adapters/invitation-
 import { createInvitationSharingModule } from "../modules/invitation-sharing";
 import { sharedLocalReservations } from "./reservations";
 import { createSupabaseClient } from "./supabase";
+import { Weather } from "../modules/weather";
+import { createOpenMeteoWeatherProvider } from "../adapters/open-meteo";
 
 export function createAppModules() {
   const client = createSupabaseClient();
@@ -29,6 +31,7 @@ export function createAppModules() {
     createReactNativeInvitationShareAdapter(),
   );
   const trips = createSupabaseTripsModule(client, () => true);
+  const weather = new Weather(createOpenMeteoWeatherProvider());
   const tripAssistant = createSupabaseTripAssistant(client);
   const placesProvider = createGeoapifyPlacesProvider(
     `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ""}/functions/v1/places`,
@@ -82,6 +85,7 @@ export function createAppModules() {
     expenses,
     offlineTripPack,
     tripTracking,
+    weather,
   };
 }
 

@@ -11,6 +11,7 @@ import type { TripAssistantModule } from '../modules/trip-assistant'
 import type { TripTrackingModule } from '../modules/trip-tracking'
 import type { TripsModule } from '../modules/trips'
 import type { UUID } from '../modules/_shared/model'
+import type { WeatherModule } from '../modules/weather'
 
 /**
  * The application boundary consumed by routes and UI composition.
@@ -30,6 +31,7 @@ export interface NaveyoModules {
   expenses: ExpensesModule
   offlineTripPack: OfflineTripPackModule
   tripTracking: TripTrackingModule
+  weather: WeatherModule
   /** Native analyzer is optional while OCR-001 is not available in a build. */
   reservationAnalyzer?: DocumentAnalyzer
 }

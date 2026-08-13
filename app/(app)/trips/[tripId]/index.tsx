@@ -11,6 +11,7 @@ import type {
 } from "../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../src/modules/trips";
 import { TripDashboardScreen } from "../../../../src/screens/TripDashboardScreen";
+import type { DashboardWeatherState } from "../../../../src/screens/TripDashboardScreen";
 
 export default function TripDetailRoute() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function TripDetailRoute() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
 
   const load = useCallback(async () => {
     if (!trips || !bootstrap || !tripId) {
@@ -46,13 +48,28 @@ export default function TripDetailRoute() {
       ]);
       setTrip(nextTrip);
       setStops(nextStops);
+      let loadedItinerary: ItineraryItem[] = [];
       try {
-        setItineraryItems(await bootstrap.modules.itinerary.list(tripId));
+        loadedItinerary = await bootstrap.modules.itinerary.list(tripId);
+        setItineraryItems(loadedItinerary);
       } catch {
         setItineraryItems([]);
         setError(
           "Le Voyage et ses Étapes sont chargés, mais les lieux de la carte sont temporairement indisponibles.",
         );
+      }
+      const itineraryItem = loadedItinerary.find((item) => item.place?.coordinates);
+      const stop = itineraryItem ? nextStops.find((candidate) => candidate.id === itineraryItem.stopId) : nextStops[0];
+      const coordinates = itineraryItem?.place?.coordinates ?? (stop ? (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates : undefined);
+      if (!coordinates || !stop) {
+        setWeather({ status: "empty", message: "Ajoutez une Étape géolocalisable pour afficher la météo." });
+      } else {
+        try {
+          const forecast = await bootstrap.modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
+          setWeather({ status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.slice(0, 7).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) });
+        } catch (cause) {
+          setWeather({ status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" });
+        }
       }
       try {
         setReservations(await sharedLocalReservations.list(tripId));
@@ -115,6 +132,22 @@ export default function TripDetailRoute() {
       onOpenDocuments={() =>
         router.push(`/(app)/trips/${routeTripId}/documents`)
       }
+      weather={weather}
     />
   );
+}
+
+function weatherIcon(code: number): string {
+  if (code === 0) return "☀️";
+  if (code <= 3) return "⛅";
+  if (code <= 48) return "🌫️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "🌨️";
+  if (code <= 82) return "🌦️";
+  return "⛈️";
+}
+
+function formatWeatherDate(value: string, timeZone: string): string {
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("fr-FR", { weekday: "short", timeZone }).format(date);
 }

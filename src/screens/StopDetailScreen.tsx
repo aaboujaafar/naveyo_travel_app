@@ -52,7 +52,10 @@ export interface StopDetailScreenProps {
   onOpenItinerary: () => void;
   onOpenDocuments: () => void;
   onOpenReservations: () => void;
+  weather?: StopWeatherViewModel;
 }
+
+export interface StopWeatherViewModel { status: "loading" | "ready" | "unavailable" | "error"; errorMessage?: string; updatedAt?: string; days?: { date: string; weatherCode: number; temperatureMinC: number; temperatureMaxC: number; precipitationProbabilityMax?: number; precipitationSumMm?: number; uvIndexMax?: number; windGustsMaxKmh?: number }[]; current?: { temperatureC: number; apparentTemperatureC?: number; weatherCode: number }; onRetry?: () => Promise<void> }
 
 export function buildStopMapModel(itinerary: ItineraryItem[]): MapModel {
   const points: MapPoint[] = [];
@@ -223,7 +226,7 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
             <View style={styles.section}>
               <SectionTitle title="Préparation de l’Étape" />
               <View style={styles.futureGrid}>
-                <ComingSoonCard icon="calendar" title="Météo" message="Prévisions et alertes locales" />
+                <StopWeather weather={props.weather} />
                 <ComingSoonCard icon="check" title="Packing" message="Liste indépendante par Étape" />
                 <ComingSoonCard icon="users" title="Activité sociale" message="Présence et position en temps réel" />
               </View>
@@ -301,6 +304,15 @@ function ComingSoonCard({ icon, title, message }: { icon: "calendar" | "check" |
   );
 }
 
+function StopWeather({ weather }: { weather?: StopWeatherViewModel }) {
+  if (!weather || weather.status === "unavailable") return <ComingSoonCard icon="calendar" title="Météo" message={weather?.errorMessage ?? "Prévisions indisponibles"} />;
+  if (weather.status === "loading") return <View style={styles.weatherCard}><Skeleton height={spacing.lg} /><Skeleton height={spacing.md} width="70%" /></View>;
+  if (weather.status === "error") return <View style={styles.weatherCard}><InlineMessage variant="error" title="Météo indisponible" message={weather.errorMessage ?? "Impossible de charger la météo."} />{weather.onRetry ? <Button size="sm" variant="secondary" onPress={() => void weather.onRetry?.()}>Réessayer</Button> : null}</View>;
+  const day = weather.days?.[0];
+  if (!day) return <ComingSoonCard icon="calendar" title="Météo" message="Aucune prévision disponible" />;
+  return <View style={styles.weatherCard}><View style={styles.weatherHeading}><Icon name="calendar" size={20} color={colors.teal} /><View style={styles.flexOne}><AppText variant="label">Météo</AppText><AppText variant="caption" color="muted">Prévisions Open‑Meteo</AppText></View><AppText variant="h3">{Math.round(day.temperatureMaxC)}°</AppText></View><AppText variant="bodySmall">Min {Math.round(day.temperatureMinC)}° · Pluie {Math.round(day.precipitationProbabilityMax ?? 0)}%</AppText></View>;
+}
+
 function StopDetailLoading({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.screen}>
@@ -351,6 +363,8 @@ const styles = StyleSheet.create({
   reservationDot: { position: "absolute", left: -spacing.lg + spacing.xs, top: spacing.lg, width: spacing.sm + spacing.xs, height: spacing.sm + spacing.xs, borderRadius: radius.full, backgroundColor: colors.accent, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surface },
   reservationCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   futureGrid: { gap: spacing.sm },
+  weatherCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
+  weatherHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   futureCard: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderColor: colors.border, backgroundColor: colors.surface },
   futureContent: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md, opacity: 0.5 },
   flexOne: { flex: 1 },

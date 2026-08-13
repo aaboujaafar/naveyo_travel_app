@@ -47,7 +47,10 @@ export interface TripDashboardScreenProps {
   onOpenExpenses: () => void;
   onOpenReservations: () => void;
   onOpenDocuments: () => void;
+  weather?: DashboardWeatherState;
 }
+
+export interface DashboardWeatherState { status: "loading" | "ready" | "empty" | "error"; message?: string; updatedAt?: string; days?: { date: string; label: string; icon: string; temperatureMin: number; temperatureMax: number; precipitationProbabilityMax?: number }[] }
 
 const tabs: readonly { key: DashboardTab; label: string; future?: boolean }[] = [
   { key: "today", label: "Aujourd'hui" },
@@ -240,6 +243,8 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
           />
         ) : null}
 
+        <DashboardWeather weather={props.weather} />
+
         <ComingSoonFrame label="Météo en direct" inset>
           <View style={styles.alertStack}>
             <FutureAlert icon="☀️" message="Alerte UV et recommandations météo" />
@@ -302,6 +307,13 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
       </View>
     </View>
   );
+}
+
+function DashboardWeather({ weather }: { weather?: DashboardWeatherState }) {
+  if (!weather || weather.status === "empty") return <Section title="Météo"><InlineMessage title="Météo indisponible" message={weather?.message ?? "Ajoutez une Étape pour afficher les prévisions."} /></Section>;
+  if (weather.status === "loading") return <Section title="Météo"><Skeleton height={spacing.xl * 2} borderRadius={radius.md} /></Section>;
+  if (weather.status === "error") return <Section title="Météo"><InlineMessage variant="error" title="Météo indisponible" message={weather.message ?? "Impossible de charger la météo."} /></Section>;
+  return <Section title="Météo — Prévisions"><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherStrip}>{(weather.days ?? []).slice(0, 7).map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="h3">{day.icon}</AppText><AppText variant="label">{Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}°</AppText>{day.precipitationProbabilityMax !== undefined ? <AppText variant="badge" color="muted">Pluie {Math.round(day.precipitationProbabilityMax)}%</AppText> : null}</View>)}</ScrollView></Section>;
 }
 
 function TodayPanel({
