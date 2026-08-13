@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Stop, Trip } from "../modules/_shared/model";
+import type { Coordinates, ItineraryItem, Stop, Trip, UUID } from "../modules/_shared/model";
 import {
+  buildDashboardMapPresentation,
   countTripDays,
   formatTripDateRange,
   getTravelerCount,
@@ -40,4 +41,93 @@ describe("trip dashboard model", () => {
       "b",
     ]);
   });
+
+  it("builds identifiable markers across Étapes from confirmed coordinates only", () => {
+    const stops = [
+      dashboardStop("stop-a", "Lisbonne"),
+      dashboardStop("stop-b", "Porto"),
+    ];
+    const items = [
+      dashboardItem("item-a", "stop-a", { latitude: 38.7223, longitude: -9.1393 }),
+      dashboardItem("item-b", "stop-b", { latitude: 41.1579, longitude: -8.6291 }),
+      dashboardItem("item-without-place", "stop-a", undefined, false),
+    ];
+
+    expect(buildDashboardMapPresentation(stops, items)).toEqual({
+      model: {
+        points: [
+          {
+            id: "item-a",
+            label: "Étape 1 · Lieu item-a",
+            coordinates: { latitude: 38.7223, longitude: -9.1393 },
+          },
+          {
+            id: "item-b",
+            label: "Étape 2 · Lieu item-b",
+            coordinates: { latitude: 41.1579, longitude: -8.6291 },
+          },
+        ],
+      },
+      confirmedPlaceCount: 2,
+      locatedPlaceCount: 2,
+      unlocatedPlaceCount: 0,
+    });
+  });
+
+  it("keeps partial and empty Voyages marker-free without inventing coordinates", () => {
+    const stop = dashboardStop("stop-a", "Lisbonne");
+    const partial = buildDashboardMapPresentation(
+      [stop],
+      [
+        dashboardItem("missing", stop.id, undefined),
+        dashboardItem("invalid", stop.id, { latitude: 91, longitude: 2 }),
+        dashboardItem("not-a-place", stop.id, undefined, false),
+      ],
+    );
+
+    expect(partial.model.points).toEqual([]);
+    expect(partial.confirmedPlaceCount).toBe(2);
+    expect(partial.locatedPlaceCount).toBe(0);
+    expect(partial.unlocatedPlaceCount).toBe(2);
+    expect(buildDashboardMapPresentation([], [])).toEqual({
+      model: { points: [] },
+      confirmedPlaceCount: 0,
+      locatedPlaceCount: 0,
+      unlocatedPlaceCount: 0,
+    });
+  });
 });
+
+function dashboardStop(id: string, name: string): Stop {
+  return {
+    id: id as UUID,
+    tripId: "trip" as UUID,
+    name,
+    countryCode: "PT",
+    timeZone: "Europe/Lisbon" as Stop["timeZone"],
+    startDate: "2026-09-01",
+    endDate: "2026-09-02",
+  };
+}
+
+function dashboardItem(
+  id: string,
+  stopId: string,
+  coordinates?: Coordinates,
+  includePlace = true,
+): ItineraryItem {
+  return {
+    id: id as UUID,
+    tripId: "trip" as UUID,
+    stopId: stopId as UUID,
+    title: `Lieu ${id}`,
+    date: "2026-09-01",
+    ...(includePlace
+      ? {
+          place: coordinates
+            ? { kind: "venue" as const, label: `Lieu ${id}`, coordinates }
+            : { kind: "venue" as const, label: `Lieu ${id}` },
+        }
+      : {}),
+  };
+}
