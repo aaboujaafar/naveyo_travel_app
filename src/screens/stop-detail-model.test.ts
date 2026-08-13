@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   IANATimeZone,
   ISODateTime,
@@ -15,6 +15,40 @@ import {
   formatStopDateRange,
   stopDayCount,
 } from "./stop-detail-model";
+import { buildStopMapModel } from "./StopDetailScreen";
+
+vi.mock("react-native", () => ({
+  Pressable: "Pressable",
+  ScrollView: "ScrollView",
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+  Platform: { select: (values: { default?: string }) => values.default },
+  View: "View",
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+vi.mock("react-native-svg", () => ({
+  default: "Svg",
+  Circle: "Circle",
+  Line: "Line",
+  Path: "Path",
+  Polygon: "Polygon",
+  Polyline: "Polyline",
+  Rect: "Rect",
+}));
+vi.mock("../ui", () => ({
+  AppText: "AppText",
+  Badge: "Badge",
+  Button: "Button",
+  Icon: "Icon",
+  IconButton: "IconButton",
+  InlineMessage: "InlineMessage",
+  SectionTitle: "SectionTitle",
+  Skeleton: "Skeleton",
+}));
+vi.mock("../adapters/map/expo-maps-view", () => ({
+  ExpoMapsView: () => null,
+}));
 
 const tripId = "trip-1" as UUID;
 const stop: Stop = {
@@ -60,6 +94,52 @@ describe("stop detail model", () => {
     expect(formatStopDateRange(stop)).toContain("10 août 2026");
     expect(formatStopDateRange(stop)).toContain("12 août 2026");
     expect(stopDayCount(stop)).toBe(3);
+  });
+
+  it("builds the stop map only from confirmed itinerary coordinates", () => {
+    const items: ItineraryItem[] = [
+      {
+        ...item("museum", stop.id, "2026-08-10", "2026-08-10T09:00"),
+        place: {
+          kind: "venue",
+          label: "Musée",
+          coordinates: { latitude: 38.7223, longitude: -9.1393 },
+        },
+      },
+      {
+        ...item("walk", stop.id, "2026-08-10", "2026-08-10T11:00"),
+        place: { kind: "meetingPoint", label: "Point sans coordonnées" },
+      },
+      {
+        ...item("market", stop.id, "2026-08-10", "2026-08-10T13:00"),
+        place: {
+          kind: "venue",
+          label: "Marché",
+          coordinates: { latitude: 38.7139, longitude: -9.1394 },
+        },
+      },
+    ];
+
+    expect(buildStopMapModel(items)).toEqual({
+      points: [
+        {
+          id: "museum",
+          label: "Musée",
+          coordinates: { latitude: 38.7223, longitude: -9.1393 },
+        },
+        {
+          id: "market",
+          label: "Marché",
+          coordinates: { latitude: 38.7139, longitude: -9.1394 },
+        },
+      ],
+    });
+  });
+
+  it("keeps an empty map model when an Étape has no geolocated place", () => {
+    expect(buildStopMapModel([item("agenda", stop.id, "2026-08-10", "2026-08-10T09:00")])).toEqual({
+      points: [],
+    });
   });
 });
 
