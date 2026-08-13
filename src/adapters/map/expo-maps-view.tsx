@@ -39,6 +39,11 @@ type AppleMapsPolyline = NonNullable<
   ExpoMapsTypes.AppleMaps.MapProps["polylines"]
 >[number];
 type AppleMapsViewComponent = typeof import("expo-maps").AppleMaps.View;
+type ExpoMapsRequireResult =
+  | ExpoMapsModule
+  | { default?: ExpoMapsModule }
+  | null
+  | undefined;
 
 let loadedExpoMaps: ExpoMapsModule | null | undefined;
 
@@ -48,9 +53,23 @@ function loadExpoMaps(): ExpoMapsModule | null {
   try {
     // Dynamic loading is intentional: expo-maps can throw before rendering when its native view is absent.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const module = require("expo-maps") as ExpoMapsModule;
+    const required = require("expo-maps") as ExpoMapsRequireResult;
+    // Metro can expose an ES module through `default` when it is loaded dynamically.
+    // Accept both shapes so a valid native module is not mistaken for an unavailable one.
+    const module =
+      required !== null &&
+      typeof required === "object" &&
+      "AppleMaps" in required
+        ? required
+        : required !== null &&
+            typeof required === "object" &&
+            required.default !== undefined
+          ? required.default
+          : null;
     loadedExpoMaps =
-      typeof module.AppleMaps?.View === "function" ? module : null;
+      module !== null && typeof module.AppleMaps?.View === "function"
+        ? module
+        : null;
   } catch {
     loadedExpoMaps = null;
   }
