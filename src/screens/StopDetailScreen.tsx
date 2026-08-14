@@ -4,6 +4,7 @@ import type { MapModel, MapPoint } from "../adapters/map";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
   ItineraryItem,
+  PlaceCandidate,
   Reservation,
   Stop,
   TravelDocument,
@@ -14,9 +15,11 @@ import {
   AppText,
   Badge,
   Button,
+  DatePickerField,
   Icon,
   IconButton,
   InlineMessage,
+  Input,
   SectionTitle,
   Skeleton,
 } from "../ui";
@@ -34,9 +37,12 @@ import {
   formatStopDateRange,
   stopDayCount,
 } from "./stop-detail-model";
+import type { StopDiscoveryKind, StopDiscoverySection } from "./stop-discovery-model";
+import { placeAttribution } from "../modules/places";
 
-type StopDetailTab = "itinerary" | "documents" | "reservations";
+type StopDetailTab = "itinerary" | "discover" | "documents" | "reservations";
 
+export interface ActivitySchedule { date: string; time?: string }
 export interface StopDetailScreenProps {
   tripName: string;
   stop: Stop | null;
@@ -52,13 +58,33 @@ export interface StopDetailScreenProps {
   onOpenItinerary: () => void;
   onOpenDocuments: () => void;
   onOpenReservations: () => void;
+  onEditLocation?: () => void;
   weather?: StopWeatherViewModel;
+  discovery?: StopDiscoveryViewModel;
+  addingPlaceId?: UUID | null;
+  onAddDiscovery?: (place: PlaceCandidate, kind: StopDiscoveryKind, schedule: ActivitySchedule) => Promise<void>;
+  manualPlaceSearch?: ManualPlaceSearchViewModel;
+  onAddReservationToItinerary?: (reservation: Reservation) => Promise<void>;
+  addingReservationId?: UUID | null;
+  addedReservationIds?: UUID[];
 }
 
 export interface StopWeatherViewModel { status: "loading" | "ready" | "unavailable" | "error"; errorMessage?: string; updatedAt?: string; days?: { date: string; weatherCode: number; temperatureMinC: number; temperatureMaxC: number; precipitationProbabilityMax?: number; precipitationSumMm?: number; uvIndexMax?: number; windGustsMaxKmh?: number }[]; current?: { temperatureC: number; apparentTemperatureC?: number; weatherCode: number }; onRetry?: () => Promise<void> }
+export interface StopDiscoveryViewModel { status: "loading" | "ready" | "error"; sections: StopDiscoverySection[]; errorMessage?: string }
+export interface ManualPlaceSearchViewModel {
+  query: string;
+  results: PlaceCandidate[];
+  loading: boolean;
+  onQueryChange: (query: string) => void;
+  onSearch: () => Promise<void>;
+}
 
-export function buildStopMapModel(itinerary: ItineraryItem[]): MapModel {
+export function buildStopMapModel(itinerary: ItineraryItem[], stop?: Stop): MapModel {
   const points: MapPoint[] = [];
+
+  if (stop?.coordinates) {
+    points.push({ id: `stop-${stop.id}`, label: stop.name, coordinates: stop.coordinates });
+  }
 
   for (const item of itinerary) {
     const place = item.place;
@@ -77,7 +103,7 @@ export function buildStopMapModel(itinerary: ItineraryItem[]): MapModel {
 export function StopDetailScreen(props: StopDetailScreenProps) {
   const [tab, setTab] = useState<StopDetailTab>("itinerary");
   const [expandedItemId, setExpandedItemId] = useState<UUID | null>(null);
-  const mapModel = useMemo(() => buildStopMapModel(props.itinerary), [props.itinerary]);
+  const mapModel = useMemo(() => buildStopMapModel(props.itinerary, props.stop ?? undefined), [props.itinerary, props.stop]);
 
   if (props.loading && !props.stop) return <StopDetailLoading onBack={props.onBack} />;
 
@@ -100,6 +126,7 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
             disabled={props.loading}
             accessibilityLabel="Actualiser l’Étape"
           />
+          {props.onEditLocation ? <IconButton icon={<Icon name="edit" size={20} />} onPress={props.onEditLocation} accessibilityLabel="Modifier la localisation" /> : null}
         </View>
 
         {props.error ? (
@@ -133,6 +160,7 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
 
             <View accessibilityRole="tablist" style={styles.tabs}>
               <Tab label="Itinéraire" active={tab === "itinerary"} onPress={() => setTab("itinerary")} />
+              <Tab label="Découvrir" active={tab === "discover"} onPress={() => setTab("discover")} />
               <Tab label="Documents" active={tab === "documents"} onPress={() => setTab("documents")} />
               <Tab label="Réservations" active={tab === "reservations"} onPress={() => setTab("reservations")} />
             </View>
@@ -182,6 +210,17 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
               </View>
             ) : null}
 
+            {tab === "discover" ? (
+              <DiscoveryContent
+                discovery={props.discovery}
+                itinerary={props.itinerary}
+                addingPlaceId={props.addingPlaceId}
+                onAdd={props.onAddDiscovery}
+                manualPlaceSearch={props.manualPlaceSearch}
+                stop={props.stop}
+              />
+            ) : null}
+
             {tab === "documents" ? (
               <View style={styles.section}>
                 <SectionTitle title="Documents associés" />
@@ -209,14 +248,14 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
                 <SectionTitle title="Réservations liées" />
                 <View style={styles.confirmationNote}>
                   <Icon name="check" size={20} color={colors.success} />
-                  <AppText variant="bodySmall" color="muted" style={styles.flexOne}>Seules les Réservations confirmées et explicitement reliées à un Document de cette Étape apparaissent ici.</AppText>
+                  <AppText variant="bodySmall" color="muted" style={styles.flexOne}>Les réservations confirmées avec un lieu ou un transfert renseigné peuvent être ajoutées au programme de cette Étape.</AppText>
                 </View>
                 {props.reservations.length === 0 ? (
                   <InlineMessage title="Aucune Réservation liée" message="Les Réservations sans lien explicite restent visibles dans la liste du Voyage." />
                 ) : (
                   <View style={styles.reservationTimeline}>
                     <View style={styles.reservationLine} />
-                    {props.reservations.map((reservation) => <ReservationCard key={reservation.id} reservation={reservation} />)}
+                  {props.reservations.map((reservation) => <ReservationCard key={reservation.id} reservation={reservation} onAddToItinerary={props.onAddReservationToItinerary && (reservation.venue || reservation.origin || reservation.destination) && !props.addedReservationIds?.includes(reservation.id) ? () => void props.onAddReservationToItinerary?.(reservation) : undefined} adding={props.addingReservationId === reservation.id} added={props.addedReservationIds?.includes(reservation.id)} />)}
                   </View>
                 )}
                 <Button fullWidth variant="secondary" onPress={props.onOpenReservations}>Voir toutes les Réservations</Button>
@@ -227,8 +266,6 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
               <SectionTitle title="Préparation de l’Étape" />
               <View style={styles.futureGrid}>
                 <StopWeather weather={props.weather} />
-                <ComingSoonCard icon="check" title="Packing" message="Liste indépendante par Étape" />
-                <ComingSoonCard icon="users" title="Activité sociale" message="Présence et position en temps réel" />
               </View>
             </View>
           </>
@@ -236,6 +273,105 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
       </ScrollView>
     </View>
   );
+}
+
+function DiscoveryContent({
+  discovery,
+  itinerary,
+  addingPlaceId,
+  onAdd,
+  manualPlaceSearch,
+  stop,
+}: {
+  discovery?: StopDiscoveryViewModel;
+  itinerary: ItineraryItem[];
+  addingPlaceId?: UUID | null;
+  onAdd?: (place: PlaceCandidate, kind: StopDiscoveryKind, schedule: ActivitySchedule) => Promise<void>;
+  manualPlaceSearch?: ManualPlaceSearchViewModel;
+  stop: Stop | null;
+}) {
+  const addedPlaceIds = new Set(itinerary.map((item) => item.place?.placeId).filter(Boolean));
+  const [date, setDate] = useState(stop?.startDate ?? "");
+  const [time, setTime] = useState("");
+  if (!discovery || discovery.status === "loading") {
+    return <View style={styles.section}><SectionTitle title="Autour de cette Étape" /><Skeleton height={spacing["2xl"] * 3} borderRadius={radius.md} /><Skeleton height={spacing["2xl"] * 3} borderRadius={radius.md} /></View>;
+  }
+  if (discovery.status === "error") {
+    return <View style={styles.section}><SectionTitle title="Autour de cette Étape" /><InlineMessage variant="error" title="Suggestions indisponibles" message={discovery.errorMessage ?? "Impossible de charger les idées à proximité."} /></View>;
+  }
+  return (
+    <View style={styles.section}>
+      <SectionTitle title="Autour de cette Étape" />
+      <InlineMessage title="Des idées prêtes à planifier" message="Les lieux viennent de Places. Choisis le jour et, si besoin, l’heure avant d’ajouter." />
+      {stop ? <View style={styles.schedulePanel}>
+        <AppText variant="label">Quand veux-tu le faire ?</AppText>
+        <DatePickerField label="Jour" value={date} onChange={setDate} minimumDate={stop.startDate} maximumDate={stop.endDate} />
+        <Input label="Heure (facultatif)" value={time} onChangeText={setTime} placeholder="Ex. 14:30" keyboardType="numbers-and-punctuation" maxLength={5} />
+      </View> : null}
+      {manualPlaceSearch ? (
+        <View style={styles.manualSearch}>
+          <AppText variant="label">Ajouter une activité ou un lieu</AppText>
+          <View style={styles.manualSearchRow}>
+            <Input value={manualPlaceSearch.query} onChangeText={manualPlaceSearch.onQueryChange} placeholder="Ex. cours de cuisine, musée…" containerStyle={styles.manualSearchInput} returnKeyType="search" onSubmitEditing={() => void manualPlaceSearch.onSearch()} />
+            <Button size="sm" variant="secondary" disabled={manualPlaceSearch.loading || manualPlaceSearch.query.trim().length < 2} onPress={() => void manualPlaceSearch.onSearch()}>{manualPlaceSearch.loading ? "Recherche…" : "Chercher"}</Button>
+          </View>
+          {manualPlaceSearch.results.map((place) => (
+            <View key={`manual-${place.id}`} style={styles.discoveryCard}>
+              <View style={styles.discoveryCardBody}><AppText variant="label">{place.name}</AppText><AppText variant="caption" color="muted" numberOfLines={2}>{[place.address, place.category].filter(Boolean).join(" · ") || "Lieu géocodé"}</AppText></View>
+              <Button size="sm" variant="primary" disabled={!onAdd || !date} onPress={() => void onAdd?.(place, "activity", { date, time: normalizeTime(time) })} icon={<Icon name="plus" size={16} color={colors.white} />}>Ajouter</Button>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {discovery.sections.map((section) => (
+        <View key={section.kind} style={styles.discoverySection}>
+          <View style={styles.discoveryHeading}>
+            <View style={styles.discoveryIcon}><Icon name={section.kind === "specialty" ? "sparkles" : section.kind === "activity" ? "map" : "map-pin"} size={20} color={colors.teal} /></View>
+            <View style={styles.flexOne}>
+              <AppText variant="h3">{section.title}</AppText>
+              <AppText variant="caption" color="muted">{section.description}</AppText>
+            </View>
+          </View>
+          {section.places.length === 0 ? (
+            <AppText variant="caption" color="muted">Aucune adresse trouvée dans cette catégorie.</AppText>
+          ) : section.places.map((place) => {
+            const added = addedPlaceIds.has(place.id);
+            const attribution = placeAttribution(place.provider, place.attribution);
+            return (
+              <View key={`${section.kind}-${place.id}`} style={styles.discoveryCard}>
+                <View style={styles.discoveryCardBody}>
+                  <AppText variant="label">{place.name}</AppText>
+                  <AppText variant="caption" color="muted" numberOfLines={2}>
+                    {[place.category, place.address, formatDistance(place.distanceMeters)].filter(Boolean).join(" · ") || "Lieu proposé à proximité"}
+                  </AppText>
+                  {attribution ? <AppText variant="badge" color="muted">{attribution}</AppText> : null}
+                </View>
+                <Button
+                  size="sm"
+                  variant={added ? "secondary" : "primary"}
+                  disabled={added || addingPlaceId === place.id || !onAdd}
+                  onPress={() => void onAdd?.(place, section.kind, { date, time: normalizeTime(time) })}
+                  icon={<Icon name={added ? "check" : "plus"} size={16} color={added ? colors.teal : colors.white} />}
+                >
+                  {added ? "Ajouté" : addingPlaceId === place.id ? "Ajout…" : "Ajouter"}
+                </Button>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function formatDistance(value?: number): string | null {
+  if (value == null) return null;
+  return value >= 1_000 ? `${(value / 1_000).toFixed(1)} km` : `${Math.round(value)} m`;
+}
+
+function normalizeTime(value: string): string | undefined {
+  const trimmed = value.trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed) ? trimmed : undefined;
 }
 
 function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -275,7 +411,7 @@ function DetailRow({ icon, text }: { icon: "map-pin" | "file-text"; text: string
   return <View style={styles.detailRow}><Icon name={icon} size={14} color={colors.muted} /><AppText variant="caption" color="muted" style={styles.flexOne}>{text}</AppText></View>;
 }
 
-function ReservationCard({ reservation }: { reservation: Reservation }) {
+function ReservationCard({ reservation, onAddToItinerary, adding, added }: { reservation: Reservation; onAddToItinerary?: () => void; adding?: boolean; added?: boolean }) {
   const time = formatReservationTime(reservation);
   return (
     <View style={styles.reservationItem}>
@@ -287,30 +423,24 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
         {time ? <AppText variant="caption" color="muted">{time} · {reservation.start?.timeZone}</AppText> : null}
         {reservation.provider ? <AppText variant="caption" color="muted">{reservation.provider}</AppText> : null}
         {reservation.reference ? <AppText variant="caption" color="muted">Réf. {reservation.reference}</AppText> : null}
+        {added ? <Badge label="Ajoutée à l’Étape" variant="success" /> : onAddToItinerary ? <Button size="sm" variant="secondary" loading={adding} onPress={onAddToItinerary} icon={<Icon name="calendar" size={16} color={colors.teal} />}>Ajouter à l’Étape</Button> : null}
       </View>
-    </View>
-  );
-}
-
-function ComingSoonCard({ icon, title, message }: { icon: "calendar" | "check" | "users"; title: string; message: string }) {
-  return (
-    <View accessible accessibilityLabel={`${title}, à venir`} accessibilityState={{ disabled: true }} style={styles.futureCard}>
-      <View pointerEvents="none" style={styles.futureContent}>
-        <Icon name={icon} size={20} color={colors.muted} />
-        <View style={styles.flexOne}><AppText variant="label" color="muted">{title}</AppText><AppText variant="caption" color="muted">{message}</AppText></View>
-      </View>
-      <Badge label="À venir" variant="gold" />
     </View>
   );
 }
 
 function StopWeather({ weather }: { weather?: StopWeatherViewModel }) {
-  if (!weather || weather.status === "unavailable") return <ComingSoonCard icon="calendar" title="Météo" message={weather?.errorMessage ?? "Prévisions indisponibles"} />;
+  if (!weather || weather.status === "unavailable") return <View style={styles.weatherCard}><InlineMessage title="Météo indisponible" message={weather?.errorMessage ?? "Prévisions indisponibles"} /></View>;
   if (weather.status === "loading") return <View style={styles.weatherCard}><Skeleton height={spacing.lg} /><Skeleton height={spacing.md} width="70%" /></View>;
   if (weather.status === "error") return <View style={styles.weatherCard}><InlineMessage variant="error" title="Météo indisponible" message={weather.errorMessage ?? "Impossible de charger la météo."} />{weather.onRetry ? <Button size="sm" variant="secondary" onPress={() => void weather.onRetry?.()}>Réessayer</Button> : null}</View>;
-  const day = weather.days?.[0];
-  if (!day) return <ComingSoonCard icon="calendar" title="Météo" message="Aucune prévision disponible" />;
-  return <View style={styles.weatherCard}><View style={styles.weatherHeading}><Icon name="calendar" size={20} color={colors.teal} /><View style={styles.flexOne}><AppText variant="label">Météo</AppText><AppText variant="caption" color="muted">Prévisions Open‑Meteo</AppText></View><AppText variant="h3">{Math.round(day.temperatureMaxC)}°</AppText></View><AppText variant="bodySmall">Min {Math.round(day.temperatureMinC)}° · Pluie {Math.round(day.precipitationProbabilityMax ?? 0)}%</AppText></View>;
+  const days = weather.days ?? [];
+  if (!days.length) return <View style={styles.weatherCard}><InlineMessage title="Aucune prévision" message="Aucune donnée météo n’est disponible pour cette Étape." /></View>;
+  return <View style={styles.weatherCard}><View style={styles.weatherHeading}><Icon name="calendar" size={20} color={colors.teal} /><View style={styles.flexOne}><AppText variant="label">Météo de l’Étape</AppText><AppText variant="caption" color="muted">Prévisions Open‑Meteo · {days.length} jour{days.length > 1 ? "s" : ""}</AppText></View></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherDays}>{days.map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{formatWeatherDateLabel(day.date)}</AppText><AppText variant="h3">{Math.round(day.temperatureMaxC)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMinC)}°</AppText><AppText variant="caption" color="muted">Pluie {Math.round(day.precipitationProbabilityMax ?? 0)}%</AppText></View>)}</ScrollView></View>;
+}
+
+function formatWeatherDateLabel(value: string): string {
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(date);
 }
 
 function StopDetailLoading({ onBack }: { onBack: () => void }) {
@@ -338,7 +468,7 @@ const styles = StyleSheet.create({
   timeZoneRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   stats: { flexDirection: "row", gap: spacing.sm, padding: spacing.lg },
   stat: { flex: 1, minHeight: layout.minimumTouchTarget + spacing.lg, alignItems: "center", justifyContent: "center", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  tabs: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   tab: { flex: 1, minHeight: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xs, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   tabActive: { backgroundColor: colors.fg, borderColor: colors.fg },
   section: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
@@ -353,6 +483,15 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm },
   timelineDetail: { gap: spacing.sm, marginTop: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   detailRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  discoverySection: { gap: spacing.sm, paddingTop: spacing.sm },
+  discoveryHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  discoveryIcon: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.tealSoft },
+  discoveryCard: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
+  discoveryCardBody: { flex: 1, minWidth: 0, gap: spacing.xs },
+  manualSearch: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  manualSearchRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  manualSearchInput: { flex: 1 },
+  schedulePanel: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   documentCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   documentIcon: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", backgroundColor: colors.tealSoft },
   cardText: { flex: 1, minWidth: "40%", gap: spacing.xs },
@@ -365,6 +504,8 @@ const styles = StyleSheet.create({
   futureGrid: { gap: spacing.sm },
   weatherCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   weatherHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  weatherDays: { gap: spacing.sm, paddingTop: spacing.xs },
+  weatherDay: { minWidth: spacing["2xl"] * 2, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.tealSoft, gap: spacing.xs },
   futureCard: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed", borderColor: colors.border, backgroundColor: colors.surface },
   futureContent: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md, opacity: 0.5 },
   flexOne: { flex: 1 },

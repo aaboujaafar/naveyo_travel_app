@@ -28,6 +28,7 @@ export default function TripDetailRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
+  const [weatherByStopId, setWeatherByStopId] = useState<Record<string, DashboardWeatherState>>({});
   const [routePolyline, setRoutePolyline] = useState<Coordinates[]>([]);
 
   const load = useCallback(async () => {
@@ -80,26 +81,27 @@ export default function TripDetailRoute() {
           "Le Voyage et ses Étapes sont chargés, mais les lieux de la carte sont temporairement indisponibles.",
         );
       }
-      const itineraryItem = loadedItinerary.find((item) => item.place?.coordinates);
-      const stop = itineraryItem ? nextStops.find((candidate) => candidate.id === itineraryItem.stopId) : nextStops[0];
-      let coordinates = itineraryItem?.place?.coordinates ?? stop?.coordinates;
-      if (!coordinates && stop) {
-        try {
-          coordinates = (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
-        } catch {
-          coordinates = undefined;
+      const weatherEntries = await Promise.all(nextStops.map(async (stop) => {
+        const itineraryItem = loadedItinerary.find((item) => item.stopId === stop.id && item.place?.coordinates);
+        let coordinates = itineraryItem?.place?.coordinates ?? stop.coordinates;
+        if (!coordinates) {
+          try {
+            coordinates = (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
+          } catch {
+            coordinates = undefined;
+          }
         }
-      }
-      if (!coordinates || !stop) {
-        setWeather({ status: "empty", message: "Ajoutez une Étape géolocalisable pour afficher la météo." });
-      } else {
+        if (!coordinates) return [stop.id, { status: "empty", message: "Étape sans coordonnées" } satisfies DashboardWeatherState] as const;
         try {
           const forecast = await bootstrap.modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
-          setWeather({ status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.slice(0, 7).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) });
+          return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) }] as const;
         } catch (cause) {
-          setWeather({ status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" });
+          return [stop.id, { status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" } satisfies DashboardWeatherState] as const;
         }
-      }
+      }));
+      const weatherMap = Object.fromEntries(weatherEntries) as Record<string, DashboardWeatherState>;
+      setWeatherByStopId(weatherMap);
+      setWeather(nextStops[0] ? weatherMap[nextStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
       try {
         setReservations(await sharedLocalReservations.list(tripId));
       } catch {
@@ -136,6 +138,7 @@ export default function TripDetailRoute() {
       loading={loading}
       error={error}
       onRefresh={load}
+      onOpenTrips={() => router.replace("/(app)/trips")}
       onOpenSettings={() =>
         router.push(`/(app)/trips/${routeTripId}/settings`)
       }
@@ -165,6 +168,7 @@ export default function TripDetailRoute() {
         router.push(`/(app)/trips/${routeTripId}/documents`)
       }
       weather={weather}
+      weatherByStopId={weatherByStopId}
       routePolyline={routePolyline}
     />
   );
