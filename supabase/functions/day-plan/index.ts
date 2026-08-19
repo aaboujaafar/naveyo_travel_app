@@ -142,7 +142,7 @@ function parseRequest(value: unknown): RequestInput {
   if (!isUuid(input?.tripId) || !isUuid(input?.stopId) || !isDate(input?.date)) throw new Response(JSON.stringify({ error: 'invalid_request' }), { status: 400 })
   const preferences = parsePreferences(input?.preferences)
   const weather = input?.weather === undefined ? undefined : Array.isArray(input.weather) && input.weather.length <= 14 ? input.weather : undefined
-  const existingItinerary = input?.existingItinerary === undefined ? undefined : Array.isArray(input.existingItinerary) && input.existingItinerary.length <= 100 ? input.existingItinerary : undefined
+  const existingItinerary = input?.existingItinerary === undefined ? undefined : Array.isArray(input.existingItinerary) && input.existingItinerary.length <= 500 ? input.existingItinerary : undefined
   if (input?.weather !== undefined && !weather || input?.existingItinerary !== undefined && !existingItinerary) throw new Response(JSON.stringify({ error: 'invalid_context' }), { status: 400 })
   const candidates = input?.candidates === undefined ? undefined : parseCandidates(input.candidates)
   return { tripId: input.tripId, stopId: input.stopId, date: input.date, preferences, weather, existingItinerary, candidates }
