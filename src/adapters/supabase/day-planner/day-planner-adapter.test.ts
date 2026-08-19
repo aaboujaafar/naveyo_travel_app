@@ -44,6 +44,14 @@ const input: DayPlanInput = {
       coordinates: { latitude: 36.4, longitude: 25.4 },
     },
   ],
+  existingItinerary: [{
+    date: "2026-08-16",
+    title: "Déjà fait",
+    localTime: "14:00",
+    candidateId: "50000000-0000-4000-8000-000000000005" as UUID,
+    name: "Lieu historique",
+    coordinates: { latitude: 36.41, longitude: 25.41 },
+  }],
 };
 
 const client = (session: string | null): SupabaseClientLike =>
@@ -87,6 +95,19 @@ describe("AI-101 Supabase day-planner adapter", () => {
         body: JSON.stringify(input),
       }),
     );
+  });
+
+  it("serializes the complete day-plan history without remapping it", async () => {
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ draft }), { status: 200 }),
+    );
+    const planner = createSupabaseDayPlanner(client("token-123"), "/custom/day-plan");
+
+    await planner.composeDay(input);
+
+    const request = fetcher.mock.calls[0]?.[1];
+    expect(request && typeof request === "object" && "body" in request ? request.body : undefined)
+      .toBe(JSON.stringify(input));
   });
 
   it("uses body.error, then body.message, then status for HTTP errors", async () => {

@@ -3,6 +3,7 @@ import type { ItineraryItem, PlaceCandidate, UUID } from "../_shared/model";
 import type { ItineraryModule } from "../itinerary";
 import {
   confirmDayPlan,
+  mapItineraryToDayPlanHistory,
   normalizeDayPlanPreferences,
   parseDayPlanDraft,
   type DayPlanDraft,
@@ -53,6 +54,41 @@ const itinerary = (addConfirmedPlace = vi.fn(async (input) => ({
   }) as unknown as ItineraryModule;
 
 describe("day planner domain", () => {
+  it("maps itinerary place identity and omits unavailable provider metadata", () => {
+    const items: ItineraryItem[] = [{
+      id: "50000000-0000-4000-8000-000000000001" as UUID,
+      tripId,
+      stopId,
+      title: "Dîner réservé",
+      date: "2026-08-20",
+      time: { local: "20:00", timeZone: "Europe/Paris" as never },
+      place: {
+        kind: "venue",
+        placeId: "60000000-0000-4000-8000-000000000001" as UUID,
+        label: "Taverne test",
+        coordinates: { latitude: 48.85, longitude: 2.35 },
+      },
+    }, {
+      id: "50000000-0000-4000-8000-000000000002" as UUID,
+      tripId,
+      stopId,
+      title: "Temps libre",
+      date: "2026-08-21",
+    }];
+
+    expect(mapItineraryToDayPlanHistory(items)).toEqual([
+      {
+        date: "2026-08-20",
+        title: "Dîner réservé",
+        localTime: "20:00",
+        candidateId: "60000000-0000-4000-8000-000000000001",
+        name: "Taverne test",
+        coordinates: { latitude: 48.85, longitude: 2.35 },
+      },
+      { date: "2026-08-21", title: "Temps libre" },
+    ]);
+  });
+
   it("normalizes walking preferences with product defaults", () => {
     expect(normalizeDayPlanPreferences({
       mobility: "walking",

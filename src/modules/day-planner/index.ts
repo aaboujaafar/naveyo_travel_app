@@ -2,6 +2,7 @@ import type {
   IANATimeZone,
   ItineraryItem,
   PlaceCandidate,
+  Coordinates,
   UUID,
 } from "../_shared/model";
 import {
@@ -10,11 +11,36 @@ import {
   isUuid,
   parsePlaceCandidate,
 } from "../_shared/validation";
-import type {
-  SuggestionItineraryContext,
-  SuggestionWeatherContext,
-} from "../trip-assistant";
+import type { SuggestionWeatherContext } from "../trip-assistant";
 import type { ItineraryModule } from "../itinerary";
+
+export interface DayPlanHistoryItem {
+  date: string;
+  title: string;
+  localTime?: string;
+  candidateId?: UUID;
+  provider?: string;
+  providerPlaceId?: string;
+  name?: string;
+  coordinates?: Coordinates;
+}
+
+/** Maps persisted itinerary items to the compact history sent to day planning. */
+export function mapItineraryToDayPlanHistory(
+  items: ItineraryItem[],
+): DayPlanHistoryItem[] {
+  return items.map((item) => {
+    const history: DayPlanHistoryItem = {
+      date: item.date,
+      title: item.title,
+    };
+    if (item.time?.local !== undefined) history.localTime = item.time.local;
+    if (item.place?.placeId !== undefined) history.candidateId = item.place.placeId;
+    if (item.place?.label !== undefined) history.name = item.place.label;
+    if (item.place?.coordinates !== undefined) history.coordinates = item.place.coordinates;
+    return history;
+  });
+}
 
 export interface DayPlanItemDraft {
   candidateId: UUID;
@@ -86,7 +112,7 @@ export interface DayPlanInput {
   /** Legacy free-form preferences remain supported for existing callers. */
   preferences?: string | DayPlanPreferences | DayPlanPreferencesInput;
   weather?: SuggestionWeatherContext[];
-  existingItinerary?: SuggestionItineraryContext[];
+  existingItinerary?: DayPlanHistoryItem[];
   /** Ephemeral, provider-verified candidates from the current Places search. */
   candidates?: PlaceCandidate[];
 }

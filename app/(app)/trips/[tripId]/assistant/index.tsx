@@ -4,6 +4,7 @@ import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../src/modules/_shared/model";
 import {
   confirmDayPlan,
+  mapItineraryToDayPlanHistory,
   normalizeDayPlanPreferences,
   type DayPlanPreferences,
   type DayPlanDraft,
@@ -53,6 +54,8 @@ export default function TripAssistantRoute() {
     pace: "balanced",
   });
 
+  const displayedPlannedItems = plannedItems.filter((item) => item.stopId === stop?.id);
+
   const handleDayPlanPreferencesChange = (preferences: DayPlanPreferences) => {
     setDayPlanPreferences(preferences);
     setNearbyCandidates([]);
@@ -77,7 +80,7 @@ export default function TripAssistantRoute() {
           if (!selected || !bootstrap) return;
           const items = await bootstrap.modules.itinerary.list(tripId as UUID);
           if (!active) return;
-          setPlannedItems(items.filter((item) => item.stopId === selected.id));
+          setPlannedItems(items);
           let coordinates = selected.coordinates;
           if (!coordinates) coordinates = (await bootstrap.modules.places.search({ query: selected.name, tripId: tripId as UUID, stopId: selected.id, countryCode: selected.countryCode })).at(0)?.coordinates;
           if (!coordinates) return;
@@ -130,7 +133,7 @@ export default function TripAssistantRoute() {
           countryCode: stop?.countryCode,
           timeZone: stop?.timeZone,
           weather,
-          existingItinerary: plannedItems.map((item): SuggestionItineraryContext => ({ date: item.date, title: item.title, localTime: item.time?.local })),
+          existingItinerary: displayedPlannedItems.map((item): SuggestionItineraryContext => ({ date: item.date, title: item.title, localTime: item.time?.local })),
         });
         setDrafts(result);
       } else setDrafts([]);
@@ -158,13 +161,7 @@ export default function TripAssistantRoute() {
         date: selectedDayPlanDate,
         preferences,
         weather: weather.filter((day) => day.date === selectedDayPlanDate),
-        existingItinerary: plannedItems
-          .filter((item) => item.date === selectedDayPlanDate)
-          .map((item): SuggestionItineraryContext => ({
-            date: item.date,
-            title: item.title,
-            localTime: item.time?.local,
-          })),
+        existingItinerary: mapItineraryToDayPlanHistory(plannedItems),
       });
       setNearbyCandidates(result.candidates);
       setDayPlan(result);
@@ -229,7 +226,7 @@ export default function TripAssistantRoute() {
         if (tripId) router.replace(`/(app)/trips/${tripId}`);
         else router.back();
       }}
-      planningContext={{ weather, plannedCount: plannedItems.length }}
+      planningContext={{ weather, plannedCount: displayedPlannedItems.length }}
       dayPlanSection={stop ? (
         <DayPlanSection
           dates={stopDates(stop.startDate, stop.endDate)}
