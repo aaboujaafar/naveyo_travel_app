@@ -21,6 +21,7 @@ export interface PlaceReference {
   address?: string;
   countryCode?: string;
   coordinates?: Coordinates;
+  attribution?: string;
 }
 
 export interface Coordinates {
@@ -46,6 +47,7 @@ export interface TripInvitation {
 export interface Trip {
   id: UUID;
   name: string;
+  imageUrl?: string;
   referenceCurrency: ISO4217;
   startsOn?: string;
   endsOn?: string;
@@ -59,20 +61,40 @@ export interface Stop {
   id: UUID;
   tripId: UUID;
   name: string;
+  imageUrl?: string;
   countryCode: string;
   timeZone: IANATimeZone;
   startDate: string;
   endDate: string;
+  /** Optional geocoded location; legacy stops may omit these fields. */
+  coordinates?: Coordinates;
+  address?: string;
+  providerPlaceId?: string;
+  attribution?: string;
+}
+
+export interface PlaceImageCredit {
+  photographer: string;
+  photographerUrl: string;
+  sourceUrl: string;
 }
 
 export interface PlaceCandidate {
   id: UUID;
-  provider: "geoapify" | "manual";
+  provider: "geoapify" | "google" | "manual";
   name: string;
+  /** Optional provider photo URL; consumers must keep a local fallback. */
+  imageUrl?: string;
+  /** Unsplash attribution metadata when the illustrative photo comes from Unsplash. */
+  imageCredit?: PlaceImageCredit;
   category?: string;
   address?: string;
   countryCode?: string;
   coordinates: Coordinates;
+  providerPlaceId?: string;
+  attribution?: string;
+  timeZone?: IANATimeZone;
+  distanceMeters?: number;
 }
 
 export interface ItineraryItem {

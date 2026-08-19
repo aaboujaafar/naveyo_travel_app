@@ -8,6 +8,7 @@ import type {
   LocalDateTime,
   Money,
   PlaceCandidate,
+  PlaceImageCredit,
   PlaceReference,
   Reservation,
   ReservationDraft,
@@ -205,6 +206,14 @@ const stringValue = (value: unknown, name: string): string => {
   return value;
 };
 
+const isHttpsUrl = (value: string): boolean => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 const uuidValue = (value: unknown, name: string): UUID => {
   if (typeof value !== "string" || !isUuid(value))
     throw new Error(`Invalid ${name}`);
@@ -264,6 +273,7 @@ export const parsePlaceReference = (value: unknown): PlaceReference => {
     candidate.countryCode,
     "place reference countryCode",
   );
+  result.attribution = parseOptionalString(candidate.attribution, "place reference attribution");
   if (candidate.coordinates !== undefined)
     result.coordinates = parseCoordinates(candidate.coordinates);
   return result;
@@ -314,6 +324,7 @@ export const parseTrip = (value: unknown): Trip => {
   return {
     id: uuidValue(candidate.id, "trip id"),
     name: stringValue(candidate.name, "trip name"),
+    ...(candidate.imageUrl !== undefined ? { imageUrl: parseOptionalString(candidate.imageUrl, "trip imageUrl") } : {}),
     referenceCurrency:
       typeof candidate.referenceCurrency === "string" &&
       isCurrency(candidate.referenceCurrency)
@@ -352,10 +363,20 @@ export const parseStop = (value: unknown): Stop => {
     id: uuidValue(candidate.id, "stop id"),
     tripId: uuidValue(candidate.tripId, "stop tripId"),
     name: stringValue(candidate.name, "stop name"),
+    ...(candidate.imageUrl !== undefined ? { imageUrl: parseOptionalString(candidate.imageUrl, "stop imageUrl") } : {}),
     countryCode: stringValue(candidate.countryCode, "stop countryCode"),
     timeZone,
     startDate,
     endDate,
+    ...(candidate.coordinates === undefined
+      ? {}
+      : { coordinates: parseCoordinates(candidate.coordinates) }),
+    address: parseOptionalString(candidate.address, "stop address"),
+    providerPlaceId: parseOptionalString(
+      candidate.providerPlaceId,
+      "stop providerPlaceId",
+    ),
+    attribution: parseOptionalString(candidate.attribution, "stop attribution"),
   };
 };
 
@@ -559,7 +580,11 @@ export const parseReservation = (value: unknown): Reservation => {
 
 export const parsePlaceCandidate = (value: unknown): PlaceCandidate => {
   const candidate = record(value, "Place candidate");
-  if (candidate.provider !== "geoapify" && candidate.provider !== "manual")
+  if (
+    candidate.provider !== "geoapify" &&
+    candidate.provider !== "google" &&
+    candidate.provider !== "manual"
+  )
     throw new Error("Invalid place provider");
   const result: PlaceCandidate = {
     id: uuidValue(candidate.id, "place id"),
@@ -567,12 +592,41 @@ export const parsePlaceCandidate = (value: unknown): PlaceCandidate => {
     name: stringValue(candidate.name, "place name"),
     coordinates: parseCoordinates(candidate.coordinates),
   };
+  result.imageUrl = parseOptionalString(candidate.imageUrl, "place imageUrl");
+  if (candidate.imageCredit !== undefined) {
+    const imageCredit = record(candidate.imageCredit, "Place image credit");
+    const photographer = stringValue(imageCredit.photographer, "image photographer");
+    const photographerUrl = stringValue(imageCredit.photographerUrl, "image photographer URL");
+    const sourceUrl = stringValue(imageCredit.sourceUrl, "image source URL");
+    if (!isHttpsUrl(photographerUrl) || !isHttpsUrl(sourceUrl)) {
+      throw new Error("Invalid place image credit URL");
+    }
+    result.imageCredit = { photographer, photographerUrl, sourceUrl } satisfies PlaceImageCredit;
+  }
   result.category = parseOptionalString(candidate.category, "place category");
   result.address = parseOptionalString(candidate.address, "place address");
   result.countryCode = parseOptionalString(
     candidate.countryCode,
     "place countryCode",
   );
+  result.providerPlaceId = parseOptionalString(
+    candidate.providerPlaceId,
+    "place providerPlaceId",
+  );
+  result.attribution = parseOptionalString(
+    candidate.attribution,
+    "place attribution",
+  );
+  if (candidate.timeZone !== undefined) {
+    if (typeof candidate.timeZone !== "string" || !isIanaTimeZone(candidate.timeZone))
+      throw new Error("Invalid place timezone");
+    result.timeZone = candidate.timeZone;
+  }
+  if (candidate.distanceMeters !== undefined) {
+    if (typeof candidate.distanceMeters !== "number" || !Number.isFinite(candidate.distanceMeters) || candidate.distanceMeters < 0)
+      throw new Error("Invalid place distance");
+    result.distanceMeters = candidate.distanceMeters;
+  }
   return result;
 };
 
