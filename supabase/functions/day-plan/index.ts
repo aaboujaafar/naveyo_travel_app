@@ -1,6 +1,8 @@
 import { requireTripMember } from '../_shared/auth.ts'
 import { completeChat } from '../_shared/ai.ts'
 import { discoverDayPlaces, type DiscoveredPlace } from '../_shared/day-place-discovery.ts'
+import { collectUsedPlaceHistory } from '../_shared/day-plan-history.ts'
+import { excludePreviouslyUsedPlaces } from '../_shared/day-place-exclusions.ts'
 
 type Row = Record<string, unknown>
 type Candidate = DiscoveredPlace
@@ -289,14 +291,14 @@ Deno.serve(async (request) => {
       authenticated.client.from('trips').select('name,reference_currency').eq('id', input.tripId).single(),
       authenticated.client.from('stops').select('name,country_code,timezone,local_start,local_end,latitude,longitude').eq('id', input.stopId).eq('trip_id', input.tripId).single(),
       placesPromise,
-      authenticated.client.from('itinerary_items').select('title,local_time,timezone,item_type,place_id').eq('trip_id', input.tripId).eq('stop_id', input.stopId).eq('local_date', input.date).order('local_time', { ascending: true }),
+      authenticated.client.from('itinerary_items').select('title,local_date,local_time,timezone,item_type,place_id,place:places(id,provider,provider_place_id,name,latitude,longitude)').eq('trip_id', input.tripId).order('local_date', { ascending: true }).order('local_time', { ascending: true }),
     ])
     if (tripResult.error || !tripResult.data || stopResult.error || !stopResult.data) return json({ error: 'trip_context_not_found' }, 404)
     const stop = stopResult.data as Row
     const startDate = text(stop.local_start, 10)
     const endDate = text(stop.local_end, 10)
     if (!startDate || !endDate || input.date < startDate || input.date > endDate) return json({ error: 'date_outside_stop' }, 400)
-    if (itineraryResult.error) return json({ error: 'day_itinerary_lookup_failed' }, 503)
+    if (itineraryResult.error) return json({ error: 'day_history_lookup_failed' }, 503)
     const stopCoordinates = coordinates({ latitude: stop.latitude, longitude: stop.longitude })
     const fallbackCandidates = input.candidates?.map((candidate) => mapClientCandidate(candidate as unknown as Row)).filter((row): row is Candidate => row !== null).slice(0, MAX_CANDIDATES) ??
       (!placesResult.error && Array.isArray(placesResult.data) ? placesResult.data : []).map((row) => mapCandidate(row as Row)).filter((row): row is Candidate => row !== null).slice(0, MAX_CANDIDATES)
@@ -323,9 +325,21 @@ Deno.serve(async (request) => {
       discoveryFailure = 'places_provider_unavailable'
     }
     if (candidates.length === 0) candidates = fallbackCandidates
-    const existingItinerary = Array.isArray(itineraryResult.data) ? itineraryResult.data : []
+    const databaseItinerary = Array.isArray(itineraryResult.data) ? itineraryResult.data : []
+    const clientItinerary = input.existingItinerary ?? []
+    const usedPlaceHistory = collectUsedPlaceHistory(databaseItinerary, clientItinerary)
+    const hadCandidatesBeforeExclusion = candidates.length > 0
+    candidates = excludePreviouslyUsedPlaces(candidates, usedPlaceHistory)
+    const existingItinerary = databaseItinerary.filter((item) => record(item)?.local_date === input.date)
+    const clientDayItinerary = clientItinerary.filter((item) => {
+      const row = record(item)
+      return row?.local_date === input.date || row?.date === input.date
+    })
     const createdAt = new Date().toISOString()
-    if (candidates.length === 0) return json({ error: discoveryFailure ?? 'places_provider_unavailable' }, 503)
+    if (candidates.length === 0) {
+      if (hadCandidatesBeforeExclusion) return json({ error: 'no_new_places_available' }, 409)
+      return json({ error: discoveryFailure ?? 'places_provider_unavailable' }, 503)
+    }
 
     const quota = await authenticated.client.rpc('consume_trip_assistant_quota', { target_account: authenticated.user.id })
     if (quota.error) return json({ error: 'assistant_quota_unavailable' }, 503)
@@ -337,7 +351,7 @@ Deno.serve(async (request) => {
         timeoutMs: TIMEOUT_MS,
         messages: [
           { role: 'system', content: 'You compose one travel day using only the supplied places. Never invent a place, opening hour, price, or travel time. Use weather and confirmed itinerary items as constraints, avoid duplicating confirmed items, and leave unavailable details unknown. Return only valid JSON with an items array of at most eight items. Each item must contain candidateId, title, reason, localTime (HH:MM), and durationMinutes (integer 15..480). Use unique candidate IDs and unique local times. Sort items by localTime. This is an unpersisted draft.' },
-          { role: 'user', content: JSON.stringify({ task: 'compose a full day plan', date: input.date, stop: stopResult.data, preferences: input.preferences, weather: input.weather, existingItinerary: [...existingItinerary, ...(input.existingItinerary ?? [])].slice(0, 100), candidates }) },
+          { role: 'user', content: JSON.stringify({ task: 'compose a full day plan', date: input.date, stop: stopResult.data, preferences: input.preferences, weather: input.weather, existingItinerary: [...existingItinerary, ...clientDayItinerary].slice(0, 100), candidates }) },
         ],
       })
     } catch (error) {
