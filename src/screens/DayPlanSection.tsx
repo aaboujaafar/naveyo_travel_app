@@ -14,6 +14,9 @@ import { colors, layout, radius, spacing } from "../theme";
 import {
   formatDayPlanDate,
   formatDayPlanDuration,
+  formatPriceLevel,
+  formatRating,
+  formatStraightLineDistance,
   sortedDayPlanItems,
 } from "./day-plan-model";
 import {
@@ -136,7 +139,7 @@ export function DayPlanSection({
             <InlineMessage title="Aucune proposition" message="Essayez de recomposer cette journée avec d’autres contraintes." />
           ) : (
             <View style={styles.items}>
-              {items.map((item) => <DayPlanItem key={item.candidateId} item={item} />)}
+              {items.map((item) => <DayPlanItem key={item.candidateId} item={item} candidate={draft.candidates.find((entry) => entry.id === item.candidateId)} />)}
             </View>
           )}
           <InlineMessage
@@ -262,8 +265,12 @@ function PreferenceGroup({ label, children }: { label: string; children: ReactNo
   return <View style={styles.preferenceGroup}><AppText variant="caption" color="muted">{label}</AppText>{children}</View>;
 }
 
-function DayPlanItem({ item }: { item: DayPlanItemDraft }) {
+function DayPlanItem({ item, candidate }: { item: DayPlanItemDraft; candidate?: DayPlanDraft["candidates"][number] }) {
   const time = item.localTime || "Horaire flexible";
+  const rating = formatRating(candidate?.rating);
+  const price = formatPriceLevel(candidate?.priceLevel);
+  const distance = formatStraightLineDistance(item.distanceFromPreviousMeters);
+  const reviewCount = candidate?.userRatingCount === undefined ? null : `${candidate.userRatingCount} avis`;
   return (
     <View style={styles.item} accessibilityLabel={`${item.title}, ${time}, ${formatDayPlanDuration(item.durationMinutes)}`}>
       <View style={styles.itemTime}>
@@ -274,6 +281,13 @@ function DayPlanItem({ item }: { item: DayPlanItemDraft }) {
         <AppText variant="label">{item.title}</AppText>
         <AppText variant="caption" color="muted">{item.reason}</AppText>
         <AppText variant="caption" color="muted">{formatDayPlanDuration(item.durationMinutes)}</AppText>
+        {rating || reviewCount || price ? (
+          <AppText variant="caption" color="muted">{[rating, reviewCount, price].filter(Boolean).join(" · ")}</AppText>
+        ) : null}
+        {item.openingStatus !== undefined ? (
+          <AppText variant="caption" color="muted">{item.openingStatus === "verified_open" ? "Ouvert à cet horaire" : "Horaires non confirmés"}</AppText>
+        ) : null}
+        {distance ? <AppText variant="caption" color="muted">{distance}</AppText> : null}
       </View>
     </View>
   );

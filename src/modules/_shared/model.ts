@@ -79,6 +79,23 @@ export interface PlaceImageCredit {
   sourceUrl: string;
 }
 
+export interface OpeningHoursPoint {
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+export interface OpeningHoursPeriod {
+  open: OpeningHoursPoint;
+  close?: OpeningHoursPoint;
+}
+
+export interface OpeningHours {
+  periods?: OpeningHoursPeriod[];
+  weekdayDescriptions?: string[];
+  sourceText?: string;
+}
+
 export interface PlaceCandidate {
   id: UUID;
   provider: "geoapify" | "google" | "manual";
@@ -95,6 +112,11 @@ export interface PlaceCandidate {
   attribution?: string;
   timeZone?: IANATimeZone;
   distanceMeters?: number;
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: 0 | 1 | 2 | 3 | 4;
+  businessStatus?: "operational" | "temporarily_closed" | "permanently_closed" | "unknown";
+  openingHours?: OpeningHours;
 }
 
 export interface ItineraryItem {

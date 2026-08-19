@@ -1,8 +1,10 @@
 import { requireTripMember } from '../_shared/auth.ts'
 import { completeChat } from '../_shared/ai.ts'
 import { discoverDayPlaces, type DiscoveredPlace } from '../_shared/day-place-discovery.ts'
+import { enrichDayPlaces } from '../_shared/day-place-enrichment.ts'
 import { collectUsedPlaceHistory } from '../_shared/day-plan-history.ts'
 import { excludePreviouslyUsedPlaces } from '../_shared/day-place-exclusions.ts'
+import { validateDaySchedule, type VerifiedDayItem } from '../_shared/day-schedule-validation.ts'
 
 type Row = Record<string, unknown>
 type Candidate = DiscoveredPlace
@@ -39,7 +41,13 @@ type ClientCandidate = {
   attribution?: string
   distanceMeters?: number
 }
-type DayItem = { candidateId: string; title: string; reason: string; localTime: string; durationMinutes: number }
+type DayItem = {
+  candidateId: string
+  title: string
+  reason: string
+  localTime: string
+  durationMinutes: number
+}
 
 const MAX_CANDIDATES = 100
 const MAX_ITEMS = 8
@@ -212,7 +220,7 @@ function mapCandidate(row: Row): Candidate | null {
   }
 }
 
-function draft(input: RequestInput, candidates: Candidate[], items: DayItem[], createdAt: string): Record<string, unknown> {
+function draft(input: RequestInput, candidates: Candidate[], items: VerifiedDayItem[], createdAt: string): Record<string, unknown> {
   return {
     id: crypto.randomUUID(),
     tripId: input.tripId,
@@ -336,6 +344,7 @@ Deno.serve(async (request) => {
       return row?.local_date === input.date || row?.date === input.date
     })
     const createdAt = new Date().toISOString()
+    candidates = (await enrichDayPlaces(candidates.slice(0, 16))) as Candidate[]
     if (candidates.length === 0) {
       if (hadCandidatesBeforeExclusion) return json({ error: 'no_new_places_available' }, 409)
       return json({ error: discoveryFailure ?? 'places_provider_unavailable' }, 503)
@@ -350,7 +359,7 @@ Deno.serve(async (request) => {
       response = await completeChat({
         timeoutMs: TIMEOUT_MS,
         messages: [
-          { role: 'system', content: 'You compose one travel day using only the supplied places. Never invent a place, opening hour, price, or travel time. Use weather and confirmed itinerary items as constraints, avoid duplicating confirmed items, and leave unavailable details unknown. Return only valid JSON with an items array of at most eight items. Each item must contain candidateId, title, reason, localTime (HH:MM), and durationMinutes (integer 15..480). Use unique candidate IDs and unique local times. Sort items by localTime. This is an unpersisted draft.' },
+          { role: 'system', content: 'You compose one travel day using only the supplied enriched places. Never invent a place, opening hour, price, rating, or travel time. Use rating, price, and opening hours only when those fields are present; otherwise leave the detail unknown. Choose local times only where supplied opening hours confirm that the place is open. Optimize the geographic order of places using their coordinates and mobility, but never invent or state travel times. Use weather and confirmed itinerary items as constraints, and avoid duplicating confirmed items. Return only valid JSON with an items array of at most eight items. Each item must contain candidateId, title, reason, localTime (HH:MM), and durationMinutes (integer 15..480). Use unique candidate IDs and unique local times. Sort items by localTime. This is an unpersisted draft.' },
           { role: 'user', content: JSON.stringify({ task: 'compose a full day plan', date: input.date, stop: stopResult.data, preferences: input.preferences, weather: input.weather, existingItinerary: [...existingItinerary, ...clientDayItinerary].slice(0, 100), candidates }) },
         ],
       })
@@ -360,7 +369,15 @@ Deno.serve(async (request) => {
     }
     if (response.status === 429) return json({ error: 'assistant_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'assistant_provider_failed' }, 503)
-    const items = parseItems(parseJsonOutput(extractOutputText(await response.json())), candidates)
+    const proposedItems = parseItems(parseJsonOutput(extractOutputText(await response.json())), candidates)
+    const validation = validateDaySchedule({
+      date: input.date,
+      items: proposedItems,
+      candidates,
+      mobility: input.preferences.mobility,
+    })
+    const items = validation.items
+    if (proposedItems.length > 0 && items.length === 0) return json({ error: 'no_feasible_schedule' }, 422)
     return json({ draft: draft(input, candidates, items, createdAt), trip: tripResult.data, stop: stopResult.data })
   } catch (error) {
     if (error instanceof Response) return error

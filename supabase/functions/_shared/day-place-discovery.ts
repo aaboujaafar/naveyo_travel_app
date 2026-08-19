@@ -1,5 +1,24 @@
 export type DayPlaceProvider = "google" | "geoapify";
 
+export type PlaceBusinessStatus = "operational" | "temporarily_closed" | "permanently_closed" | "unknown";
+
+export type PlaceOpeningHours = {
+  periods?: {
+    open: { day: number; hour: number; minute: number };
+    close?: { day: number; hour: number; minute: number };
+  }[];
+  weekdayDescriptions?: string[];
+  sourceText?: string;
+};
+
+export type PlaceFacts = {
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: 0 | 1 | 2 | 3 | 4;
+  businessStatus?: PlaceBusinessStatus;
+  openingHours?: PlaceOpeningHours;
+};
+
 export type DiscoveredPlace = {
   id: string;
   provider: DayPlaceProvider;
@@ -11,7 +30,7 @@ export type DiscoveredPlace = {
   coordinates: { latitude: number; longitude: number };
   attribution: string;
   distanceMeters?: number;
-};
+} & PlaceFacts;
 
 export type DayPlaceDiscoveryInput = {
   center: { latitude: number; longitude: number };
@@ -107,6 +126,118 @@ const normalizeName = (value: string): string => value
   .replace(/[^a-z0-9]+/g, " ")
   .trim()
   .replace(/\s+/g, " ");
+
+const validDayTime = (value: unknown): { day: number; hour: number; minute: number } | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const day = record.day;
+  const hour = record.hour ?? 0;
+  const minute = record.minute ?? 0;
+  if (!Number.isInteger(day) || !Number.isInteger(hour) || !Number.isInteger(minute)) return undefined;
+  if ((day as number) < 0 || (day as number) > 6 || (hour as number) < 0 || (hour as number) > 23 || (minute as number) < 0 || (minute as number) > 59) return undefined;
+  return { day: day as number, hour: hour as number, minute: minute as number };
+};
+
+const DAY_NAMES: Record<string, number> = { Su: 0, Mo: 1, Tu: 2, We: 3, Th: 4, Fr: 5, Sa: 6 };
+
+const parseClock = (value: string): { hour: number; minute: number } | undefined => {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? { hour, minute } : undefined;
+};
+
+const parseGeoOpeningHoursText = (value: string): PlaceOpeningHours | undefined => {
+  const periods: NonNullable<PlaceOpeningHours["periods"]> = [];
+  const pattern = /((?:Su|Mo|Tu|We|Th|Fr|Sa)(?:-(?:Su|Mo|Tu|We|Th|Fr|Sa))?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/g;
+  for (const match of value.matchAll(pattern)) {
+    const range = match[1].split("-");
+    const startDay = DAY_NAMES[range[0]];
+    const endDay = DAY_NAMES[range[1] ?? range[0]];
+    const openClock = parseClock(match[2]);
+    const closeClock = parseClock(match[3]);
+    if (startDay === undefined || endDay === undefined || !openClock || !closeClock) continue;
+    const days: number[] = [];
+    for (let day = startDay; ; day = (day + 1) % 7) {
+      days.push(day);
+      if (day === endDay) break;
+      if (days.length === 7) break;
+    }
+    for (const day of days) {
+      periods.push({
+        open: { day, hour: openClock.hour, minute: openClock.minute },
+        close: { day: closeClock.hour < openClock.hour || (closeClock.hour === openClock.hour && closeClock.minute < openClock.minute) ? (day + 1) % 7 : day, hour: closeClock.hour, minute: closeClock.minute },
+      });
+    }
+  }
+  return periods.length > 0 ? { periods, sourceText: value.trim() } : (value.trim() ? { sourceText: value.trim() } : undefined);
+};
+
+export const parsePlaceOpeningHours = (value: unknown): PlaceOpeningHours | undefined => {
+  if (typeof value === "string") return parseGeoOpeningHoursText(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const hasPeriods = Array.isArray(record.periods);
+  const rawPeriods = hasPeriods ? record.periods as unknown[] : [];
+  const periods = rawPeriods.flatMap((period) => {
+    if (!period || typeof period !== "object" || Array.isArray(period)) return [];
+    const item = period as Record<string, unknown>;
+    const open = validDayTime(item.open);
+    if (!open) return [];
+    const close = item.close === undefined ? undefined : validDayTime(item.close);
+    if (item.close !== undefined && !close) return [];
+    return [{ open, ...(close ? { close } : {}) }];
+  });
+  const weekdayDescriptions = Array.isArray(record.weekdayDescriptions ?? record.weekday_text)
+    ? (record.weekdayDescriptions ?? record.weekday_text as unknown[]).filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+    : undefined;
+  const sourceText = text(record.sourceText);
+  if (!hasPeriods && (!weekdayDescriptions || weekdayDescriptions.length === 0) && !sourceText) return undefined;
+  return {
+    ...(hasPeriods ? { periods } : {}),
+    ...(weekdayDescriptions && weekdayDescriptions.length > 0 ? { weekdayDescriptions } : {}),
+    ...(sourceText ? { sourceText } : {}),
+  };
+};
+
+const parseRating = (value: unknown): number | undefined => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+const parseCount = (value: unknown): number | undefined => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+const GOOGLE_PRICE_LEVELS = {
+  FREE: 0,
+  INEXPENSIVE: 1,
+  MODERATE: 2,
+  EXPENSIVE: 3,
+  VERY_EXPENSIVE: 4,
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+} as const;
+const parsePriceLevel = (value: unknown): 0 | 1 | 2 | 3 | 4 | undefined => typeof value === "string" && value in GOOGLE_PRICE_LEVELS
+  ? GOOGLE_PRICE_LEVELS[value as keyof typeof GOOGLE_PRICE_LEVELS]
+  : undefined;
+
+const parseBusinessStatus = (value: unknown): PlaceBusinessStatus | undefined => {
+  if (value === "OPERATIONAL") return "operational";
+  if (value === "CLOSED_TEMPORARILY") return "temporarily_closed";
+  if (value === "CLOSED_PERMANENTLY") return "permanently_closed";
+  if (typeof value === "string") return "unknown";
+  return undefined;
+};
+
+const googleFacts = (place: Record<string, unknown>): PlaceFacts | undefined => {
+  const regularOpeningHours = parsePlaceOpeningHours(place.regularOpeningHours);
+  const facts: PlaceFacts = {
+    ...(parseRating(place.rating) !== undefined ? { rating: parseRating(place.rating) } : {}),
+    ...(parseCount(place.userRatingCount) !== undefined ? { userRatingCount: parseCount(place.userRatingCount) } : {}),
+    ...(parsePriceLevel(place.priceLevel) !== undefined ? { priceLevel: parsePriceLevel(place.priceLevel) } : {}),
+    ...(parseBusinessStatus(place.businessStatus) !== undefined ? { businessStatus: parseBusinessStatus(place.businessStatus) } : {}),
+    ...(regularOpeningHours ? { openingHours: regularOpeningHours } : {}),
+  };
+  return Object.keys(facts).length > 0 ? facts : undefined;
+};
 
 export const haversineDistanceMeters = (
   first: { latitude: number; longitude: number },
@@ -222,6 +353,7 @@ const googlePlace = async (value: unknown, center: DayPlaceDiscoveryInput["cente
     coordinates: { latitude, longitude },
     attribution: GOOGLE_ATTRIBUTION,
     distanceMeters: haversineDistanceMeters(center, { latitude, longitude }),
+    ...(googleFacts(place) ?? {}),
   };
 };
 
@@ -233,7 +365,7 @@ async function discoverGoogle(input: DayPlaceDiscoveryInput, apiKey: string): Pr
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents,places.rating,places.userRatingCount,places.priceLevel,places.businessStatus,places.regularOpeningHours",
       },
       body: JSON.stringify({
         includedTypes: bucket.google,
@@ -266,6 +398,7 @@ const geoapifyPlace = async (value: unknown, center: DayPlaceDiscoveryInput["cen
   const name = text(properties.name) ?? text(properties.address_line1) ?? text(properties.formatted);
   if (!providerPlaceId || !name || latitude === undefined || longitude === undefined) return undefined;
   const categories = Array.isArray(properties.categories) ? properties.categories.filter((item): item is string => typeof item === "string") : [];
+  const openingHours = parsePlaceOpeningHours(properties.opening_hours);
   return {
     id: await deterministicUuid(normalizeProviderId("geoapify", providerPlaceId)),
     provider: "geoapify",
@@ -277,6 +410,7 @@ const geoapifyPlace = async (value: unknown, center: DayPlaceDiscoveryInput["cen
     coordinates: { latitude, longitude },
     attribution: GEOAPIFY_ATTRIBUTION,
     distanceMeters: haversineDistanceMeters(center, { latitude, longitude }),
+    ...(openingHours ? { openingHours } : {}),
   };
 };
 

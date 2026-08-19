@@ -9,6 +9,9 @@ import type {
   Money,
   PlaceCandidate,
   PlaceImageCredit,
+  OpeningHours,
+  OpeningHoursPoint,
+  OpeningHoursPeriod,
   PlaceReference,
   Reservation,
   ReservationDraft,
@@ -626,6 +629,69 @@ export const parsePlaceCandidate = (value: unknown): PlaceCandidate => {
     if (typeof candidate.distanceMeters !== "number" || !Number.isFinite(candidate.distanceMeters) || candidate.distanceMeters < 0)
       throw new Error("Invalid place distance");
     result.distanceMeters = candidate.distanceMeters;
+  }
+  if (candidate.rating !== undefined) {
+    if (typeof candidate.rating !== "number" || !Number.isFinite(candidate.rating) || candidate.rating < 0 || candidate.rating > 5) {
+      throw new Error("Invalid place rating");
+    }
+    result.rating = candidate.rating;
+  }
+  if (candidate.userRatingCount !== undefined) {
+    if (typeof candidate.userRatingCount !== "number" || !Number.isSafeInteger(candidate.userRatingCount) || candidate.userRatingCount < 0) {
+      throw new Error("Invalid place userRatingCount");
+    }
+    result.userRatingCount = candidate.userRatingCount;
+  }
+  if (candidate.priceLevel !== undefined) {
+    if (typeof candidate.priceLevel !== "number" || !Number.isSafeInteger(candidate.priceLevel) || candidate.priceLevel < 0 || candidate.priceLevel > 4) {
+      throw new Error("Invalid place priceLevel");
+    }
+    result.priceLevel = candidate.priceLevel as PlaceCandidate["priceLevel"];
+  }
+  if (candidate.businessStatus !== undefined) {
+    if (!["operational", "temporarily_closed", "permanently_closed", "unknown"].includes(String(candidate.businessStatus))) {
+      throw new Error("Invalid place businessStatus");
+    }
+    result.businessStatus = candidate.businessStatus as NonNullable<PlaceCandidate["businessStatus"]>;
+  }
+  if (candidate.openingHours !== undefined) {
+    result.openingHours = parseOpeningHours(candidate.openingHours);
+  }
+  return result;
+};
+
+const parseOpeningHoursPoint = (value: unknown, name: string): OpeningHoursPoint => {
+  const point = record(value, name);
+  for (const [key, min, max] of [["day", 0, 6], ["hour", 0, 23], ["minute", 0, 59]] as const) {
+    if (typeof point[key] !== "number" || !Number.isSafeInteger(point[key]) || point[key] < min || point[key] > max) {
+      throw new Error(`Invalid ${name} ${key}`);
+    }
+  }
+  return { day: point.day as number, hour: point.hour as number, minute: point.minute as number };
+};
+
+const parseOpeningHours = (value: unknown): OpeningHours => {
+  const hours = record(value, "Place openingHours");
+  if (hours.periods !== undefined && !Array.isArray(hours.periods)) throw new Error("Invalid place openingHours periods");
+  const periods: OpeningHoursPeriod[] | undefined = (hours.periods as unknown[] | undefined)?.map((period, index) => {
+    const entry = record(period, `Place openingHours period ${index}`);
+    const parsed: OpeningHoursPeriod = { open: parseOpeningHoursPoint(entry.open, "opening period open") };
+    if (entry.close !== undefined) parsed.close = parseOpeningHoursPoint(entry.close, "opening period close");
+    return parsed;
+  });
+  const result: OpeningHours = { ...(periods === undefined ? {} : { periods }) };
+  if (hours.weekdayDescriptions !== undefined) {
+    if (!Array.isArray(hours.weekdayDescriptions) || hours.weekdayDescriptions.some((entry) => typeof entry !== "string" || entry.length === 0)) {
+      throw new Error("Invalid place weekdayDescriptions");
+    }
+    result.weekdayDescriptions = hours.weekdayDescriptions as string[];
+  }
+  if (hours.sourceText !== undefined) {
+    if (typeof hours.sourceText !== "string" || hours.sourceText.length === 0) throw new Error("Invalid place openingHours sourceText");
+    result.sourceText = hours.sourceText;
+  }
+  if (result.periods === undefined && result.weekdayDescriptions === undefined && result.sourceText === undefined) {
+    throw new Error("Invalid empty place openingHours");
   }
   return result;
 };

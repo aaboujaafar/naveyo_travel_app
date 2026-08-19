@@ -180,6 +180,50 @@ describe("day planner domain", () => {
     expect(parseDayPlanDraft({ ...draft(), candidates: undefined }).candidates).toEqual([]);
   });
 
+  it("parses optional provider facts and opening periods strictly", () => {
+    const parsed = parseDayPlanDraft({
+      ...draft(),
+      candidates: [{
+        ...firstCandidate,
+        rating: 4.6,
+        userRatingCount: 128,
+        priceLevel: 2,
+        businessStatus: "operational",
+        openingHours: {
+          periods: [{
+            open: { day: 1, hour: 9, minute: 0 },
+            close: { day: 1, hour: 18, minute: 30 },
+          }],
+          weekdayDescriptions: ["Lundi: 09:00–18:30"],
+          sourceText: "Source confirmée",
+        },
+      }],
+      items: [{
+        ...draft().items[0]!,
+        openingStatus: "verified_open",
+        distanceFromPreviousMeters: 850,
+      }],
+    });
+    expect(parsed.candidates[0]).toMatchObject({ rating: 4.6, userRatingCount: 128, priceLevel: 2, businessStatus: "operational" });
+    expect(parsed.candidates[0]?.openingHours?.periods?.[0]?.close).toEqual({ day: 1, hour: 18, minute: 30 });
+    expect(parsed.items[0]).toMatchObject({ openingStatus: "verified_open", distanceFromPreviousMeters: 850 });
+  });
+
+  it("rejects malformed optional provider facts", () => {
+    const candidate = { ...firstCandidate };
+    for (const invalid of [
+      { ...candidate, rating: 5.1 },
+      { ...candidate, userRatingCount: -1 },
+      { ...candidate, priceLevel: 5 },
+      { ...candidate, businessStatus: "closed" },
+      { ...candidate, openingHours: { periods: [{ open: { day: 7, hour: 9, minute: 0 } }] } },
+    ]) {
+      expect(() => parseDayPlanDraft({ ...draft(), candidates: [invalid], items: [{ ...draft().items[0]!, candidateId: invalid.id }] })).toThrow();
+    }
+    expect(() => parseDayPlanDraft({ ...draft(), items: [{ ...draft().items[0]!, openingStatus: "closed" }] })).toThrow();
+    expect(() => parseDayPlanDraft({ ...draft(), items: [{ ...draft().items[0]!, distanceFromPreviousMeters: 1.5 }] })).toThrow();
+  });
+
   it("rejects an item whose candidate is absent from supplied draft candidates", () => {
     expect(() => parseDayPlanDraft({
       ...draft(),

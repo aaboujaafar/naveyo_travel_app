@@ -46,6 +46,14 @@ Avant tout appel au modèle, l’Edge Function fusionne les éléments persisté
 
 L’exclusion intervient avant la consommation du quota IA. Quand tous les lieux disponibles ont déjà été utilisés, la fonction renvoie `no_new_places_available` sans appeler le modèle. Seuls les éléments de la date demandée sont ensuite transmis comme contraintes horaires au modèle ; l’historique complet sert uniquement au filtrage déterministe.
 
+## Enrichissement et faisabilité — lot 4
+
+Le pool transmis au modèle est limité à seize lieux et peut contenir une note, un nombre d’avis, un niveau de prix, un statut commercial et des horaires issus du fournisseur. Ces champs restent facultatifs : leur absence est affichée comme inconnue et n’est jamais complétée par le modèle.
+
+Après composition, un contrôle déterministe retire les établissements signalés fermés, les propositions incompatibles avec des horaires structurés connus et les sauts géographiques excessifs. Les horaires inconnus restent acceptés avec un avertissement. Les distances affichées sont des distances à vol d’oiseau entre activités, jamais des temps de trajet estimés.
+
+Google Places est la source la plus riche lorsqu’une clé serveur est configurée ; Geoapify reste le fallback. Les champs Google de note, prix et horaires changent la catégorie de facturation du fournisseur. Le quota Google Cloud doit donc être borné indépendamment du quota IA Naveyo.
+
 ## Validation visuelle restante
 
 - comparaison sur iPhone en largeurs 390 px et 430 px ;

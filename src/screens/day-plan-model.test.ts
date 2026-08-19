@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   formatDayPlanDate,
   formatDayPlanDuration,
+  formatPriceLevel,
+  formatRating,
+  formatStraightLineDistance,
   sortedDayPlanItems,
   stopDates,
 } from "./day-plan-model";
@@ -26,6 +29,17 @@ describe("day-plan-model", () => {
     expect(formatDayPlanDuration(45)).toBe("45 min");
     expect(formatDayPlanDuration(120)).toBe("2 h");
     expect(formatDayPlanDuration(150)).toBe("2 h 30 min");
+  });
+
+  it("formats provider facts without inventing missing values", () => {
+    expect(formatPriceLevel(0)).toBe("Gratuit");
+    expect(formatPriceLevel(3)).toBe("€€€");
+    expect(formatPriceLevel(undefined)).toBeNull();
+    expect(formatRating(4.6)).toBe("4,6/5");
+    expect(formatRating(undefined)).toBeNull();
+    expect(formatStraightLineDistance(850)).toBe("850 m à vol d’oiseau");
+    expect(formatStraightLineDistance(1_250)).toBe("1,3 km à vol d’oiseau");
+    expect(formatStraightLineDistance(undefined)).toBeNull();
   });
 
   it("sorts timed items first and preserves the order of ties", () => {

@@ -60,6 +60,22 @@ export function formatDayPlanDuration(minutes: number): string {
   return `${hours} h ${remainder} min`;
 }
 
+export function formatPriceLevel(priceLevel?: 0 | 1 | 2 | 3 | 4): string | null {
+  if (priceLevel === undefined || !Number.isInteger(priceLevel) || priceLevel < 0 || priceLevel > 4) return null;
+  return priceLevel === 0 ? "Gratuit" : "€".repeat(priceLevel);
+}
+
+export function formatRating(rating?: number): string | null {
+  if (rating === undefined) return null;
+  return `${rating.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5`;
+}
+
+export function formatStraightLineDistance(distanceMeters?: number): string | null {
+  if (distanceMeters === undefined) return null;
+  if (distanceMeters < 1_000) return `${distanceMeters} m à vol d’oiseau`;
+  return `${(distanceMeters / 1_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km à vol d’oiseau`;
+}
+
 export function sortedDayPlanItems(
   items: readonly DayPlanItemDraft[],
 ): DayPlanItemDraft[] {

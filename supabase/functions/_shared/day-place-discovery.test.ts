@@ -128,4 +128,55 @@ describe("discoverDayPlaces provider fallback", () => {
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.id).toBe(await deterministicUuid("google:google-same-place"));
   });
+
+  it("requests and strictly normalizes Google facts", async () => {
+    setRuntimeEnv({ GOOGLE_PLACES_API_KEY: "google-test-key" });
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+      places: [{
+        id: "google-facts",
+        displayName: { text: "Facts Place" },
+        location: { latitude: 36.401, longitude: 25.401 },
+        rating: 4.8,
+        userRatingCount: 123,
+        priceLevel: "PRICE_LEVEL_EXPENSIVE",
+        businessStatus: "OPERATIONAL",
+        regularOpeningHours: {
+          periods: [{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 18, minute: 30 } }],
+          weekdayDescriptions: ["Monday: 9:00 AM – 6:30 PM"],
+        },
+      }],
+    }));
+
+    const result = await discoverDayPlaces(input({ preferences: { radiusMeters: 5_000, themes: ["culture"] } }));
+    const request = fetcher.mock.calls[0]?.[1];
+    expect(String(request?.headers && new Headers(request.headers).get("X-Goog-FieldMask"))).toContain("places.rating");
+    expect(String(request?.headers && new Headers(request.headers).get("X-Goog-FieldMask"))).toContain("places.regularOpeningHours");
+    expect(result.candidates[0]).toMatchObject({
+      rating: 4.8,
+      userRatingCount: 123,
+      priceLevel: 3,
+      businessStatus: "operational",
+      openingHours: {
+        periods: [{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 18, minute: 30 } }],
+        weekdayDescriptions: ["Monday: 9:00 AM – 6:30 PM"],
+      },
+    });
+  });
+
+  it("ignores invalid Google facts instead of inventing values", async () => {
+    setRuntimeEnv({ GOOGLE_PLACES_API_KEY: "google-test-key" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ places: [{
+      id: "google-invalid-facts",
+      displayName: { text: "Invalid Facts" },
+      location: { latitude: 36.401, longitude: 25.401 },
+      rating: 7,
+      userRatingCount: 1.5,
+      priceLevel: "UNKNOWN",
+      businessStatus: "NOT_A_STATUS",
+      regularOpeningHours: { periods: [{ open: { day: 8, hour: 25, minute: 0 } }] },
+    }] }));
+
+    const result = await discoverDayPlaces(input({ preferences: { radiusMeters: 5_000, themes: ["culture"] } }));
+    expect(result.candidates[0]).toMatchObject({ businessStatus: "unknown" });
+  });
 });

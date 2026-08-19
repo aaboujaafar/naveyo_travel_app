@@ -48,6 +48,8 @@ export interface DayPlanItemDraft {
   reason: string;
   localTime: string;
   durationMinutes: number;
+  openingStatus?: "verified_open" | "unknown";
+  distanceFromPreviousMeters?: number;
 }
 
 export interface DayPlanDraft {
@@ -314,13 +316,24 @@ const item = (value: unknown): DayPlanItemDraft => {
   ) {
     throw new Error("Invalid durationMinutes");
   }
-  return {
+  const result: DayPlanItemDraft = {
     candidateId: uuid(candidate.candidateId, "candidateId"),
     title: nonEmptyString(candidate.title, "title"),
     reason: nonEmptyString(candidate.reason, "reason"),
     localTime: localTime(candidate.localTime),
     durationMinutes,
   };
+  if (candidate.openingStatus !== undefined) {
+    if (candidate.openingStatus !== "verified_open" && candidate.openingStatus !== "unknown") throw new Error("Invalid openingStatus");
+    result.openingStatus = candidate.openingStatus;
+  }
+  if (candidate.distanceFromPreviousMeters !== undefined) {
+    if (typeof candidate.distanceFromPreviousMeters !== "number" || !Number.isSafeInteger(candidate.distanceFromPreviousMeters) || candidate.distanceFromPreviousMeters < 0) {
+      throw new Error("Invalid distanceFromPreviousMeters");
+    }
+    result.distanceFromPreviousMeters = candidate.distanceFromPreviousMeters;
+  }
+  return result;
 };
 
 const parseCandidates = (value: unknown): PlaceCandidate[] => {
