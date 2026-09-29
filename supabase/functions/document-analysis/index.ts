@@ -1,10 +1,10 @@
 import { requireTripMember } from '../_shared/auth.ts'
+import { completeChat } from '../_shared/ai.ts'
 
 type RecordValue = Record<string, unknown>
 
 const MAX_TEXT_LENGTH = 20_000
 const TIMEOUT_MS = 45_000
-const ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions'
 const RESERVATION_TYPES = ['accommodation', 'flight', 'train', 'ferry', 'activity', 'other'] as const
 const CONFIRMATION_FIELDS = ['type', 'title', 'provider', 'reference', 'start', 'end', 'venue', 'origin', 'destination']
 
@@ -83,25 +83,19 @@ Deno.serve(async (request) => {
   try {
     const input = parseRequest(await request.json())
     await requireTripMember(request, input.tripId)
-    const apiKey = Deno.env.get('OPENCODE_GO_API_KEY')
-    if (!apiKey) return json({ error: 'document_provider_unavailable' }, 503)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
     let response: Response
     try {
-      response = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: Deno.env.get('OPENCODE_DOCUMENT_MODEL') ?? 'deepseek-v4-pro',
-          messages: [
-            { role: 'system', content: 'Extract travel reservation data. Never invent values. Return empty strings for missing fields. The result is only a draft requiring human confirmation. Return only one valid JSON object with exactly these keys: type, title, provider, reference, startLocal, startTimeZone, endLocal, endTimeZone, venue, origin, destination. The type must be accommodation, flight, train, ferry, activity, or other.' },
-            { role: 'user', content: input.extractedText },
-          ],
-        }),
+      response = await completeChat({
+        timeoutMs: TIMEOUT_MS,
+        messages: [
+          { role: 'system', content: 'Extract travel reservation data. Never invent values. Return empty strings for missing fields. The result is only a draft requiring human confirmation. Return only one valid JSON object with exactly these keys: type, title, provider, reference, startLocal, startTimeZone, endLocal, endTimeZone, venue, origin, destination. The type must be accommodation, flight, train, ferry, activity, or other.' },
+          { role: 'user', content: input.extractedText },
+        ],
       })
-    } finally { clearTimeout(timeout) }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ai_provider_unavailable') return json({ error: 'document_provider_unavailable' }, 503)
+      throw error
+    }
     if (response.status === 429) return json({ error: 'document_provider_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'document_provider_failed' }, 503)
     const draft = schemaOutput(parseJsonOutput(outputText(await response.json())))

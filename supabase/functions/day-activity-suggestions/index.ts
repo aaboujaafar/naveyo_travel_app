@@ -1,4 +1,5 @@
 import { requireTripMember } from '../_shared/auth.ts'
+import { completeChat } from '../_shared/ai.ts'
 
 type Row = Record<string, unknown>
 type Candidate = { id: string; name: string; category?: string; address?: string; countryCode?: string; coordinates: { latitude: number; longitude: number } }
@@ -145,27 +146,20 @@ Deno.serve(async (request) => {
     const timezone = text(stop.timezone, 80) ?? 'UTC'
     const location = input.location ?? candidates[0]?.coordinates
     const weather = await fetchWeather(input, timezone, location)
-    const apiKey = Deno.env.get('OPENCODE_GO_API_KEY')
-    if (!apiKey) return json({ error: 'assistant_provider_unavailable' }, 503)
     const payload = { task: 'propose activities for one travel day using only supplied confirmed place candidates', date: input.localDate, period: input.period, timeWindow: input.timeWindow, stop: { name: stop.name, countryCode: stop.country_code, timezone }, weather, preferences: input.preferences, constraints: input.constraints, existingItinerary: itineraryResult.error ? [] : itineraryResult.data, candidates }
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
     let response: Response
     try {
-      response = await fetch('https://opencode.ai/zen/go/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: Deno.env.get('OPENCODE_ACTIVITY_MODEL') ?? 'deepseek-v4-pro',
-          temperature: 0,
-          messages: [
-            { role: 'system', content: 'You plan travel activities. Use only supplied candidates. Never invent places, coordinates, opening hours, prices, travel times, or weather. Respect date, timezone, period, weather, existing itinerary, and constraints. Return only valid JSON with a suggestions array. Each item must contain candidateId, title, reason, idealStartLocal (HH:mm or empty string), durationMinutes (number or empty string), and indoor (boolean). Return at most 5 suggestions. Suggestions are drafts and never confirmed itinerary items.' },
-            { role: 'user', content: JSON.stringify(payload) },
-          ],
-        }),
+      response = await completeChat({
+        timeoutMs: TIMEOUT_MS,
+        messages: [
+          { role: 'system', content: 'You plan travel activities. Use only supplied candidates. Never invent places, coordinates, opening hours, prices, travel times, or weather. Respect date, timezone, period, weather, existing itinerary, and constraints. Return only valid JSON with a suggestions array. Each item must contain candidateId, title, reason, idealStartLocal (HH:mm or empty string), durationMinutes (number or empty string), and indoor (boolean). Return at most 5 suggestions. Suggestions are drafts and never confirmed itinerary items.' },
+          { role: 'user', content: JSON.stringify(payload) },
+        ],
       })
-    } finally { clearTimeout(timeout) }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ai_provider_unavailable') return json({ error: 'assistant_provider_unavailable' }, 503)
+      throw error
+    }
     if (response.status === 429) return json({ error: 'assistant_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'assistant_provider_failed' }, 503)
     const suggestions = parseSuggestions(parseJsonOutput(extractOutputText(await response.json())), candidates)

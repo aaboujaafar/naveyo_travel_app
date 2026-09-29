@@ -1,13 +1,13 @@
 import { requireTripMember } from '../_shared/auth.ts'
+import { completeChat } from '../_shared/ai.ts'
 
 type Row = Record<string, unknown>
 type Candidate = { id: string; provider: 'geoapify' | 'manual'; name: string; category?: string; address?: string; countryCode?: string; coordinates: { latitude: number; longitude: number } }
-type RequestInput = { tripId: string; stopId: string; query: string; preferences?: string }
+type RequestInput = { tripId: string; stopId: string; query: string; preferences?: string; weather?: unknown[]; existingItinerary?: unknown[] }
 
 const MAX_CANDIDATES = 50
 const MAX_SUGGESTIONS = 5
 const TIMEOUT_MS = 10_000
-const OPENCODE_ENDPOINT = 'https://opencode.ai/zen/go/v1/chat/completions'
 
 const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -22,7 +22,10 @@ function parseRequest(value: unknown): RequestInput {
   if (!isUuid(tripId) || !isUuid(stopId) || !query || query.length < 2) throw new Response(JSON.stringify({ error: 'invalid_request' }), { status: 400 })
   const preferences = request?.preferences === undefined ? undefined : text(request.preferences, 1000)
   if (request?.preferences !== undefined && !preferences) throw new Response(JSON.stringify({ error: 'invalid_preferences' }), { status: 400 })
-  return { tripId, stopId, query, preferences }
+  const weather = request?.weather === undefined ? undefined : Array.isArray(request.weather) ? request.weather.slice(0, 14) : undefined
+  const existingItinerary = request?.existingItinerary === undefined ? undefined : Array.isArray(request.existingItinerary) ? request.existingItinerary.slice(0, 100) : undefined
+  if (request?.weather !== undefined && !weather || request?.existingItinerary !== undefined && !existingItinerary) throw new Response(JSON.stringify({ error: 'invalid_context' }), { status: 400 })
+  return { tripId, stopId, query, preferences, weather, existingItinerary }
 }
 
 function mapCandidate(row: Row): Candidate | null {
@@ -98,26 +101,19 @@ Deno.serve(async (request) => {
     const candidates = (Array.isArray(placesResult.data) ? placesResult.data : []).map((row) => mapCandidate(row as Row)).filter((row): row is Candidate => row !== null).slice(0, MAX_CANDIDATES)
     if (candidates.length === 0) return json({ drafts: [], trip: tripResult.data, stop: stopResult.data })
 
-    const apiKey = Deno.env.get('OPENCODE_GO_API_KEY')
-    if (!apiKey) return json({ error: 'assistant_provider_unavailable' }, 503)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
     let response: Response
     try {
-      response = await fetch(OPENCODE_ENDPOINT, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: Deno.env.get('OPENCODE_ACTIVITY_MODEL') ?? 'deepseek-v4-pro',
-          temperature: 0,
-          messages: [
-            { role: 'system', content: 'You recommend travel places. Use only the supplied candidates. Never invent places, coordinates, prices, opening hours, or travel times. Return only valid JSON with a suggestions array. Each item must contain candidateId, title, and reason. Return at most five suggestions. Suggestions are drafts and never confirmed itinerary items.' },
-            { role: 'user', content: JSON.stringify({ task: 'recommend places from the supplied candidates only', trip: tripResult.data, stop: stopResult.data, preferences: input.preferences, query: input.query, candidates }) },
-          ],
-        }),
+      response = await completeChat({
+        timeoutMs: TIMEOUT_MS,
+        messages: [
+          { role: 'system', content: 'You recommend travel places. Use only the supplied candidates. Analyze the supplied weather and existing itinerary before recommending. Prefer indoor places during rain or strong heat, avoid duplicating planned activities, and spread suggestions across the stop when dates are supplied. Never invent places, coordinates, prices, opening hours, or travel times. Return only valid JSON with a suggestions array. Each item must contain candidateId, title, and reason. Return at most five suggestions. Suggestions are drafts and never confirmed itinerary items.' },
+          { role: 'user', content: JSON.stringify({ task: 'recommend places from supplied candidates using weather and existing itinerary context', trip: tripResult.data, stop: stopResult.data, preferences: input.preferences, query: input.query, weather: input.weather, existingItinerary: input.existingItinerary, candidates }) },
+        ],
       })
-    } finally { clearTimeout(timeout) }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ai_provider_unavailable') return json({ error: 'assistant_provider_unavailable' }, 503)
+      throw error
+    }
     if (response.status === 429) return json({ error: 'assistant_quota_reached' }, 429)
     if (!response.ok) return json({ error: 'assistant_provider_failed' }, 503)
     const providerResponse = await response.json()
