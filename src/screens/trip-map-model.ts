@@ -1,6 +1,7 @@
 import type {
   Coordinates,
   ItineraryItem,
+  Stop,
   TrackPoint,
   TrackingStatus,
   UUID,
@@ -28,14 +29,23 @@ export function itineraryPointCount(items: ItineraryItem[]): number {
 export function buildItineraryMapModel(
   items: ItineraryItem[],
   trackPoints: TrackPoint[],
+  stops: Stop[] = [],
+  routePolyline: Coordinates[] = [],
 ): MapModel {
-  const points = items.flatMap((item) => {
+  const placePoints = items.flatMap((item) => {
     const coordinates = item.place?.coordinates;
     return isValidCoordinates(coordinates)
       ? [{ id: item.id, label: item.title, coordinates }]
       : [];
   });
-  const polyline = samplePolyline(
+  // Keep a confirmed Step visible even when it has no POI in the itinerary yet.
+  const itemStopIds = new Set(items.map((item) => item.stopId));
+  const stopPoints = stops.flatMap((stop) => {
+    if (!isValidCoordinates(stop.coordinates) || itemStopIds.has(stop.id)) return [];
+    return [{ id: `stop-${stop.id}`, label: stop.name, coordinates: stop.coordinates }];
+  });
+  const points = [...stopPoints, ...placePoints];
+  const gpsPolyline = samplePolyline(
     trackPoints
       .filter((point) => isValidCoordinateValues(point.latitude, point.longitude))
       .map((point) => ({
@@ -43,11 +53,39 @@ export function buildItineraryMapModel(
         longitude: point.longitude,
       })),
   );
+  const plannedPolyline = validCoordinatePolyline(routePolyline);
 
   return {
     points,
-    polyline: polyline.length > 1 ? polyline : undefined,
+    polyline:
+      gpsPolyline.length > 1
+        ? gpsPolyline
+        : plannedPolyline.length > 1
+          ? plannedPolyline
+          : undefined,
   };
+}
+
+export function itineraryRouteCoordinates(
+  items: ItineraryItem[],
+  stop?: Stop,
+): Coordinates[] {
+  const candidates = [
+    stop?.coordinates,
+    ...items.map((item) => item.place?.coordinates),
+  ].filter((coordinate): coordinate is Coordinates => isValidCoordinates(coordinate));
+  const result: Coordinates[] = [];
+  for (const coordinate of candidates) {
+    const previous = result.at(-1);
+    if (
+      previous?.latitude === coordinate.latitude &&
+      previous.longitude === coordinate.longitude
+    ) {
+      continue;
+    }
+    result.push(coordinate);
+  }
+  return result;
 }
 
 export function trackDistanceMeters(points: TrackPoint[]): number {
@@ -85,6 +123,10 @@ function samplePolyline(points: Coordinates[]): Coordinates[] {
     );
     return points[sourceIndex];
   }).filter((point): point is Coordinates => point !== undefined);
+}
+
+function validCoordinatePolyline(points: Coordinates[]): Coordinates[] {
+  return samplePolyline(points.filter((point) => isValidCoordinates(point)));
 }
 
 function isValidCoordinates(

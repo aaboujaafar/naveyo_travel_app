@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { MapModel, MapPoint } from "../adapters/map";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
@@ -39,6 +39,7 @@ import {
 } from "./stop-detail-model";
 import type { StopDiscoveryKind, StopDiscoverySection } from "./stop-discovery-model";
 import { placeAttribution } from "../modules/places";
+import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
 
 type StopDetailTab = "itinerary" | "discover" | "documents" | "reservations";
 
@@ -139,6 +140,8 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
         {props.stop ? (
           <>
             <View style={[styles.hero, shadows.md]}>
+              <Image source={destinationImageSource(props.stop.name, props.stop.imageUrl)} style={styles.heroImage} resizeMode="cover" accessibilityLabel={destinationImageLabel(props.stop.name, props.stop.imageUrl)} />
+              <View style={styles.heroImageOverlay} />
               <View style={styles.heroIcon}><Icon name="map-pin" size={24} color={colors.white} /></View>
               <View style={styles.heroText}>
                 <AppText variant="h1" color="onAccent">{props.stop.name}</AppText>
@@ -304,7 +307,7 @@ function DiscoveryContent({
       <SectionTitle title="Autour de cette Étape" />
       <InlineMessage title="Des idées prêtes à planifier" message="Les lieux viennent de Places. Choisis le jour et, si besoin, l’heure avant d’ajouter." />
       {stop ? <View style={styles.schedulePanel}>
-        <AppText variant="label">Quand veux-tu le faire ?</AppText>
+        <AppText variant="label">Quand souhaitez-vous le faire ?</AppText>
         <DatePickerField label="Jour" value={date} onChange={setDate} minimumDate={stop.startDate} maximumDate={stop.endDate} />
         <Input label="Heure (facultatif)" value={time} onChangeText={setTime} placeholder="Ex. 14:30" keyboardType="numbers-and-punctuation" maxLength={5} />
       </View> : null}
@@ -339,11 +342,22 @@ function DiscoveryContent({
             const attribution = placeAttribution(place.provider, place.attribution);
             return (
               <View key={`${section.kind}-${place.id}`} style={styles.discoveryCard}>
+                <Image source={placeImageSource(place, section.kind)} style={styles.discoveryImage} resizeMode="cover" />
                 <View style={styles.discoveryCardBody}>
                   <AppText variant="label">{place.name}</AppText>
                   <AppText variant="caption" color="muted" numberOfLines={2}>
                     {[place.category, place.address, formatDistance(place.distanceMeters)].filter(Boolean).join(" · ") || "Lieu proposé à proximité"}
                   </AppText>
+                  {place.imageCredit ? (
+                    <Pressable
+                      accessibilityRole="link"
+                      onPress={() => void Linking.openURL(place.imageCredit?.photographerUrl ?? place.imageCredit?.sourceUrl ?? "")}
+                    >
+                      <AppText variant="badge" color="muted">
+                        Photo par {place.imageCredit.photographer} · Unsplash
+                      </AppText>
+                    </Pressable>
+                  ) : null}
                   {attribution ? <AppText variant="badge" color="muted">{attribution}</AppText> : null}
                 </View>
                 <Button
@@ -367,6 +381,12 @@ function DiscoveryContent({
 function formatDistance(value?: number): string | null {
   if (value == null) return null;
   return value >= 1_000 ? `${(value / 1_000).toFixed(1)} km` : `${Math.round(value)} m`;
+}
+
+function placeImageSource(place: PlaceCandidate, kind: StopDiscoveryKind) {
+  if (place.imageUrl) return { uri: place.imageUrl };
+  if (kind === "specialty") return require("../../assets/restaurant-detail.png");
+  return kind === "activity" ? require("../../assets/photo-album-3.png") : require("../../assets/photo-album-2.png");
 }
 
 function normalizeTime(value: string): string | undefined {
@@ -462,7 +482,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg },
   headerText: { flex: 1, gap: spacing.xs },
   message: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
-  hero: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.accent },
+  hero: { position: "relative", overflow: "hidden", flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.accent },
+  heroImage: { ...StyleSheet.absoluteFill, width: "100%", height: "100%" },
+  heroImageOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(10, 30, 37, 0.58)" },
   heroIcon: { width: spacing["2xl"], height: spacing["2xl"], borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.overlay },
   heroText: { flex: 1, gap: spacing.xs },
   timeZoneRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
@@ -488,6 +510,7 @@ const styles = StyleSheet.create({
   discoveryIcon: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radius.full, backgroundColor: colors.tealSoft },
   discoveryCard: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   discoveryCardBody: { flex: 1, minWidth: 0, gap: spacing.xs },
+  discoveryImage: { width: spacing["2xl"] + spacing.md, height: spacing["2xl"] + spacing.md, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
   manualSearch: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
   manualSearchRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   manualSearchInput: { flex: 1 },

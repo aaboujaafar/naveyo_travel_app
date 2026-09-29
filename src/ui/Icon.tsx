@@ -68,6 +68,10 @@ const iconShapes = {
     { kind: "circle", cx: 11, cy: 11, r: 8 },
     { kind: "path", d: "M21 21l-4.35-4.35" },
   ],
+  edit: [
+    { kind: "path", d: "M12 20h9" },
+    { kind: "path", d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z" },
+  ],
   calendar: [
     { kind: "rect", x: 3, y: 4, width: 18, height: 18, rx: 2 },
     { kind: "line", x1: 16, y1: 2, x2: 16, y2: 6 },
@@ -185,7 +189,7 @@ export function Icon({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      accessible={accessibilityLabel !== undefined}
+      accessible={accessibilityLabel !== undefined ? true : undefined}
       accessibilityLabel={accessibilityLabel}
     >
       {iconShapes[name].map(renderShape)}

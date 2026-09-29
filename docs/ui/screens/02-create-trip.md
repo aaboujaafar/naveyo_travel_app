@@ -19,7 +19,7 @@ Date : 11 août 2026.
 | Modèles, couverture, météo, voyageurs, type et budget estimé | Reproduits visuellement, désactivés et marqués « À venir » |
 | Villes étapes, préparation, notes et documents | Reproduits visuellement, désactivés et marqués « À venir » |
 
-La création conserve la devise V0 `EUR` et redirige vers l'invitation après succès. Aucune donnée provenant d'une section « À venir » n'est persistée.
+La création conserve la devise V0 `EUR` et redirige vers l'invitation après succès. Aucune donnée provenant d'une section « À venir » n'est persistée. Le champ Destination reste le nom libre du Voyage : il ne déclenche pas de géocodage et ne crée pas automatiquement une Étape. La localisation est choisie dans le parcours « Nouvelle Étape » (`GEO-003`).
 
 ## Validation
 

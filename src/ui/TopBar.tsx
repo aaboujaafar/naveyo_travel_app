@@ -1,6 +1,5 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { AppText } from "./AppText";
@@ -24,13 +23,10 @@ export function TopBar({
   transparent = false,
   style,
 }: TopBarProps) {
-  const insets = useSafeAreaInsets();
-
   return (
     <View
       style={[
         styles.container,
-        { paddingTop: Math.max(insets.top, spacing.md) },
         transparent && styles.transparent,
         style,
       ]}
@@ -65,6 +61,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     gap: spacing.md,
     backgroundColor: colors.bg,

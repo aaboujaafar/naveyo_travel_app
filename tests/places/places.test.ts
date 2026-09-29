@@ -42,6 +42,8 @@ describe("places module", () => {
     expect(result).toHaveLength(2);
     expect(result[0]?.provider).toBe("geoapify");
     expect(result[0]?.attribution).toContain("OpenStreetMap");
+    expect(result[1]?.attribution).toContain("Geoapify");
+    expect(result[1]?.attribution).toContain("OpenStreetMap");
     expect(result[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
@@ -71,5 +73,36 @@ describe("places module", () => {
     });
     expect(manual.provider).toBe("manual");
     expect(manual.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("supports autocomplete, reverse and nearby contracts", async () => {
+    const provider = new FakePlacesProvider([airport]);
+    const places = new Places(provider);
+    expect(await places.autocomplete({ query: "a" })).toEqual([]);
+    expect(await places.autocomplete({ query: "air" })).toHaveLength(1);
+    expect(await places.reverse({ coordinates: airport.coordinates })).toBeNull();
+    expect(await places.nearby({ coordinates: airport.coordinates, radiusMeters: 500 })).toHaveLength(1);
+    expect(() => places.nearby({ coordinates: airport.coordinates, radiusMeters: 0 })).toThrow();
+  });
+
+  it("resolves recently displayed candidates without a places row", async () => {
+    const candidate: PlaceCandidate = {
+      id: assertStableId("60000000-0000-5000-8000-000000000000"),
+      provider: "geoapify",
+      name: "Miradouro",
+      coordinates: { latitude: 38.71, longitude: -9.13 },
+    };
+    const provider = {
+      search: async () => [],
+      nearby: async () => [candidate],
+      getById: async () => { throw new Error("Places search failed (404): place_not_found"); },
+    };
+    const places = new Places(provider);
+    await places.nearby({ coordinates: candidate.coordinates, radiusMeters: 1_000 });
+    await expect(places.getById(candidate.id)).resolves.toEqual(candidate);
+
+    const remembered = { ...candidate, id: assertStableId("70000000-0000-5000-8000-000000000000") };
+    places.remember([remembered]);
+    await expect(places.getById(remembered.id)).resolves.toEqual(remembered);
   });
 });

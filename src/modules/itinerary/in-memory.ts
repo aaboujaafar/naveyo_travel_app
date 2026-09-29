@@ -49,5 +49,6 @@ function placeReference(place: PlaceCandidate): ItineraryItem["place"] {
     address: place.address,
     countryCode: place.countryCode,
     coordinates: place.coordinates,
+    attribution: place.attribution,
   };
 }

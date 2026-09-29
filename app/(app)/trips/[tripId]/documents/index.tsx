@@ -97,6 +97,7 @@ export default function DocumentsRoute() {
       onDownload={download}
       onAssign={assign}
       onOpenReservations={() => router.replace(`/(app)/trips/${routeTripId}/reservations`)}
+      onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
       onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
     />
   );

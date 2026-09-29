@@ -39,6 +39,8 @@ export type { AvatarProps, AvatarStackProps, AvatarSize } from "./Avatar";
 
 export { Input, TextArea } from "./Input";
 export type { InputProps, TextAreaProps } from "./Input";
+export { DatePickerField } from "./DatePicker";
+export type { DatePickerFieldProps } from "./DatePicker";
 
 export { ProgressBar, CircularProgress } from "./ProgressBar";
 export type { ProgressBarProps, CircularProgressProps } from "./ProgressBar";

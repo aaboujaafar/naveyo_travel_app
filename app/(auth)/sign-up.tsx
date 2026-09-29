@@ -40,13 +40,13 @@ export default function SignUpScreen() {
 
   return (
     <AuthFrame
-      title="Créer un compte"
-      subtitle="Préparez le second compte membre du voyage dans le shell."
+      title="Créer votre compte"
+      subtitle="Commencez un Voyage ou rejoignez celui d’un proche."
     >
       <View style={styles.branding}>
-        <Text style={styles.brand}>Accès privé</Text>
+        <Text style={styles.brand}>Bienvenue dans Naveyo</Text>
         <Text style={styles.tagline}>
-          Créez le premier Compte du Voyage dans Supabase.
+          Un espace simple et privé pour préparer votre Voyage à deux.
         </Text>
       </View>
 
@@ -91,8 +91,8 @@ export default function SignUpScreen() {
       </Button>
 
       <ScreenNote>
-        Le Compte est créé dans Supabase et la session est conservée dans le
-        stockage sécurisé de l’iPhone.
+        Votre compte et vos Voyages restent accessibles uniquement aux
+        personnes invitées.
       </ScreenNote>
     </AuthFrame>
   );

@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
+import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
 import type { Coordinates, ItineraryItem, PlaceReference, Reservation, Stop, Trip } from "../modules/_shared/model";
 import {
   colors,
@@ -49,6 +50,7 @@ export interface TripDashboardScreenProps {
   onOpenExpenses: () => void;
   onOpenReservations: () => void;
   onOpenDocuments: () => void;
+  onOpenPacking: () => void;
   weather?: DashboardWeatherState;
   weatherByStopId?: Record<string, DashboardWeatherState>;
   routePolyline?: Coordinates[];
@@ -140,10 +142,10 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
       >
         <View style={styles.hero}>
           <Image
-            source={require("../../assets/trip-lisbon-cover.png")}
+            source={destinationImageSource(props.stops[0]?.name ?? trip.name, props.stops[0]?.imageUrl ?? trip.imageUrl)}
             resizeMode="cover"
             style={styles.heroImage}
-            accessibilityLabel="Vue aérienne de Lisbonne"
+            accessibilityLabel={destinationImageLabel(props.stops[0]?.name ?? trip.name, props.stops[0]?.imageUrl ?? trip.imageUrl)}
           />
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
@@ -236,6 +238,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onOpenCreateStop={props.onOpenCreateStop}
             onOpenReservations={props.onOpenReservations}
             onOpenDocuments={props.onOpenDocuments}
+            onOpenPacking={props.onOpenPacking}
             weatherByStopId={props.weatherByStopId}
           />
         ) : null}
@@ -311,6 +314,7 @@ function TodayPanel({
   onOpenCreateStop,
   onOpenReservations,
   onOpenDocuments,
+  onOpenPacking,
   weatherByStopId,
 }: {
   stops: Stop[];
@@ -322,6 +326,7 @@ function TodayPanel({
   onOpenCreateStop: () => void;
   onOpenReservations: () => void;
   onOpenDocuments: () => void;
+  onOpenPacking: () => void;
   weatherByStopId?: Record<string, DashboardWeatherState>;
 }) {
   const [selectedStopId, setSelectedStopId] = useState<string | null>(stops[0]?.id ?? null);
@@ -357,6 +362,7 @@ function TodayPanel({
           <QuickAction icon="map-pin" label="Itinéraire" onPress={onOpenItinerary} />
           <QuickAction icon="file-text" label="Documents" onPress={onOpenDocuments} />
           <QuickAction icon="calendar" label="Réservations" onPress={onOpenReservations} />
+          <QuickAction icon="check" label="Bagages" onPress={onOpenPacking} />
         </View>
       </Section>
 
@@ -581,7 +587,7 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: "layers" | "file-text" | "map-pin" | "calendar"; label: string; onPress: () => void }) {
+function QuickAction({ icon, label, onPress }: { icon: "layers" | "file-text" | "map-pin" | "calendar" | "check"; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
       <Icon name={icon} size={22} color={colors.accent} />

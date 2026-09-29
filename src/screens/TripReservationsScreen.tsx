@@ -13,6 +13,7 @@ export interface TripReservationsScreenProps {
   onBack: () => void;
   onRetry: () => Promise<void>;
   onOpenDocuments: () => void;
+  onOpenPacking: () => void;
   onImport: () => void;
   onOpenNavigation: (place: PlaceReference, provider: "apple" | "waze") => Promise<void>;
 }
@@ -23,7 +24,7 @@ export function TripReservationsScreen(props: TripReservationsScreenProps) {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <RecordsHeader title="Réservations" subtitle={props.tripName} onBack={props.onBack} />
-        <RecordsTabs active="reservations" onOpenDocuments={props.onOpenDocuments} onOpenReservations={() => undefined} />
+        <RecordsTabs active="reservations" onOpenDocuments={props.onOpenDocuments} onOpenReservations={() => undefined} onOpenPacking={props.onOpenPacking} />
         <View style={styles.confirmationNote}><Icon name="check" size={20} color={colors.success} /><AppText variant="bodySmall" color="muted" style={styles.flexOne}>Seules les Réservations confirmées après relecture humaine apparaissent ici.</AppText></View>
         {props.error ? <View style={styles.message}><InlineMessage variant="error" title="Chargement impossible" message={props.error} /><Button variant="secondary" onPress={() => void props.onRetry()}>Réessayer</Button></View> : null}
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Coordinates, ItineraryItem, Stop, Trip, UUID } from "../modules/_shared/model";
 import {
   buildDashboardMapPresentation,
+  dashboardRouteCoordinates,
   countTripDays,
   formatTripDateRange,
   getTravelerCount,
@@ -95,6 +96,21 @@ describe("trip dashboard model", () => {
       locatedPlaceCount: 0,
       unlocatedPlaceCount: 0,
     });
+  });
+
+  it("adds a planned route to the dashboard map model when provided", () => {
+    const stops = [{
+      ...dashboardStop("stop-a", "Lisbonne"),
+      coordinates: { latitude: 38.7223, longitude: -9.1393 },
+    }];
+    const items = [dashboardItem("item-a", "stop-a", { latitude: 38.8, longitude: -9.1 })];
+    const route = [
+      { latitude: 38.7223, longitude: -9.1393 },
+      { latitude: 38.8, longitude: -9.1 },
+    ];
+
+    expect(dashboardRouteCoordinates(stops, items)).toEqual(route);
+    expect(buildDashboardMapPresentation(stops, items, route).model.polyline).toEqual(route);
   });
 });
 

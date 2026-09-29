@@ -21,9 +21,12 @@ Ce dernier choix évite d'inférer une association depuis une date, un pays, un 
 
 - en-tête avec retour et actualisation ;
 - identité de l'Étape, plage de dates locales, pays et fuseau IANA ;
+- localisation confirmée de l’Étape, coordonnées et attribution lorsqu’elles existent ;
 - compteurs réels de jours, éléments d'itinéraire et Documents ;
 - onglets Itinéraire, Documents et Réservations ;
 - aperçu cartographique dégradé et accès à la carte complète ;
+- action « Explorer autour » centrée sur les coordonnées de l’Étape ;
+- action de modification de localisation avec confirmation explicite ;
 - chronologie réelle avec heure locale, fuseau, lieu et notes disponibles ;
 - consultation et téléchargement persistant des Documents privés ;
 - timeline des Réservations confirmées explicitement liées ;
@@ -32,8 +35,9 @@ Ce dernier choix évite d'inférer une association depuis une date, un pays, un 
 ## Sections visibles avec « À venir »
 
 - météo et alertes locales ;
-- packing list indépendante par Étape ;
 - activité sociale, présence et position live des Membres.
+
+La packing list collaborative V0 est gérée au niveau du Voyage, et peut être consultée depuis le détail de l'Étape lorsque ses éléments sont associés à cette Étape.
 
 Ces sections reprennent les capacités visibles dans les références, mais restent désactivées et signalées comme indisponibles aux technologies d'assistance. Aucun contenu social, lieu, météo ou position n'est inventé.
 
@@ -43,6 +47,7 @@ Ces sections reprennent les capacités visibles dans les références, mais rest
 - les formats de calendrier utilisent UTC uniquement pour présenter les composantes de la date locale ;
 - aucun statut « fait » ou « en cours » n'est inventé pour un élément d'itinéraire ;
 - aucun fond cartographique n'est présenté comme disponible hors ligne ;
+- une Étape sans coordonnées reste consultable et affiche une action de résolution ;
 - les Documents restent privés et aucun document d'identité n'est introduit ;
 - seules des Réservations déjà confirmées sont affichées.
 

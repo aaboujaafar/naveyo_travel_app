@@ -383,21 +383,9 @@ function ComingSoonSection({
   title: string;
   children: React.ReactNode;
 }) {
-  return (
-    <Section title={title}>
-      <View
-        accessible
-        accessibilityLabel={`${title}, à venir`}
-        accessibilityState={{ disabled: true }}
-        style={styles.comingSoonFrame}
-      >
-        <View pointerEvents="none" style={styles.comingSoonContent}>
-          {children}
-        </View>
-        <Badge label="À venir" variant="gold" style={styles.comingSoonBadge} />
-      </View>
-    </Section>
-  );
+  void title;
+  void children;
+  return null;
 }
 
 function AvatarBubble({

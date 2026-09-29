@@ -78,6 +78,15 @@ export default function ItineraryRoute() {
       onOpenTracking={() => {
         if (tripId) router.push(`/(app)/trips/${tripId}/tracking`);
       }}
+      onCalculateRoute={async (coordinates) => {
+        if (!bootstrap || !tripId || !bootstrap.modules.routing) return null;
+        const result = await bootstrap.modules.routing.calculate({
+          tripId,
+          coordinates,
+          mode: "drive",
+        });
+        return result?.geometry ?? null;
+      }}
     />
   );
 }

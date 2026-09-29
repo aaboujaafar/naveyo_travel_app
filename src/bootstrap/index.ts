@@ -6,12 +6,22 @@ import type { ItineraryModule } from '../modules/itinerary'
 import { OfflineTripPack } from '../modules/offline-trip-pack/module'
 import type { OfflineTripPackModule, OfflineTripPackStore, TripPackFileStore } from '../modules/offline-trip-pack'
 import type { PlacesModule } from '../modules/places'
-import type { DocumentAnalyzer, ReservationsModule } from '../modules/reservations'
+import type {
+  DocumentAnalyzer,
+  OnDeviceReservationAnalyzer,
+  ReservationDocumentTextExtractor,
+  ReservationImportInbox,
+  ReservationTextAnalyzer,
+  ReservationsModule,
+} from '../modules/reservations'
 import type { TripAssistantModule } from '../modules/trip-assistant'
+import type { DayPlanner } from '../modules/day-planner'
 import type { TripTrackingModule } from '../modules/trip-tracking'
 import type { TripsModule } from '../modules/trips'
 import type { UUID } from '../modules/_shared/model'
 import type { WeatherModule } from '../modules/weather'
+import type { RoutingModule } from '../modules/routing'
+import type { PackingListModule } from '../modules/packing-list/interface'
 
 /**
  * The application boundary consumed by routes and UI composition.
@@ -26,12 +36,21 @@ export interface NaveyoModules {
   itinerary: ItineraryModule
   places: PlacesModule
   tripAssistant: TripAssistantModule
+  /** AI-101 day composition is optional in older deterministic test bootstraps. */
+  dayPlanner?: DayPlanner
   reservations: ReservationsModule
+  reservationImportInbox?: ReservationImportInbox
+  reservationTextExtractor?: ReservationDocumentTextExtractor
+  reservationTextAnalyzer?: ReservationTextAnalyzer
+  /** Apple Intelligence analysis, tried before any remote call. */
+  reservationOnDeviceAnalyzer?: OnDeviceReservationAnalyzer
   documents: DocumentsModule
   expenses: ExpensesModule
   offlineTripPack: OfflineTripPackModule
   tripTracking: TripTrackingModule
   weather: WeatherModule
+  routing?: RoutingModule
+  packingList: PackingListModule
   /** Native analyzer is optional while OCR-001 is not available in a build. */
   reservationAnalyzer?: DocumentAnalyzer
 }

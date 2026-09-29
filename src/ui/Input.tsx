@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ export function Input({
   ...props
 }: InputProps) {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const accessibilityLabel = label ?? props.placeholder ?? "Champ de saisie";
   const handleFocus = useCallback(
     (event: Parameters<NonNullable<TextInputProps["onFocus"]>>[0]) => {
@@ -53,14 +54,17 @@ export function Input({
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
+        onTouchStart={() => inputRef.current?.focus()}
         style={[
           styles.field,
           focused && styles.fieldFocused,
           error && styles.fieldError,
         ]}
       >
-        {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
+        {leftIcon && <View pointerEvents="none" style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
+          ref={inputRef}
+          {...props}
           style={styles.input}
           placeholderTextColor={colors.muted}
           accessibilityLabel={accessibilityLabel}
@@ -68,9 +72,8 @@ export function Input({
           importantForAccessibility="yes"
           onFocus={handleFocus}
           onBlur={handleBlur}
-          {...props}
         />
-        {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
+        {rightIcon && <View pointerEvents="none" style={styles.rightIcon}>{rightIcon}</View>}
       </View>
       {error ? (
         <Text style={styles.error}>{error}</Text>
@@ -94,12 +97,14 @@ export function TextArea({
   ...props
 }: TextAreaProps) {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const accessibilityLabel = label ?? props.placeholder ?? "Zone de texte";
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
+        onTouchStart={() => inputRef.current?.focus()}
         style={[
           styles.textArea,
           focused && styles.fieldFocused,
@@ -107,6 +112,8 @@ export function TextArea({
         ]}
       >
         <TextInput
+          ref={inputRef}
+          {...props}
           style={styles.textAreaInput}
           placeholderTextColor={colors.muted}
           accessibilityLabel={accessibilityLabel}
@@ -117,7 +124,6 @@ export function TextArea({
           textAlignVertical="top"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          {...props}
         />
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
@@ -140,7 +146,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     borderWidth: 1.5,
     borderColor: colors.border,
-    minHeight: 48,
+    minHeight: 56,
     paddingHorizontal: spacing.md,
   },
   fieldFocused: {
@@ -157,7 +163,7 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typography.body,
     color: colors.fg,
-    padding: 0,
+    paddingVertical: 12,
   },
   leftIcon: {
     marginRight: spacing.sm,

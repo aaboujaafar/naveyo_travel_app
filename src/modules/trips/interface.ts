@@ -35,4 +35,5 @@ export interface TripsModule {
   acceptInvitation(token: UUID): Promise<TripInvitation>;
   listStops(tripId: UUID): Promise<Stop[]>;
   createStop(input: Omit<Stop, "id">): Promise<Stop>;
+  updateStop?(stopId: UUID, input: Partial<Omit<Stop, "id" | "tripId">>): Promise<Stop>;
 }

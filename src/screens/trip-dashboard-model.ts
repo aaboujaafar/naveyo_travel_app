@@ -75,9 +75,15 @@ export interface DashboardMapPresentation {
 export function buildDashboardMapPresentation(
   stops: readonly Stop[],
   items: readonly ItineraryItem[],
+  routePolyline: Coordinates[] = [],
 ): DashboardMapPresentation {
   const stopOrder = new Map(stops.map((stop, index) => [stop.id, index + 1]));
-  const points = [];
+  const stopPoints = stops.flatMap((stop, index) =>
+    isValidCoordinates(stop.coordinates)
+      ? [{ id: `stop-${stop.id}`, label: `Étape ${index + 1} · ${stop.name}`, coordinates: stop.coordinates }]
+      : [],
+  );
+  const placePoints = [];
   let confirmedPlaceCount = 0;
   let unlocatedPlaceCount = 0;
 
@@ -92,7 +98,7 @@ export function buildDashboardMapPresentation(
       continue;
     }
 
-    points.push({
+    placePoints.push({
       id: item.id,
       label: `Étape ${stopNumber} · ${place.label || item.title}`,
       coordinates: place.coordinates,
@@ -100,11 +106,36 @@ export function buildDashboardMapPresentation(
   }
 
   return {
-    model: { points },
+    model: {
+      points: [...stopPoints, ...placePoints],
+      ...(routePolyline.length > 1 ? { polyline: routePolyline } : {}),
+    },
     confirmedPlaceCount,
-    locatedPlaceCount: points.length,
+    locatedPlaceCount: placePoints.length,
     unlocatedPlaceCount,
   };
+}
+
+export function dashboardRouteCoordinates(
+  stops: readonly Stop[],
+  items: readonly ItineraryItem[],
+): Coordinates[] {
+  const candidates = [
+    ...stops.map((stop) => stop.coordinates),
+    ...items.map((item) => item.place?.coordinates),
+  ].filter((coordinate): coordinate is Coordinates => isValidCoordinates(coordinate));
+  const result: Coordinates[] = [];
+  for (const coordinate of candidates) {
+    const previous = result.at(-1);
+    if (
+      previous?.latitude === coordinate.latitude &&
+      previous.longitude === coordinate.longitude
+    ) {
+      continue;
+    }
+    result.push(coordinate);
+  }
+  return result;
 }
 
 function isValidCoordinates(value: Coordinates | null | undefined): value is Coordinates {

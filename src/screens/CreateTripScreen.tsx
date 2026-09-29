@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import {
   Badge,
   Button,
   Chip,
+  DatePickerField,
   Icon,
   IconButton,
   InlineMessage,
@@ -72,7 +75,7 @@ export function CreateTripScreen({
   );
 
   return (
-    <View style={styles.screen}>
+      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <View style={styles.scrollArea}>
         <ScrollView
           style={styles.scroll}
@@ -149,25 +152,24 @@ export function CreateTripScreen({
           <FormSection title="Dates du voyage">
             <View style={styles.dateRow}>
               <View style={styles.dateField}>
-                <Input
+                <DatePickerField
+                  label="Départ"
                   value={values.startsOn}
-                  onChangeText={(startsOn) =>
+                  onChange={(startsOn) =>
                     setValues((current) => ({ ...current, startsOn }))
                   }
-                  accessibilityLabel="Date de départ"
-                  placeholder="AAAA-MM-JJ"
-                  rightIcon={<Icon name="calendar" size={16} />}
+                  placeholder="Choisir"
                 />
               </View>
               <View style={styles.dateField}>
-                <Input
+                <DatePickerField
+                  label="Retour"
                   value={values.endsOn}
-                  onChangeText={(endsOn) =>
+                  onChange={(endsOn) =>
                     setValues((current) => ({ ...current, endsOn }))
                   }
-                  accessibilityLabel="Date de retour"
-                  placeholder="AAAA-MM-JJ"
-                  rightIcon={<Icon name="calendar" size={16} />}
+                  minimumDate={values.startsOn || undefined}
+                  placeholder="Choisir"
                 />
               </View>
             </View>
@@ -350,7 +352,7 @@ export function CreateTripScreen({
           {ready ? "Tout est prêt !" : "Renseignez destination et dates pour continuer"}
         </AppText>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -376,28 +378,14 @@ function ComingSoonSection({
   title: string;
   children: React.ReactNode;
 }) {
-  return (
-    <FormSection title={title}>
-      <ComingSoonFrame>{children}</ComingSoonFrame>
-    </FormSection>
-  );
+  void title;
+  void children;
+  return null;
 }
 
 function ComingSoonFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <View
-      accessible
-      style={styles.futureFrame}
-      accessibilityLabel="Fonctionnalité à venir"
-    >
-      <View style={styles.futureContent} pointerEvents="none">
-        {children}
-      </View>
-      <View style={styles.futureBadge}>
-        <Badge label="À venir" variant="gold" />
-      </View>
-    </View>
-  );
+  void children;
+  return null;
 }
 
 function CoverOption({

@@ -16,7 +16,6 @@ import {
   Button,
   Icon,
   SectionTitle,
-  Switch,
 } from "../ui";
 import type { IconName } from "../ui";
 
@@ -30,7 +29,6 @@ interface CarouselSlide {
   title: string;
   description: string;
   tint: "accent" | "teal" | "gold";
-  future?: boolean;
 }
 
 const slides: readonly CarouselSlide[] = [
@@ -43,12 +41,6 @@ const slides: readonly CarouselSlide[] = [
     title: "Documents utiles, même hors ligne",
     description: "Téléchargez le paquet du Voyage avant de partir et gardez les informations essentielles.",
     tint: "teal",
-  },
-  {
-    title: "Photos, Journal et récap social",
-    description: "Un aperçu du carnet enrichi prévu après l’alpha privée.",
-    tint: "gold",
-    future: true,
   },
 ];
 
@@ -169,7 +161,6 @@ export function OnboardingScreen({
                     <Rect width="100%" height="100%" fill={`url(#slide-overlay-${index})`} />
                   </Svg>
                   <View style={styles.slideCaption}>
-                    {slide.future ? <Badge label="À venir" variant="gold" /> : null}
                     <AppText variant="h3" color="onAccent">{slide.title}</AppText>
                     <AppText variant="caption" color="onAccent">{slide.description}</AppText>
                   </View>
@@ -190,20 +181,6 @@ export function OnboardingScreen({
             </View>
           </View>
 
-          <ComingSoon label="Compteur et témoignages">
-            <View style={styles.socialProof}>
-              <View style={styles.avatarStack}>
-                <View style={[styles.miniAvatar, styles.avatarAccent]}><AppText variant="badge" color="onAccent">N</AppText></View>
-                <View style={[styles.miniAvatar, styles.avatarTeal]}><AppText variant="badge" color="onAccent">V</AppText></View>
-                <View style={[styles.miniAvatar, styles.avatarGold]}><AppText variant="badge" color="onAccent">+</AppText></View>
-              </View>
-              <View style={styles.flexOne}>
-                <AppText variant="label">Communauté Naveyo</AppText>
-                <AppText variant="caption" color="muted">Compteur public et témoignages après l’alpha privée</AppText>
-              </View>
-            </View>
-          </ComingSoon>
-
           <View style={styles.features}>
             <Feature
               icon="users"
@@ -217,14 +194,6 @@ export function OnboardingScreen({
               title="Suggestions IA contrôlées"
               description="Découvrez de vrais candidats de lieux autour de chaque Étape, puis confirmez vos choix."
             />
-            <ComingSoon label="Photos, Journal et récap social">
-              <Feature
-                icon="image"
-                tone="gold"
-                title="Récap prêt à partager"
-                description="Photos, Journal, stories et export social sont prévus après la V0."
-              />
-            </ComingSoon>
             <Feature
               icon="file-text"
               tone="muted"
@@ -245,35 +214,6 @@ export function OnboardingScreen({
             </View>
           </View>
 
-          <ComingSoon label="Témoignages publics">
-            <View style={styles.testimonials}>
-              <SectionTitle title="Ils voyagent avec Naveyo" />
-              <View style={styles.testimonialCard}>
-                <AppText variant="h2" color="accent">“</AppText>
-                <AppText variant="bodySmall" color="muted">Les témoignages publics seront ajoutés après les validations de l’alpha privée.</AppText>
-                <View style={styles.testimonialFooter}><View style={styles.testimonialAvatar} /><View style={styles.flexOne}><SkeletonLine /><SkeletonLine short /></View></View>
-              </View>
-            </View>
-          </ComingSoon>
-
-          <View>
-            <SectionTitle title="Autorisations · aperçu" />
-            <View style={styles.permissions}>
-              <PermissionRow icon="image" tone="accent" title="Photos et fichiers" detail="Demandée seulement pour importer un Document" enabled />
-              <PermissionRow icon="map-pin" tone="teal" title="Localisation" detail="Consentement explicite au démarrage de la Trace" enabled />
-              <PermissionRow icon="message-circle" tone="gold" title="Notifications" detail="Non nécessaires à la V0" future />
-            </View>
-          </View>
-
-          <ComingSoon label="Stores publics et Android">
-            <View>
-              <SectionTitle title="Bientôt disponible" />
-              <View style={styles.storeBadges}>
-                <StoreBadge icon="home" title="App Store public" />
-                <StoreBadge icon="map" title="Google Play" />
-              </View>
-            </View>
-          </ComingSoon>
         </View>
 
         <View style={[styles.actions, actionsInsetStyle]}>
@@ -320,38 +260,6 @@ function Step({ number, tone, title, description }: { number: string; tone: "acc
   );
 }
 
-function PermissionRow({ icon, tone, title, detail, enabled, future }: { icon: IconName; tone: "accent" | "teal" | "gold"; title: string; detail: string; enabled?: boolean; future?: boolean }) {
-  return (
-    <View style={styles.permissionRow}>
-      <View style={[styles.permissionIcon, styles[`featureIcon_${tone}`]]}><Icon name={icon} size={20} color={toneColor(tone)} /></View>
-      <View style={styles.flexOne}><AppText variant="label">{title}</AppText><AppText variant="caption" color="muted">{detail}</AppText></View>
-      {future ? <Badge label="À venir" variant="gold" /> : <Switch value={enabled === true} label={`${title}, aperçu informatif`} onChange={() => undefined} disabled />}
-    </View>
-  );
-}
-
-function StoreBadge({ icon, title }: { icon: IconName; title: string }) {
-  return (
-    <View accessibilityLabel={`${title}, à venir`} accessibilityState={{ disabled: true }} style={styles.storeBadge}>
-      <Icon name={icon} size={22} color={colors.white} />
-      <View><AppText variant="badge" color="onAccent">Disponible sur</AppText><AppText variant="label" color="onAccent">{title}</AppText></View>
-    </View>
-  );
-}
-
-function ComingSoon({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View accessible accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={styles.futureWrap}>
-      <View pointerEvents="none" style={styles.futureContent}>{children}</View>
-      <Badge label="À venir" variant="gold" style={styles.futureBadge} />
-    </View>
-  );
-}
-
-function SkeletonLine({ short }: { short?: boolean }) {
-  return <View style={[styles.skeletonLine, short && styles.skeletonLineShort]} />;
-}
-
 function toneColor(tone: "accent" | "teal" | "gold" | "muted"): string {
   return tone === "accent" ? colors.accent : tone === "teal" ? colors.teal : tone === "gold" ? colors.gold : colors.muted;
 }
@@ -377,12 +285,6 @@ const styles = StyleSheet.create({
   dots: { flexDirection: "row", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md },
   dot: { width: spacing.sm, height: spacing.sm, borderRadius: radius.full, backgroundColor: colors.border },
   dotActive: { width: spacing.lg, backgroundColor: colors.accent },
-  socialProof: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  avatarStack: { flexDirection: "row", alignItems: "center" },
-  miniAvatar: { width: spacing.xl, height: spacing.xl, marginLeft: -spacing.sm, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  avatarAccent: { backgroundColor: colors.accent, marginLeft: 0 },
-  avatarTeal: { backgroundColor: colors.teal },
-  avatarGold: { backgroundColor: colors.gold },
   features: { gap: spacing.md },
   featureCard: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   featureIcon: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
@@ -400,20 +302,6 @@ const styles = StyleSheet.create({
   stepCircle_teal: { backgroundColor: colors.teal },
   stepCircle_gold: { backgroundColor: colors.gold },
   stepConnector: { flex: 0.4, height: StyleSheet.hairlineWidth, marginTop: spacing.md + spacing.xs, backgroundColor: colors.border },
-  testimonials: { gap: spacing.md },
-  testimonialCard: { padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  testimonialFooter: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
-  testimonialAvatar: { width: spacing.xl, height: spacing.xl, borderRadius: radius.full, backgroundColor: colors.border },
-  skeletonLine: { width: "70%", height: spacing.sm, marginBottom: spacing.xs, borderRadius: radius.full, backgroundColor: colors.border },
-  skeletonLineShort: { width: "44%" },
-  permissions: { overflow: "hidden", borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  permissionRow: { minHeight: spacing["2xl"] + spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  permissionIcon: { width: spacing.xl + spacing.xs, height: spacing.xl + spacing.xs, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
-  storeBadges: { flexDirection: "row", justifyContent: "center", gap: spacing.sm },
-  storeBadge: { flex: 1, minHeight: spacing["2xl"], flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.fg },
-  futureWrap: { position: "relative" },
-  futureContent: { opacity: 0.48 },
-  futureBadge: { position: "absolute", top: spacing.xs, right: spacing.xs },
   actions: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   flexOne: { flex: 1 },
 });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Trip } from "../modules/trips";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
@@ -7,6 +7,7 @@ import {
   AppText,
   Badge,
   Button,
+  DatePickerField,
   Icon,
   IconButton,
   InlineMessage,
@@ -58,7 +59,7 @@ export function TripSettingsScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -112,21 +113,18 @@ export function TripSettingsScreen({
               error={attempted ? validation.name : undefined}
             />
             <View style={styles.dateRow}>
-              <Input
+              <DatePickerField
                 label="Début"
                 value={values.startsOn}
-                onChangeText={(startsOn) => setValues((current) => ({ ...current, startsOn }))}
-                placeholder="AAAA-MM-JJ"
-                autoCapitalize="none"
+                onChange={(startsOn) => setValues((current) => ({ ...current, startsOn }))}
                 error={attempted ? validation.startsOn : undefined}
                 containerStyle={styles.dateInput}
               />
-              <Input
+              <DatePickerField
                 label="Fin"
                 value={values.endsOn}
-                onChangeText={(endsOn) => setValues((current) => ({ ...current, endsOn }))}
-                placeholder="AAAA-MM-JJ"
-                autoCapitalize="none"
+                onChange={(endsOn) => setValues((current) => ({ ...current, endsOn }))}
+                minimumDate={values.startsOn || undefined}
                 error={attempted ? validation.endsOn : undefined}
                 containerStyle={styles.dateInput}
               />
@@ -211,20 +209,14 @@ export function TripSettingsScreen({
           </AppText>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 function ComingSoonSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.sectionBlock}>
-      <AppText variant="h3" style={styles.sectionTitle}>{title}</AppText>
-      <View accessible accessibilityLabel={`${title}, à venir`} accessibilityState={{ disabled: true }} style={styles.comingSoonFrame}>
-        <View pointerEvents="none" style={styles.comingSoonContent}>{children}</View>
-        <Badge label="À venir" variant="gold" style={styles.comingSoonBadge} />
-      </View>
-    </View>
-  );
+  void title;
+  void children;
+  return null;
 }
 
 const styles = StyleSheet.create({

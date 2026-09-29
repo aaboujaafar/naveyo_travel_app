@@ -81,7 +81,7 @@ export class TripAssistantService implements TripAssistant {
     const validCandidates = candidates.slice(0, this.options.maxCandidates).map((candidate) => parsePlaceCandidate(candidate))
     const uniqueCandidates = [...new Map(validCandidates.map((candidate) => [candidate.id, candidate])).values()]
     if (uniqueCandidates.length === 0) return []
-    const output = await withTimeout(this.dependencies.model.complete({ tripId: input.tripId, stopId: input.stopId, stopName: input.stopName, countryCode: input.countryCode, timeZone: input.timeZone, preferences: input.preferences?.trim(), candidates: uniqueCandidates }), this.options.timeoutMs)
+    const output = await withTimeout(this.dependencies.model.complete({ tripId: input.tripId, stopId: input.stopId, stopName: input.stopName, countryCode: input.countryCode, timeZone: input.timeZone, preferences: input.preferences?.trim(), weather: input.weather, existingItinerary: input.existingItinerary, candidates: uniqueCandidates }), this.options.timeoutMs)
     const drafts = parseSuggestionOutput(output, uniqueCandidates, this.options.now?.() ?? new Date().toISOString(), input.tripId, input.stopId, this.options.id ?? (() => assertStableId(crypto.randomUUID())), this.options.maxSuggestions)
     await this.dependencies.draftStore.save(drafts)
     return drafts

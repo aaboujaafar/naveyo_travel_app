@@ -1,7 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../src/bootstrap";
-import { sharedLocalReservations } from "../../../../src/bootstrap/reservations";
 import type {
   Coordinates,
   ItineraryItem,
@@ -103,7 +102,7 @@ export default function TripDetailRoute() {
       setWeatherByStopId(weatherMap);
       setWeather(nextStops[0] ? weatherMap[nextStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
       try {
-        setReservations(await sharedLocalReservations.list(tripId));
+        setReservations(await bootstrap.modules.reservations.list(tripId));
       } catch {
         setReservations([]);
         setError(
@@ -166,6 +165,9 @@ export default function TripDetailRoute() {
       }
       onOpenDocuments={() =>
         router.push(`/(app)/trips/${routeTripId}/documents`)
+      }
+      onOpenPacking={() =>
+        router.push(`/(app)/trips/${routeTripId}/packing`)
       }
       weather={weather}
       weatherByStopId={weatherByStopId}

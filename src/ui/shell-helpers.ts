@@ -1,4 +1,4 @@
-export type EntryRoute = "/(auth)" | "/(auth)/sign-in" | "/(app)";
+export type EntryRoute = "/(auth)" | "/(auth)/sign-in" | "/(app)/trips";
 export type ShellRouteGroup = "(auth)" | "(app)" | "unknown";
 
 export type ShellConnectivityState = {
@@ -7,7 +7,7 @@ export type ShellConnectivityState = {
 };
 
 export function resolveEntryRoute(isAuthenticated: boolean): EntryRoute {
-  return isAuthenticated ? "/(app)" : "/(auth)/sign-in";
+  return isAuthenticated ? "/(app)/trips" : "/(auth)/sign-in";
 }
 
 export function resolveShellRedirect(
@@ -15,9 +15,9 @@ export function resolveShellRedirect(
   currentRouteGroup: ShellRouteGroup,
 ): EntryRoute | null {
   if (currentRouteGroup === "unknown") {
-    return isAuthenticated ? "/(app)" : "/(auth)";
+    return isAuthenticated ? "/(app)/trips" : "/(auth)";
   }
-  if (isAuthenticated && currentRouteGroup === "(auth)") return "/(app)";
+  if (isAuthenticated && currentRouteGroup === "(auth)") return "/(app)/trips";
   if (!isAuthenticated && currentRouteGroup === "(app)")
     return "/(auth)/sign-in";
   return null;

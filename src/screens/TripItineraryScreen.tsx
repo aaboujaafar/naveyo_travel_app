@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MapAdapter } from "../adapters/map/interface";
 import { ExpoMapsAdapter } from "../adapters/map/expo-maps-adapter";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
+  Coordinates,
   ItineraryItem,
   Stop,
   TrackPoint,
@@ -26,6 +27,7 @@ import {
   buildItineraryMapModel,
   formatDistance,
   formatLocalItineraryDate,
+  itineraryRouteCoordinates,
   trackDistanceMeters,
 } from "./trip-map-model";
 
@@ -40,6 +42,7 @@ export interface TripItineraryScreenProps {
   onOpenTrip: () => void;
   onOpenAssistant: (stopId: Stop["id"]) => void;
   onOpenTracking: () => void;
+  onCalculateRoute?: (coordinates: Coordinates[]) => Promise<Coordinates[] | null>;
   mapAdapter?: MapAdapter;
 }
 
@@ -58,6 +61,7 @@ export function TripItineraryScreen({
   onOpenTrip,
   onOpenAssistant,
   onOpenTracking,
+  onCalculateRoute,
   mapAdapter,
 }: TripItineraryScreenProps) {
   const insets = useSafeAreaInsets();
@@ -75,9 +79,48 @@ export function TripItineraryScreen({
         : [],
     [activeDay, selectedFilter],
   );
+  const routeInput = useMemo(
+    () => itineraryRouteCoordinates(activeDay?.items ?? [], activeDay?.stop),
+    [activeDay],
+  );
+  const routeKey = routeInput
+    .map((coordinate) => `${coordinate.latitude},${coordinate.longitude}`)
+    .join("|");
+  const [routeState, setRouteState] = useState<{
+    key: string;
+    geometry: Coordinates[];
+  }>({ key: "", geometry: [] });
+
+  useEffect(() => {
+    let active = true;
+    if (!onCalculateRoute || routeInput.length < 2) return () => {
+      active = false;
+    };
+    void onCalculateRoute(routeInput)
+      .then((geometry) => {
+        if (active) setRouteState({ key: routeKey, geometry: geometry ?? [] });
+      })
+      .catch(() => {
+        if (active) setRouteState({ key: routeKey, geometry: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [onCalculateRoute, routeInput, routeKey]);
+
+  const routePolyline = useMemo(
+    () => (routeState.key === routeKey ? routeState.geometry : []),
+    [routeKey, routeState.geometry, routeState.key],
+  );
+
   const mapModel = useMemo(
-    () => buildItineraryMapModel(visibleItems, trackPoints),
-    [trackPoints, visibleItems],
+    () => buildItineraryMapModel(
+      visibleItems,
+      trackPoints,
+      activeDay ? [activeDay.stop] : stops,
+      routePolyline,
+    ),
+    [activeDay, routePolyline, stops, trackPoints, visibleItems],
   );
   const resolvedMapAdapter = useMemo(
     () => mapAdapter ?? new ExpoMapsAdapter(),
@@ -371,28 +414,15 @@ function OfflineCard({ offline }: { offline: OfflineTripPackLoad | null }) {
 }
 
 function ComingSoonFrame({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View
-      accessible
-      accessibilityLabel={`${label}, à venir`}
-      accessibilityState={{ disabled: true }}
-      style={styles.comingSoonFrame}
-    >
-      <View pointerEvents="none" style={styles.comingSoonContent}>{children}</View>
-      <Badge label="À venir" variant="gold" style={styles.comingSoonBadge} />
-    </View>
-  );
+  void label;
+  void children;
+  return null;
 }
 
 function ComingSoonSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <AppText variant="sectionTitle" color="muted" style={styles.sectionTitle}>
-        {title.toUpperCase()}
-      </AppText>
-      <ComingSoonFrame label={title}>{children}</ComingSoonFrame>
-    </View>
-  );
+  void title;
+  void children;
+  return null;
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
@@ -417,6 +447,7 @@ function BottomNavItem({
   comingSoon?: boolean;
   onPress?: () => void;
 }) {
+  if (comingSoon) return null;
   const disabled = comingSoon || !onPress;
   return (
     <Pressable

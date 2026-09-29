@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { describePlacesError } from "../../../../../src/screens/places-error";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../src/modules/_shared/model";
 import {
@@ -138,9 +139,7 @@ export default function TripAssistantRoute() {
         setDrafts(result);
       } else setDrafts([]);
     } catch (cause: unknown) {
-      setError(
-        cause instanceof Error ? cause.message : "Suggestions indisponibles",
-      );
+      setError(describePlacesError(cause, "Suggestions indisponibles pour le moment."));
     } finally {
       setLoading(false);
     }
@@ -163,6 +162,7 @@ export default function TripAssistantRoute() {
         weather: weather.filter((day) => day.date === selectedDayPlanDate),
         existingItinerary: mapItineraryToDayPlanHistory(plannedItems),
       });
+      bootstrap.modules.places.remember?.(result.candidates);
       setNearbyCandidates(result.candidates);
       setDayPlan(result);
     } catch (cause: unknown) {

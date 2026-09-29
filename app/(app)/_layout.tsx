@@ -2,23 +2,26 @@ import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { colors } from "../../src/theme/colors";
-import { createAppleShareInbox } from "../../src/adapters/apple-document-analysis";
+import { useNaveyoBootstrap } from "../../src/bootstrap";
 
 export default function AppLayout() {
   const router = useRouter();
+  const bootstrap = useNaveyoBootstrap();
 
   useEffect(() => {
-    void createAppleShareInbox()
+    const inbox = bootstrap?.modules.reservationImportInbox;
+    if (!inbox) return;
+    void inbox
       .list()
       .then(async (pending) => {
         const fresh = pending.filter((item) => item.status === "new");
-        await Promise.all(fresh.map((item) => createAppleShareInbox().updateStatus(item.id, "seen")));
+        await Promise.all(fresh.map((item) => inbox.updateStatus(item.id, "seen")));
         if (fresh.length > 0) router.replace("/(app)/imports");
       })
       .catch(() => {
         // The native inbox is unavailable outside an iOS development build.
       });
-  }, [router]);
+  }, [bootstrap, router]);
 
   return (
     <View style={styles.container}>

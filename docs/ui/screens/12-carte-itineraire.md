@@ -12,10 +12,10 @@ Routes Naveyo :
 | Section du template | État Naveyo V0 | Traitement |
 |---|---|---|
 | En-tête et sélection du jour | Compatible | Jours construits depuis les dates locales réelles des Étapes. |
-| Carte et filtres | Compatible en mode dégradé | Les lieux avec coordonnées restent comptés et listés. Le fond cartographique est explicitement indisponible tant que l'Adapter MapKit n'est pas composé. |
+| Carte et filtres | Compatible en mode dégradé | Les Étapes et lieux avec coordonnées confirmées restent comptés et listés. Les recherches Geoapify sont réalisées en amont par les Modules ; le fond cartographique dépend de l’Adapter MapKit. |
 | Itinéraire du jour | Compatible | Éléments réels ordonnés par le Module, heure locale et fuseau IANA affichés sans conversion implicite. |
 | Détail d'un élément | Compatible | Adresse, lieu, notes, heure locale et fuseau viennent exclusivement de l'élément réel. |
-| Ajout intercalé et réorganisation | Non disponible dans le contrat courant | Aperçu visible, désactivé et marqué « À venir ». Aucun élément fictif n'est persisté. |
+| Ajout intercalé et réorganisation | Ajout de lieu actif après `GEO-006` | Recherche, POI proches et épingle manuelle peuvent créer un élément uniquement après confirmation. La réorganisation reste hors V0. |
 | Mode hors ligne | Compatible | État réel du `TripPack`, manifeste et raison d'indisponibilité affichés. Le fond MapKit n'est jamais présenté comme garanti hors connexion. |
 | Famille en temps réel | Hors V0 | Visible, désactivée et marquée « À venir ». Aucune position d'un Membre du voyage n'est chargée ni affichée. |
 | Statistiques | Compatible partiellement | Distance dérivée des points WGS84 réels, nombre de points GPS et nombre d'éléments prévus. Aucun nombre de pas n'est inventé. |
@@ -39,6 +39,7 @@ Routes Naveyo :
 - chaque heure affiche sa valeur locale et son fuseau IANA d'origine ;
 - la distance est dérivée exclusivement de points WGS84 horodatés réellement enregistrés ;
 - le `TripPack` actif n'est jamais remplacé ou modifié depuis ces écrans.
+- la trace GPS est affichée comme trace et n’est jamais envoyée au géocodage inverse automatiquement.
 
 ## Validation visuelle restante
 

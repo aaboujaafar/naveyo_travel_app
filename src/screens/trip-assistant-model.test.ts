@@ -3,6 +3,8 @@ import type { SuggestionDraft } from "../modules/trip-assistant";
 import type { UUID } from "../modules/_shared/model";
 import {
   buildAssistantPreferences,
+  assistantCategoryPlaceType,
+  isAssistantRadius,
   filterSuggestionDrafts,
   isAssistantSearchReady,
 } from "./trip-assistant-model";
@@ -30,6 +32,15 @@ describe("trip assistant presentation model", () => {
   it("translates a visual category into a bounded preference", () => {
     expect(buildAssistantPreferences("Restaurants")).toBe("restaurant");
     expect(buildAssistantPreferences("Hébergements")).toBe("hébergement");
+  });
+
+  it("maps Explorer filters to bounded provider inputs", () => {
+    expect(assistantCategoryPlaceType("Restaurants")).toBe("restaurant");
+    expect(assistantCategoryPlaceType("Hébergements")).toBe("accommodation");
+    expect(assistantCategoryPlaceType("À voir")).toBe("attraction");
+    expect(assistantCategoryPlaceType("Activités")).toBe("activity");
+    expect(isAssistantRadius(500)).toBe(true);
+    expect(isAssistantRadius(750)).toBe(false);
   });
 
   it("filters only already verified suggestion drafts", () => {

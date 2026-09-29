@@ -46,9 +46,9 @@ export default function AcceptInvitationScreen() {
     >
       <Card style={styles.card}>
         <Badge label="ACCÈS PRIVÉ" variant="teal" />
-        <Text style={styles.title}>Tu es invité(e)</Text>
+        <Text style={styles.title}>Vous êtes invité(e)</Text>
         <Text style={styles.message}>
-          Ton compte sera ajouté comme éditeur. Tu pourras consulter et gérer
+          Votre compte sera ajouté comme éditeur. Vous pourrez consulter et gérer
           les informations partagées du Voyage.
         </Text>
       </Card>

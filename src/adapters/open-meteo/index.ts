@@ -1,5 +1,4 @@
-import type { WeatherForecastInput, WeatherProvider } from "../../modules/weather";
-import type { WeatherForecast } from "../../modules/weather";
+import type { WeatherForecast, WeatherForecastInput, WeatherProvider } from "../../modules/weather";
 
 export function createOpenMeteoWeatherProvider(): WeatherProvider {
   return { async forecast(input: WeatherForecastInput): Promise<WeatherForecast> {

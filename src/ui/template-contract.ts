@@ -78,14 +78,15 @@ export const v0TemplateContracts = [
   },
   {
     id: "documents-reservations",
-    label: "Documents et Réservations",
+    label: "Documents, Réservations et Packing",
     routes: [
       "/(app)/trips/[tripId]/documents",
       "/(app)/trips/[tripId]/reservations",
+      "/(app)/trips/[tripId]/packing",
     ],
     template: "14-checklist-documents.html",
     coverage: "scoped",
-    excludedSections: ["packing list"],
+    excludedSections: [],
   },
   {
     id: "account",

@@ -1,8 +1,10 @@
 import type { PlaceCandidate, UUID } from "../../modules/_shared/model";
 import {
   assertStableId,
+  isIanaTimeZone,
   parseCoordinates,
 } from "../../modules/_shared/validation";
+import { placeAttribution } from "../../modules/places/attribution";
 
 export type GeoapifyFeature = {
   properties?: Record<string, unknown>;
@@ -68,21 +70,47 @@ export function normalizeGeoapifyResponse(
     const category = Array.isArray(properties.categories)
       ? text(properties.categories[0])
       : text(properties.category);
+    const datasource = properties.datasource as Record<string, unknown> | undefined;
+    const imageUrl = text(properties.image) ?? text(properties.photo) ?? text(datasource?.image);
+    const imageCredit = (() => {
+      const value = properties.image_credit;
+      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+      const credit = value as Record<string, unknown>;
+      const photographer = text(credit.photographer);
+      const photographerUrl = text(credit.photographerUrl);
+      const sourceUrl = text(credit.sourceUrl);
+      if (!photographer || !photographerUrl || !sourceUrl) return undefined;
+      return { photographer, photographerUrl, sourceUrl };
+    })();
     result.push({
       id: stableId(providerId),
       provider: "geoapify",
       name,
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(imageCredit ? { imageCredit } : {}),
       category,
       address: text(properties.formatted),
       countryCode: text(properties.country_code)?.toUpperCase(),
       coordinates: parseCoordinates({ latitude, longitude }),
-      attribution:
+      attribution: placeAttribution(
+        "geoapify",
         text(properties.attribution) ??
-        text(
-          (properties.datasource as Record<string, unknown> | undefined)
-            ?.attribution,
-        ),
+          text(
+            datasource?.attribution,
+          ),
+      ),
       providerPlaceId: providerId,
+      timeZone: (() => {
+        const timezone = properties.timezone;
+        const value = timezone && typeof timezone === "object"
+          ? (timezone as Record<string, unknown>).name
+          : timezone;
+        return typeof value === "string" && isIanaTimeZone(value) ? value : undefined;
+      })(),
+      distanceMeters:
+        typeof properties.distance === "number" && Number.isFinite(properties.distance) && properties.distance >= 0
+          ? properties.distance
+          : undefined,
     });
   }
   return result;

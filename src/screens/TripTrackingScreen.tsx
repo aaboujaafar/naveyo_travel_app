@@ -168,24 +168,6 @@ export function TripTrackingScreen({
         </View>
       </View>
 
-      <View
-        accessible
-        accessibilityLabel="Famille en temps réel, à venir"
-        accessibilityState={{ disabled: true }}
-        style={styles.comingSoonSection}
-      >
-        <View pointerEvents="none" style={styles.comingSoonContent}>
-          <AppText variant="sectionTitle" color="muted" style={styles.sectionTitle}>
-            FAMILLE EN TEMPS RÉEL
-          </AppText>
-          <View style={styles.familyRow}>
-            <View style={styles.familyDot} />
-            <AppText variant="bodySmall" style={styles.familyText}>Position des Membres du Voyage</AppText>
-            <AppText variant="caption" color="muted">À venir</AppText>
-          </View>
-        </View>
-        <Badge label="À venir" variant="gold" style={styles.comingSoonBadge} />
-      </View>
     </Screen>
   );
 }

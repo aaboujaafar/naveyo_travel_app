@@ -8,6 +8,7 @@ import type {
   UUID,
 } from "../../../../../src/modules/_shared/model";
 import { PlaceDetailScreen } from "../../../../../src/screens/PlaceDetailScreen";
+import { describePlacesError } from "../../../../../src/screens/places-error";
 import {
   buildPlaceScheduleDates,
   type PlaceScheduleDate,
@@ -48,9 +49,7 @@ export default function PlaceDetailRoute() {
       setPlace(nextPlace);
       setStops(nextStops);
     } catch (cause: unknown) {
-      setError(
-        cause instanceof Error ? cause.message : "Impossible de charger le lieu.",
-      );
+      setError(describePlacesError(cause, "Impossible de charger le lieu."));
     } finally {
       setLoading(false);
     }
@@ -111,6 +110,12 @@ export default function PlaceDetailRoute() {
     );
   }, [place]);
 
+  const openWaze = useCallback(async () => {
+    const coordinates = place?.coordinates;
+    if (!coordinates || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) return;
+    await Linking.openURL(`https://waze.com/ul?ll=${coordinates.latitude},${coordinates.longitude}&navigate=yes`);
+  }, [place]);
+
   const routeTripId = rawTripId ?? "";
 
   return (
@@ -126,6 +131,11 @@ export default function PlaceDetailRoute() {
         router.push(`/(app)/trips/${routeTripId}/itinerary`)
       }
       onOpenDirections={openDirections}
+      onOpenWaze={openWaze}
+      onOpenPhotoCredit={() => {
+        const url = place?.imageCredit?.photographerUrl;
+        if (url) void Linking.openURL(url);
+      }}
       onAddToItinerary={addToItinerary}
     />
   );

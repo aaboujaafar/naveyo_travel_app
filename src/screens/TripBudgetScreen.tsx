@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { BudgetSummary, Expense, ExpenseCategory } from "../modules/expenses";
 import type { ISO4217 } from "../modules/_shared/model";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
-import { AppText, Badge, BottomSheet, Button, Icon, InlineMessage, Input, ProgressBar, SectionTitle, Skeleton } from "../ui";
+import { AppText, BottomSheet, Button, DatePickerField, Icon, InlineMessage, Input, ProgressBar, SectionTitle, Skeleton } from "../ui";
 import { expenseCategories, expenseCategoryLabels, formatExpenseDate, formatMoney, summarizeExpenseCategories } from "./trip-budget-model";
 
 export interface AddExpenseForm {
@@ -130,7 +130,7 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
         <Input label="Devise ISO 4217" value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} />
         <AppText variant="label">Catégorie</AppText>
         <View style={styles.categoryPicker}>{expenseCategories.map((value) => <FilterChip key={value} label={expenseCategoryLabels[value]} active={category === value} onPress={() => setCategory(value)} />)}</View>
-        <Input label="Date locale" value={date} onChangeText={setDate} placeholder="AAAA-MM-JJ" />
+        <DatePickerField label="Date locale" value={date} onChange={setDate} />
         <Input label="Payé par · UUID facultatif" value={paidBy} onChangeText={setPaidBy} placeholder="Compte ayant payé" />
         <ComingSoon label="Justificatif photo"><View style={styles.receiptButton}><Icon name="image" size={20} color={colors.muted} /><AppText variant="label" color="muted">Ajouter un reçu</AppText></View></ComingSoon>
         {props.error ? <InlineMessage variant="error" title="Ajout impossible" message={props.error} /> : null}
@@ -145,7 +145,7 @@ function MoneyRow({ label, value }: { label: string; value: string }) { return <
 function Stat({ label, value, success }: { label: string; value: string; success?: boolean }) { return <View style={styles.stat}><AppText variant="label" color={success ? "success" : "fg"} align="center">{value}</AppText><AppText variant="caption" color="muted" align="center">{label}</AppText></View>; }
 function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) { return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.pressed]}><AppText variant="caption" color={active ? "accent" : "muted"}>{label}</AppText></Pressable>; }
 function ExpenseRow({ expense }: { expense: Expense }) { return <View style={styles.expenseRow}><View style={styles.expenseIcon}><AppText variant="h3">{expense.category === "food" ? "🍽" : expense.category === "transport" ? "🚗" : expense.category === "accommodation" ? "🏨" : "🎫"}</AppText></View><View style={styles.flexOne}><AppText variant="label" numberOfLines={1}>{expense.label}</AppText><AppText variant="caption" color="muted">{formatExpenseDate(expense.occurredOn)}</AppText></View><View style={styles.amount}><AppText variant="label">{formatMoney(expense.original)}</AppText>{expense.original.currency !== expense.reference.currency ? <AppText variant="caption" color="muted">{formatMoney(expense.reference)}</AppText> : null}</View></View>; }
-function ComingSoon({ label, children }: { label: string; children: React.ReactNode }) { return <View accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={styles.futureWrap}><View pointerEvents="none" style={styles.futureContent}>{children}</View><Badge label="À venir" variant="gold" style={styles.futureBadge} /></View>; }
+function ComingSoon({ label, children }: { label: string; children: React.ReactNode }) { void label; void children; return null; }
 function BudgetLoading() { return <View style={styles.loading}><Skeleton height={spacing["2xl"]} /><Skeleton height={spacing["2xl"] * 4} /><Skeleton height={spacing["2xl"] * 5} /></View>; }
 
 const styles = StyleSheet.create({

@@ -9,6 +9,7 @@ import {
 } from "../src/bootstrap";
 import { createAppModules } from "../src/bootstrap/app-modules";
 import { DocumentsProvider } from "../src/modules/documents";
+import { PackingListProvider } from "../src/modules/packing-list/context";
 import { TripAssistantProvider } from "../src/modules/trip-assistant";
 import { TripsModuleProvider } from "../src/modules/trips";
 import { ShellNavigationGate, ShellSessionProvider } from "../src/ui";
@@ -25,18 +26,20 @@ export default function RootLayout() {
           <TripsModuleProvider module={modules.trips}>
             <TripAssistantProvider module={modules.tripAssistant}>
               <DocumentsProvider module={modules.documents}>
-                <ShellNavigationGate>
-                  <StatusBar style="dark" />
-                  <View style={styles.container}>
-                    <Stack
-                      initialRouteName="(auth)"
-                      screenOptions={{
-                        headerShown: false,
-                        contentStyle: { backgroundColor: colors.bg },
-                      }}
-                    />
-                  </View>
-                </ShellNavigationGate>
+                <PackingListProvider module={modules.packingList}>
+                  <ShellNavigationGate>
+                    <StatusBar style="dark" />
+                    <View style={styles.container}>
+                      <Stack
+                        initialRouteName="(auth)"
+                        screenOptions={{
+                          headerShown: false,
+                          contentStyle: { backgroundColor: colors.bg },
+                        }}
+                      />
+                    </View>
+                  </ShellNavigationGate>
+                </PackingListProvider>
               </DocumentsProvider>
             </TripAssistantProvider>
           </TripsModuleProvider>

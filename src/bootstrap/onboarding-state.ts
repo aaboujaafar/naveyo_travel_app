@@ -13,13 +13,13 @@ export interface OnboardingState {
 export type OnboardingEntryRoute =
   | "/(auth)/onboarding"
   | "/(auth)/sign-in"
-  | "/(app)";
+  | "/(app)/trips";
 
 export function resolveOnboardingEntryRoute(input: {
   isAuthenticated: boolean;
   hasSeenIntroduction: boolean;
 }): OnboardingEntryRoute {
-  if (input.isAuthenticated) return "/(app)";
+  if (input.isAuthenticated) return "/(app)/trips";
   return input.hasSeenIntroduction
     ? "/(auth)/sign-in"
     : "/(auth)/onboarding";

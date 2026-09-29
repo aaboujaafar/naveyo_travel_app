@@ -35,6 +35,6 @@ describe("onboarding state", () => {
   it("routes a first launch, an existing account and an active session", () => {
     expect(resolveOnboardingEntryRoute({ isAuthenticated: false, hasSeenIntroduction: false })).toBe("/(auth)/onboarding");
     expect(resolveOnboardingEntryRoute({ isAuthenticated: false, hasSeenIntroduction: true })).toBe("/(auth)/sign-in");
-    expect(resolveOnboardingEntryRoute({ isAuthenticated: true, hasSeenIntroduction: false })).toBe("/(app)");
+    expect(resolveOnboardingEntryRoute({ isAuthenticated: true, hasSeenIntroduction: false })).toBe("/(app)/trips");
   });
 });

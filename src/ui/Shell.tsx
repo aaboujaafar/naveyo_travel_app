@@ -43,7 +43,7 @@ export function ShellFrame({
   return (
     <KeyboardAvoidingView
       style={styles.frame}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={insets.top}
     >
       <ScrollView
@@ -54,8 +54,8 @@ export function ShellFrame({
             paddingBottom: Math.max(insets.bottom, spacing.lg),
           },
         ]}
-        keyboardShouldPersistTaps="always"
-        keyboardDismissMode="none"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -90,7 +90,7 @@ export function AuthFrame({
   return (
     <KeyboardAvoidingView
       style={styles.frame}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={insets.top}
     >
       <ScrollView
@@ -102,7 +102,7 @@ export function AuthFrame({
           },
         ]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="none"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>

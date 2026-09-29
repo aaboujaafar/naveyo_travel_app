@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Account } from "../modules/identity";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import type { Trip } from "../modules/trips";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
+import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
 import {
   AppText,
   Badge,
@@ -107,8 +108,6 @@ export function AccountScreen({
           <View style={styles.statsRow}>
             <ProfileStat value={`${trips.length}`} label="voyages" />
             <ProfileStat value={`${countryCount}`} label="pays" />
-            <ProfileStat value="—" label="photos · à venir" muted />
-            <ProfileStat value="—" label="km · à venir" muted />
           </View>
           <ComingSoonFrame label="Modification du profil">
             <Button variant="secondary" icon={<Icon name="settings" size={16} />} disabled onPress={() => undefined}>
@@ -125,6 +124,7 @@ export function AccountScreen({
           </View>
         ) : currentTrip ? (
           <View style={styles.activeTripCard}>
+            <Image source={destinationImageSource(currentTrip.name, currentTrip.imageUrl)} style={styles.activeTripCover} resizeMode="cover" accessibilityLabel={destinationImageLabel(currentTrip.name, currentTrip.imageUrl)} />
             <View style={styles.activeTripHeader}>
               <View style={styles.activeTripTitle}>
                 <AppText variant="h3">{currentTrip.name}</AppText>
@@ -132,19 +132,19 @@ export function AccountScreen({
               </View>
               <Badge label="Voyage privé" variant="accent" />
             </View>
-            <ProgressBar progress={0} />
+            <View style={styles.activeTripProgress}><ProgressBar progress={0} /></View>
             <View style={styles.quickLinks}>
               <QuickLink icon="home" label="Dashboard" onPress={() => onOpenTrip(currentTrip.id)} />
               <QuickLink icon="image" label="Photos" comingSoon />
               <QuickLink icon="wallet" label="Budget" onPress={() => onOpenExpenses(currentTrip.id)} />
             </View>
-            <Button
+            <View style={{ marginHorizontal: spacing.lg }}><Button
               size="sm"
               variant="secondary"
               onPress={() => onOpenTripSettings(currentTrip.id)}
             >
               Régler ce Voyage
-            </Button>
+            </Button></View>
           </View>
         ) : (
           <View style={styles.horizontalSection}>
@@ -293,15 +293,20 @@ function ProfileStat({ value, label, muted = false }: { value: string; label: st
 }
 
 function QuickLink({ icon, label, onPress, comingSoon = false }: { icon: "home" | "image" | "wallet"; label: string; onPress?: () => void; comingSoon?: boolean }) {
-  return <Pressable disabled={comingSoon || !onPress} onPress={onPress} accessibilityRole="button" accessibilityState={{ disabled: comingSoon || !onPress }} style={[styles.quickLink, comingSoon && styles.disabled]}><Icon name={icon} size={16} color={colors.fg} /><AppText variant="caption">{label}</AppText>{comingSoon ? <AppText variant="badge" color="gold">À venir</AppText> : null}</Pressable>;
+  if (comingSoon) return null;
+  return <Pressable disabled={!onPress} onPress={onPress} accessibilityRole="button" accessibilityState={{ disabled: !onPress }} style={styles.quickLink}><Icon name={icon} size={16} color={colors.fg} /><AppText variant="caption">{label}</AppText></Pressable>;
 }
 
 function ComingSoonFrame({ label, children }: { label: string; children: React.ReactNode }) {
-  return <View accessible accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={styles.comingSoonFrame}><View pointerEvents="none" style={styles.comingSoonContent}>{children}</View><Badge label="À venir" variant="gold" style={styles.comingSoonBadge} /></View>;
+  void label;
+  void children;
+  return null;
 }
 
 function ComingSoonSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <View style={styles.sectionBlock}><View style={styles.sectionHeader}><AppText variant="h3">{title}</AppText></View><ComingSoonFrame label={title}>{children}</ComingSoonFrame></View>;
+  void title;
+  void children;
+  return null;
 }
 
 function StorageRow({ name, detail, ready }: { name: string; detail: string; ready: boolean }) {
@@ -313,6 +318,7 @@ function PreferencePreview({ label, value }: { label: string; value: string }) {
 }
 
 function BottomNavItem({ icon, label, onPress, comingSoon = false, disabled = false }: { icon: "home" | "search" | "image" | "file-text" | "layers"; label: string; onPress?: () => void; comingSoon?: boolean; disabled?: boolean }) {
+  if (comingSoon) return null;
   const unavailable = disabled || comingSoon || !onPress;
   return <Pressable disabled={unavailable} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}${comingSoon ? ", à venir" : ""}`} accessibilityState={{ disabled: unavailable }} style={[styles.bottomNavItem, unavailable && styles.disabled]}><Icon name={icon} size={20} color={colors.muted} /><AppText variant="badge" color="muted">{label}</AppText>{comingSoon ? <AppText variant="badge" color="gold">À venir</AppText> : null}</Pressable>;
 }
@@ -328,10 +334,12 @@ const styles = StyleSheet.create({
   profileAvatar: { width: spacing["2xl"] * 2, height: spacing["2xl"] * 2, borderRadius: radius.full, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm, backgroundColor: colors.accent, ...shadows.accent },
   statsRow: { flexDirection: "row", justifyContent: "center", gap: spacing.lg, marginVertical: spacing.md },
   profileStat: { minWidth: spacing["2xl"], alignItems: "center", gap: spacing.xs },
-  activeTripCard: { gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },
-  activeTripHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
+  activeTripCard: { gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.lg, paddingBottom: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, overflow: "hidden", ...shadows.sm },
+  activeTripCover: { width: "100%", height: spacing["2xl"] * 3, backgroundColor: colors.tealSoft },
+  activeTripHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md, paddingHorizontal: spacing.lg },
   activeTripTitle: { flex: 1, gap: spacing.xs },
-  quickLinks: { flexDirection: "row", gap: spacing.sm },
+  activeTripProgress: { marginHorizontal: spacing.lg },
+  quickLinks: { flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg },
   quickLink: { flex: 1, minHeight: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.bg },
   sectionBlock: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
   sectionHeader: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.sm },

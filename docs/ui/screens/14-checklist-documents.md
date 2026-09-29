@@ -19,12 +19,12 @@ Une donnée extraite n'apparaît comme Réservation qu'après relecture et confi
 - ouverture d'un lieu réel dans Plans ou Waze sans inventer de coordonnées ;
 - états chargement, vide, erreur et nouvelle tentative.
 
-## Sections visibles avec « À venir »
+## Sections V0 actives
 
-- packing list indépendante ;
+- packing list collaborative ;
 - progression et compteur de préparation associés.
 
-La packing list reste visible mais désactivée, conformément à son exclusion du périmètre V0. Les Documents d'identité restent exclus de cet écran.
+La packing list est active en V0. Les Documents d'identité restent exclus de cet écran.
 
 ## Vérification
 
@@ -32,9 +32,10 @@ La packing list reste visible mais désactivée, conformément à son exclusion 
 - [x] confirmation humaine explicitement rappelée ;
 - [x] aucune donnée extraite promue automatiquement ;
 - [x] aucun Document d'identité pris en charge ;
-- [x] packing list visible, désactivée et marquée « À venir » ;
+- [x] packing list collaborative et progression de préparation ;
+- [ ] validation du partage propriétaire/éditeur sur deux iPhone ;
 - [x] états chargement, vide, erreur et désactivé ;
 - [ ] essai d'import réel depuis Mail ou Safari ;
 - [ ] comparaison visuelle et validation VoiceOver sur iPhone réel.
 
-Écart assumé : le template mêle checklist, packing et documents. La V0 conserve seulement les Documents de voyage et les Réservations confirmées comme fonctions actives.
+Écart assumé : le template mêle checklist, packing et documents. La V0 conserve les Documents de voyage, les Réservations confirmées et la packing list collaborative comme fonctions actives.

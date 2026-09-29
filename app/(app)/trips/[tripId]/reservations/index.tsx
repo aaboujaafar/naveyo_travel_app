@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Linking } from "react-native";
-import { sharedLocalReservations } from "../../../../../src/bootstrap/reservations";
+import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { PlaceReference, Reservation, UUID } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripReservationsScreen } from "../../../../../src/screens/TripReservationsScreen";
@@ -11,13 +11,14 @@ export default function ReservationsRoute() {
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
   const tripId = rawTripId as UUID | undefined;
   const trips = useTripsModule();
+  const bootstrap = useNaveyoBootstrap();
   const [tripName, setTripName] = useState("Voyage");
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!tripId) {
+    if (!tripId || !bootstrap) {
       setError("L'identifiant du Voyage est absent.");
       setLoading(false);
       return;
@@ -26,7 +27,7 @@ export default function ReservationsRoute() {
     setError(null);
     try {
       const [nextItems, trip] = await Promise.all([
-        sharedLocalReservations.list(tripId),
+        bootstrap.modules.reservations.list(tripId),
         trips?.get(tripId) ?? Promise.resolve(null),
       ]);
       setItems(nextItems);
@@ -36,7 +37,7 @@ export default function ReservationsRoute() {
     } finally {
       setLoading(false);
     }
-  }, [tripId, trips]);
+  }, [bootstrap, tripId, trips]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -63,6 +64,7 @@ export default function ReservationsRoute() {
       onBack={() => router.back()}
       onRetry={load}
       onOpenDocuments={() => router.replace(`/(app)/trips/${routeTripId}/documents`)}
+      onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
       onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
       onOpenNavigation={openNavigation}
     />

@@ -30,6 +30,7 @@ import {
   cameraPositionForRegion,
   ExpoMapsAdapter,
 } from "./expo-maps-adapter";
+import { isExpoMapsModule } from "./expo-maps-module";
 
 type ExpoMapsModule = typeof import("expo-maps");
 type AppleMapsMarker = NonNullable<
@@ -46,15 +47,6 @@ type ExpoMapsRequireResult =
   | undefined;
 
 let loadedExpoMaps: ExpoMapsModule | null | undefined;
-
-export function isExpoMapsModule(value: unknown): value is ExpoMapsModule {
-  if (value === null || typeof value !== "object") return false;
-
-  const candidate = value as {
-    AppleMaps?: { View?: unknown };
-  };
-  return candidate.AppleMaps?.View !== undefined;
-}
 
 function loadExpoMaps(): ExpoMapsModule | null {
   if (loadedExpoMaps !== undefined) return loadedExpoMaps;

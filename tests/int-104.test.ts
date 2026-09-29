@@ -23,8 +23,8 @@ describe("INT-104 import recovery", () => {
     expect(failure.message).toContain("Vérifiez la connexion");
   });
 
-  it("keeps invalid OpenCode drafts retryable and readable", () => {
-    const failure = describeAnalysisFailure(new Error("OpenCode returned an invalid reservation draft: missing title"));
+  it("keeps invalid AI drafts retryable and readable", () => {
+    const failure = describeAnalysisFailure(new Error("AI provider returned an invalid reservation draft: missing title"));
     expect(failure.isOffline).toBe(false);
     expect(failure.message).toContain("brouillon incomplet");
   });

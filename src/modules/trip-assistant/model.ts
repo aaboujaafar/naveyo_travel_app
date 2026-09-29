@@ -1,4 +1,5 @@
 import type { PlaceCandidate, UUID } from '../_shared/model'
+import type { SuggestionItineraryContext, SuggestionWeatherContext } from './interface'
 
 export interface SuggestionDraft {
   id: UUID
@@ -18,6 +19,8 @@ export interface SuggestionModelInput {
   countryCode?: string
   timeZone?: string
   preferences?: string
+  weather?: SuggestionWeatherContext[]
+  existingItinerary?: SuggestionItineraryContext[]
   candidates: PlaceCandidate[]
 }
 

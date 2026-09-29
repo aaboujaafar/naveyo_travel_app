@@ -6,23 +6,35 @@ import {
 } from "../adapters/supabase/documents";
 import { createSupabaseTripsModule } from "../adapters/supabase/trips";
 import { createSupabaseTripAssistant } from "../adapters/supabase/trip-assistant";
-import { createGeoapifyPlacesProvider } from "../adapters/geoapify";
+import { createSupabaseDayPlanner } from "../adapters/supabase/day-planner";
+import {
+  createGeoapifyPlacesProvider,
+  createGeoapifyRoutingProvider,
+} from "../adapters/geoapify";
 import { Places } from "../modules/places";
-import { InMemoryItineraryModule } from "../modules/itinerary/in-memory";
+import { createSupabaseItineraryModule } from "../adapters/supabase/itinerary";
+import { createSupabaseExpensesStore } from "../adapters/supabase/expenses";
 import { Expenses } from "../modules/expenses/module";
-import { InMemoryExpensesStore } from "../modules/expenses/store";
 import { InMemoryTripPackFileStore } from "../adapters/sqlite/in-memory-file-store";
 import { InMemoryTripPackStore } from "../adapters/sqlite/in-memory-trip-pack-store";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
-import { createAppleReservationAnalyzer } from "../adapters/apple-document-analysis";
+import {
+  createAppleDocumentTextExtractor,
+  createAppleOnDeviceReservationAnalyzer,
+  createAppleReservationAnalyzer,
+  createAppleShareInbox,
+} from "../adapters/apple-document-analysis";
+import { createRemoteDocumentAnalyzer } from "../adapters/ai-document-analysis";
 import { createReactNativeInvitationShareAdapter } from "../adapters/invitation-sharing";
 import { createInvitationSharingModule } from "../modules/invitation-sharing";
 import { sharedLocalReservations } from "./reservations";
 import { createSupabaseClient } from "./supabase";
 import { Weather } from "../modules/weather";
 import { createOpenMeteoWeatherProvider } from "../adapters/open-meteo";
+import { Routing } from "../modules/routing";
+import { createSupabasePackingListModule } from "../adapters/supabase/packing-list";
 
 export function createAppModules() {
   const client = createSupabaseClient();
@@ -31,15 +43,21 @@ export function createAppModules() {
     createReactNativeInvitationShareAdapter(),
   );
   const trips = createSupabaseTripsModule(client, () => true);
+  const packingList = createSupabasePackingListModule(client);
   const weather = new Weather(createOpenMeteoWeatherProvider());
   const tripAssistant = createSupabaseTripAssistant(client);
+  const dayPlanner = createSupabaseDayPlanner(client);
   const placesProvider = createGeoapifyPlacesProvider(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ""}/functions/v1/places`,
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ""}/functions/v1/places-search`,
     async () => (await client.auth.getSession()).data?.session?.access_token ?? null,
   );
   const places = new Places(placesProvider);
-  const itinerary = new InMemoryItineraryModule();
-  const expenses = new Expenses(new InMemoryExpensesStore(), {
+  const routing = new Routing(createGeoapifyRoutingProvider(
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ""}/functions/v1/route`,
+    async () => (await client.auth.getSession()).data?.session?.access_token ?? null,
+  ));
+  const itinerary = createSupabaseItineraryModule(client);
+  const expenses = new Expenses(createSupabaseExpensesStore(client), {
     async convert(input) {
       if (input.amount.currency !== input.targetCurrency) {
         throw new Error("Exchange rate provider is not configured for this currency");
@@ -79,13 +97,20 @@ export function createAppModules() {
     itinerary,
     places,
     tripAssistant,
+    dayPlanner,
     reservations: sharedLocalReservations,
+    reservationImportInbox: createAppleShareInbox(),
+    reservationTextExtractor: createAppleDocumentTextExtractor(),
+    reservationTextAnalyzer: createRemoteDocumentAnalyzer(client),
+    reservationOnDeviceAnalyzer: createAppleOnDeviceReservationAnalyzer(),
     reservationAnalyzer: createAppleReservationAnalyzer(),
     documents,
     expenses,
     offlineTripPack,
     tripTracking,
     weather,
+    routing,
+    packingList,
   };
 }
 

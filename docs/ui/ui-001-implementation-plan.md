@@ -31,7 +31,7 @@ Les templates restent en lecture seule. `templates/ui/design-system.md` tranche 
 | Détail d'un lieu | `06-place-detail.html` | 1:1 | Reproduction exacte, candidats réels uniquement |
 | Budget et Dépenses | `11-budget.html` | 1:1 partiel | Reproduction exacte des éléments V0, sans split ni dette |
 | Carte, itinéraire et Trace | `12-carte-itineraire.html` | 1:1 partiel | Carte/itinéraire exacts ; aucune position live de membre |
-| Documents et Réservations | `14-checklist-documents.html` | 1:1 partiel | Onglets Documents/Réservations exacts ; packing list exclue |
+| Documents, Réservations et Packing | `14-checklist-documents.html` | 1:1 partiel | Onglets Documents/Réservations/Packing ; packing list collaborative active |
 | Compte et réglages | `15-profil-settings.html` | 1:1 partiel | Sections V0 uniquement |
 | Connexion, inscription, mot de passe | aucune | manquante | Ne pas inventer ; préparer les primitives et demander une référence |
 | Liste des Voyages | aucune | manquante | Utiliser uniquement les composants approuvés après décision visuelle |

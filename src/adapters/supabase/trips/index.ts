@@ -104,6 +104,13 @@ const mapStop = (row: Row): Stop =>
     timeZone: stringField(row, "timezone"),
     startDate: stringField(row, "local_start"),
     endDate: stringField(row, "local_end"),
+    ...(typeof row.latitude === "number" && typeof row.longitude === "number"
+      ? { coordinates: { latitude: row.latitude, longitude: row.longitude } }
+      : {}),
+    ...(typeof row.address === "string" ? { address: row.address } : {}),
+    ...(typeof row.provider_place_id === "string" ? { providerPlaceId: row.provider_place_id } : {}),
+    ...(typeof row.attribution === "string" ? { attribution: row.attribution } : {}),
+    ...(typeof row.image_url === "string" ? { imageUrl: row.image_url } : {}),
   });
 
 export const createSupabaseTripsModule = (
@@ -303,7 +310,7 @@ export const createSupabaseTripsModule = (
       const data = await query(
         client
           .from("stops")
-          .select("id,trip_id,name,country_code,timezone,local_start,local_end")
+          .select("id,trip_id,name,country_code,timezone,local_start,local_end,address,provider_place_id,latitude,longitude,attribution,image_url")
           .eq("trip_id", tripId)
           .order("sort_order", { ascending: true }),
       );
@@ -320,23 +327,84 @@ export const createSupabaseTripsModule = (
         !isIanaTimeZone(input.timeZone)
       )
         throw new Error("Invalid stop name, country, dates or timezone");
+      const nextSortOrder = async () =>
+        asRows(
+          await query(client.from("stops").select("sort_order").eq("trip_id", input.tripId)),
+        ).reduce((maximum, row) => {
+          const value = row.sort_order;
+          return typeof value === "number" && Number.isInteger(value)
+            ? Math.max(maximum, value + 1)
+            : maximum;
+        }, 0);
       const id = assertStableId(createUuid());
+      const insertStop = async (sortOrder: number) =>
+        query(
+          client
+            .from("stops")
+            .insert({
+              id,
+              trip_id: input.tripId,
+              sort_order: sortOrder,
+              name: input.name.trim(),
+              country_code: input.countryCode,
+              timezone: input.timeZone,
+              local_start: input.startDate,
+              local_end: input.endDate,
+              address: input.address ?? null,
+              provider_place_id: input.providerPlaceId ?? null,
+              latitude: input.coordinates?.latitude ?? null,
+              longitude: input.coordinates?.longitude ?? null,
+              attribution: input.attribution ?? null,
+              image_url: input.imageUrl ?? null,
+            })
+            .select("id,trip_id,name,country_code,timezone,local_start,local_end,address,provider_place_id,latitude,longitude,attribution,image_url")
+            .single(),
+        );
+      let data: unknown = null;
+      // Both travellers may add an Étape at the same time: retry on the unique sort_order.
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          data = await insertStop(await nextSortOrder());
+          break;
+        } catch (error) {
+          if (attempt >= 2 || !(error instanceof Error) || !error.message.includes("[Supabase 23505]")) throw error;
+        }
+      }
+      if (!data) throw new Error("Supabase did not return the created stop");
+      return mapStop(asRow(data));
+    },
+    async updateStop(stopId: UUID, input: Partial<Omit<Stop, "id" | "tripId">>) {
+      mutationGuard(isOnline);
+      if (
+        (input.name !== undefined && input.name.trim().length === 0) ||
+        (input.countryCode !== undefined && !/^[A-Z]{2}$/.test(input.countryCode)) ||
+        (input.timeZone !== undefined && !isIanaTimeZone(input.timeZone)) ||
+        (input.startDate !== undefined && !isLocalDate(input.startDate)) ||
+        (input.endDate !== undefined && !isLocalDate(input.endDate)) ||
+        (input.startDate !== undefined && input.endDate !== undefined && input.endDate < input.startDate)
+      )
+        throw new Error("Invalid stop name, country, dates or timezone");
+      const payload: Record<string, unknown> = {};
+      if (input.name !== undefined) payload.name = input.name.trim();
+      if (input.countryCode !== undefined) payload.country_code = input.countryCode;
+      if (input.timeZone !== undefined) payload.timezone = input.timeZone;
+      if (input.startDate !== undefined) payload.local_start = input.startDate;
+      if (input.endDate !== undefined) payload.local_end = input.endDate;
+      if (input.address !== undefined) payload.address = input.address ?? null;
+      if (input.providerPlaceId !== undefined) payload.provider_place_id = input.providerPlaceId ?? null;
+      if (input.coordinates !== undefined) {
+        payload.latitude = input.coordinates?.latitude ?? null;
+        payload.longitude = input.coordinates?.longitude ?? null;
+      }
+      if (input.attribution !== undefined) payload.attribution = input.attribution ?? null;
+      if (input.imageUrl !== undefined) payload.image_url = input.imageUrl ?? null;
+      if (Object.keys(payload).length === 0) throw new Error("No stop changes provided");
       const data = await query(
-        client
-          .from("stops")
-          .insert({
-            id,
-            trip_id: input.tripId,
-            name: input.name.trim(),
-            country_code: input.countryCode,
-            timezone: input.timeZone,
-            local_start: input.startDate,
-            local_end: input.endDate,
-          })
-          .select("id,trip_id,name,country_code,timezone,local_start,local_end")
+        client.from("stops").update(payload).eq("id", stopId)
+          .select("id,trip_id,name,country_code,timezone,local_start,local_end,address,provider_place_id,latitude,longitude,attribution,image_url")
           .single(),
       );
-      if (!data) throw new Error("Supabase did not return the created stop");
+      if (!data) throw new Error("Supabase did not return the updated stop");
       return mapStop(asRow(data));
     },
   };

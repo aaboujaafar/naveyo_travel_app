@@ -45,7 +45,7 @@ export function BottomSheet({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.wrapper}
         >
           <Pressable
@@ -62,6 +62,8 @@ export function BottomSheet({
             <ScrollView
               bounces={false}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               contentContainerStyle={styles.content}
             >
               {children}

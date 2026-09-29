@@ -19,6 +19,8 @@ Le centre reprend la hiérarchie chaleureuse du template Checklist & Documents :
 - consentement explicite avant l’envoi du texte extrait à OpenCode Go via l’Edge Function Supabase de Naveyo ;
 - production d’un `ReservationDraft`, recherche de doublon et gestion des états chargement, erreur et hors ligne ;
 - confirmation manuelle de chaque champ persisté : toutes les cases sont décochées par défaut et l’enregistrement reste désactivé tant que chaque valeur n’a pas été relue ;
+- pour chaque adresse détectée, Geoapify propose des candidats de lieu, départ ou arrivée ; la sélection reste humaine et une adresse peut rester non géolocalisée ;
+- les coordonnées, identifiants fournisseur et attributions ne sont persistés qu’après confirmation de la Réservation ;
 - conservation du fuseau IANA à côté des dates locales ;
 - persistance uniquement après confirmation humaine, puis navigation vers les Réservations du Voyage.
 
@@ -28,9 +30,11 @@ Une URL authentifiée n’est pas scrapée. Le document original n’est pas env
 
 Les blocs suivants restent visibles, désactivés et marqués « À venir » :
 
-- checklist et packing list ;
+- checklist avancée et progression globale de préparation ;
 - comparateurs et réservations intégrées pour vols, hôtels, voitures ou activités ;
 - eSIM, liens partenaires et configuration APN.
+
+La packing list collaborative est désormais une fonctionnalité V0 et sera accessible depuis l'écran dédié du Voyage ; elle n'est pas incluse dans le parcours d'import.
 
 Les passeports, visas et documents d’identité montrés dans la référence Checklist ne sont pas reproduits, car ils sont explicitement exclus du périmètre et introduiraient des données particulièrement sensibles.
 

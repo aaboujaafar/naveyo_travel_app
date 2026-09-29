@@ -26,5 +26,5 @@ export default function TripsIndexScreen() {
   }, [bootstrap]);
 
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
-  return <TripsListScreen items={items} packs={packs} loading={loading} error={error} onRetry={load} onCreate={() => router.push("/(app)/trips/new")} onOpenTrip={(trip) => router.push(`/(app)/trips/${trip.id}`)} />;
+  return <TripsListScreen items={items} packs={packs} loading={loading} error={error} onRetry={load} onCreate={() => router.push("/(app)/trips/new")} onOpenTrip={(trip) => router.push(`/(app)/trips/${trip.id}`)} onOpenAccount={() => router.push("/(app)/account")} onOpenImports={() => router.push("/(app)/imports")} onJoinTrip={() => router.push("/(app)/invite")} />;
 }

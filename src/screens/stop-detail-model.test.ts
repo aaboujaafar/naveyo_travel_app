@@ -141,6 +141,13 @@ describe("stop detail model", () => {
       points: [],
     });
   });
+
+  it("uses the confirmed Étape coordinate as a map anchor", () => {
+    const geocodedStop = { ...stop, coordinates: { latitude: 38.7223, longitude: -9.1393 } };
+    expect(buildStopMapModel([], geocodedStop)).toEqual({
+      points: [{ id: "stop-stop-1", label: "Lisbonne", coordinates: geocodedStop.coordinates }],
+    });
+  });
 });
 
 function item(id: string, stopId: string, date: string, local: string): ItineraryItem {

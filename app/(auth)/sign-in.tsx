@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import {
   AuthFrame,
   Button,
@@ -36,12 +36,12 @@ export default function SignInScreen() {
   return (
     <AuthFrame
       title="Connexion"
-      subtitle="Accédez à votre voyage privé ou passez au shell authentifié."
+      subtitle="Retrouvez vos Voyages et toutes les informations utiles."
     >
       <View style={styles.branding}>
-        <Text style={styles.brand}>Naveyo</Text>
+        <Text style={styles.brand}>Bon retour</Text>
         <Text style={styles.tagline}>
-          Préparation et consultation de voyage pour deux adultes.
+          Connectez-vous à votre espace de voyage privé.
         </Text>
       </View>
 
@@ -88,19 +88,10 @@ export default function SignInScreen() {
         >
           Créer un compte
         </Button>
-        <Pressable
-          onPress={() => router.push("/(auth)/forgot-password")}
-          accessibilityRole="link"
-          accessibilityLabel="Mot de passe oublié"
-          hitSlop={8}
-        >
-          <Text style={styles.link}>Mot de passe oublié ?</Text>
-        </Pressable>
       </View>
 
       <ScreenNote>
-        La connexion utilise Supabase Auth et conserve la session dans le
-        stockage sécurisé de l’iPhone.
+        Votre session reste privée et protégée sur cet appareil.
       </ScreenNote>
     </AuthFrame>
   );
@@ -123,10 +114,5 @@ const styles = StyleSheet.create({
   },
   secondaryActions: {
     gap: spacing.sm,
-  },
-  link: {
-    ...typography.label,
-    color: colors.accent,
-    textAlign: "center",
   },
 });

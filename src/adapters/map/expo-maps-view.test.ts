@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isExpoMapsModule } from "./expo-maps-view";
+import { isExpoMapsModule } from "./expo-maps-module";
 
 describe("expo-maps runtime module detection", () => {
   it("accepts the forwardRef object exported by AppleMaps.View", () => {

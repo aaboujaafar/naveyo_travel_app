@@ -2,6 +2,12 @@
 
 Date de cadrage : 28 juillet 2026.
 
+## Décision géographique — 13 août 2026
+
+Geoapify est retenu côté serveur pour l’autocomplete, le géocodage, le géocodage inverse et les points d’intérêt. MapKit reste l’Adapter d’affichage et de navigation. Le nom du Voyage reste indépendant de ses Étapes. Une Étape peut être créée ou modifiée à partir d’une ville sélectionnée, d’une épingle manuelle ou d’une position utilisée explicitement ; la Trace GPS n’est jamais géocodée automatiquement.
+
+L’ancien `PLS-001` est décomposé en `GEO-001` à `GEO-007`, détaillés dans [`docs/tasks/geo-001-to-geo-007.md`](docs/tasks/geo-001-to-geo-007.md) et cadrés par [`docs/adr/0002-geoapify-geocoding-and-places.md`](docs/adr/0002-geoapify-geocoding-and-places.md).
+
 Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au début de septembre 2026.
 
 ## Intégration et audit de la vague 4 — 9 août 2026
@@ -17,7 +23,7 @@ Objectif : une alpha privée utilisable par deux adultes sur de vrais iPhone au 
 - Correction de parsing : les champs optionnels `null` issus du pont natif sont traités comme absents. Une réponse OpenCode partiellement entourée de Markdown ou renvoyée en blocs texte est normalisée avant validation.
 - Validation locale après correction : `pnpm verify` passe avec 73 tests. La validation native finale exige encore une installation et un partage réel depuis Mail/Fichiers/Photos.
 - Décision utilisateur du 10 août 2026 : `DOC-001` est réactivé avec une timebox de 8 h. Chaque Document de voyage peut être associé à zéro ou une Étape, déplacé ultérieurement et rester visible sous « Non classés ». Lorsqu'il est lié à une Réservation, il utilise la même Étape que celle-ci. `DOC-001` redevient une dépendance de l'intégration avant `QA-001` et `REL-001`.
-- Décision utilisateur du 10 août 2026 : une vague UI dédiée est ajoutée après `INT-001` et avant la QA. `UI-001` appliquera sans interprétation libre le dossier template qui sera désigné par l'utilisateur. La tâche reste `BLOCKED` jusqu'à la fourniture de ce chemin et à l'inventaire complet de la spécification, des maquettes HTML, de la bibliothèque de composants, des icônes et des styles.
+- Décision utilisateur du 10 août 2026 : une vague UI dédiée est ajoutée après `INT-001` et avant la QA. Le chemin `templates/ui/` et son inventaire ont depuis été fournis ; l’état courant de `UI-001` est `IN_PROGRESS`, avec les validations visuelles et appareil encore ouvertes.
 
 ## Mode d'emploi
 
@@ -44,8 +50,16 @@ Chaque tâche possède sa branche. Les agents y créent de petits commits locaux
 | SPI-002 | `spi-002-share-extension-spike` |
 | BCK-001 | `bck-001-supabase-foundation` |
 | TRP-001 | `trp-001-trips-stops` |
+| PCK-101 | `pck-101-packing-list` |
 | OFF-001 | `off-001-trip-pack` |
 | PLS-001 | `pls-001-places` |
+| GEO-001 | `geo-001-domain-geo-contracts` |
+| GEO-002 | `geo-002-geoapify-gateway` |
+| GEO-003 | `geo-003-stop-location-ux` |
+| GEO-004 | `geo-004-nearby-places-explore` |
+| GEO-005 | `geo-005-reverse-geocoding-imports` |
+| GEO-006 | `geo-006-itinerary-map-integration` |
+| GEO-007 | `geo-007-offline-attribution-qa` |
 | ITN-001 | `itn-001-itinerary-map` |
 | AI-001 | `ai-001-trip-assistant` |
 | EXP-001 | `exp-001-expenses` |
@@ -117,17 +131,23 @@ flowchart TD
 
     ARC --> BCK["BCK-001 Supabase et RLS"]
     ARC --> OFF["OFF-001 TripPack"]
-    ARC --> PLS["PLS-001 Lieux"]
+    ARC --> GEO1["GEO-001 Contrats géographiques"]
+    BCK --> GEO1
+    GEO1 --> GEO2["GEO-002 Gateway Geoapify"]
+    GEO2 --> GEO3["GEO-003 Étape et position"]
+    GEO2 --> GEO4["GEO-004 POI et Explorer"]
+    GEO2 --> GEO5["GEO-005 Reverse et imports"]
     ARC --> ITN["ITN-001 Itinéraire et carte"]
     ARC --> EXP["EXP-001 Dépenses"]
 
     BCK --> TRP["TRP-001 Voyage et Étapes"]
     MOB --> TRP
-    MOB --> PLS
+    MOB --> GEO3
+    MOB --> GEO4
     MOB --> ITN
     MOB --> EXP
 
-    PLS --> AI["AI-001 Suggestions IA"]
+    GEO4 --> AI["AI-001 Suggestions IA"]
     SGPS --> GPS
     BCK --> GPS
     GPS --> AGPS["GPS-002 Tracking adaptatif"]
@@ -136,17 +156,23 @@ flowchart TD
     BCK --> DOC["DOC-001 Documents privés"]
     TRP --> DOC
     SSHARE --> OCR["OCR-001 Analyse locale"]
-    PLS --> OCR
+    GEO5 --> OCR
 
     TRP --> INT["INT-001 Intégration"]
     OFF --> INT
-    PLS --> INT
+    GEO3 --> GEO6["GEO-006 Cartes et itinéraire"]
+    GEO4 --> GEO6
+    GEO5 --> GEO6
+    GEO6 --> GEO7["GEO-007 Offline et QA géographique"]
+    GEO7 --> INT
     ITN --> INT
     AI --> INT
+    AI --> AI101["AI-101 Journée complète"]
     EXP --> INT
     AGPS --> INT
     RSV --> INT
     DOC --> INT
+    TRP --> PCK["PCK-101 Packing list"]
     OCR -. "si inclus" .-> INT
 
     INT --> UI["UI-001 Conformité au template"]
@@ -156,16 +182,23 @@ flowchart TD
 
 `INT-001` peut accepter `GPS-001 = CUT` si le fallback est explicitement validé. Il peut également accepter `OCR-001 = CUT` grâce à la validation manuelle de `RSV-001`.
 
+Les fonctionnalités suivantes sont ajoutées au périmètre V0 :
+
+- `AI-101` — Composer automatiquement une journée complète (`AI-001`, `ITN-001`) — 6–8 h.
+- `PCK-101` — Packing list collaborative (`TRP-001`) — 6–8 h.
+
+Elles doivent être intégrées à `INT-001`, puis couvertes par `UI-001`, `QA-001` et `REL-001`.
+
 ## Vagues parallèles
 
 Avec trois agents de réalisation au maximum :
 
 1. Vague 0 : `FND-001` ; `DEC-001` en parallèle côté coordinateur/utilisateur.
 2. Vague 1 : `ARC-001`, `MOB-001`, `SPI-001`; lancer `SPI-002` dès qu'un slot se libère.
-3. Vague 2 : `BCK-001`, `PLS-001`, `ITN-001`; puis `OFF-001` et `EXP-001`.
-4. Vague 3 : `TRP-001`, `AI-001`, `GPS-001` si son gate passe.
-5. Vague 4 : `RSV-001`, `DOC-001`, `OCR-001` si conservé.
-6. Vague 5 : réactiver `DOC-001`, réaliser `GPS-002`, puis poursuivre `INT-001` (intégration fonctionnelle et stabilisation appareil).
+3. Vague 2 : `BCK-001`, `GEO-001`, `ITN-001`; puis `OFF-001` et `EXP-001`.
+4. Vague 3 : `TRP-001`, `GEO-002`, `GPS-001` si son gate passe.
+5. Vague 4 : `GEO-003`, `GEO-004`, `RSV-001`, `DOC-001`.
+6. Vague 5 : `GEO-005`, `GEO-006`, `OCR-001` si conservé, puis `GEO-007` et `INT-001`.
 7. Vague 6 : `UI-001` (application stricte du dossier template après stabilisation fonctionnelle).
 8. Vague 7 : `QA-001`, puis `REL-001`.
 
@@ -196,7 +229,7 @@ Constats transverses à corriger avant clôture :
 - les validations des manifestes, des limites d'import, des URLs, de l'UTC, des devises, des taux et de l'idempotence sont maintenant couvertes localement ;
 - la validation native sur iPhone reste absente pour le GPS, la Share Extension et l'accessibilité.
 
-La vague 2 est maintenant engagée avec `BCK-001` et `OFF-001`. `TRP-001`, `PLS-001`, `ITN-001` et `EXP-001` peuvent être planifiées sur ces bases, sous réserve de conserver les validations appareil pour la clôture. `GPS-001` reste en attente d'un résultat `SPI-001 = GO` explicite.
+La vague 2 est maintenant engagée avec `BCK-001` et `OFF-001`. `TRP-001`, `GEO-001`, `ITN-001` et `EXP-001` peuvent être planifiées sur ces bases, sous réserve de conserver les validations appareil pour la clôture. `GPS-001` reste en attente d'un résultat `SPI-001 = GO` explicite.
 
 ## Validation standard
 
@@ -233,19 +266,37 @@ Ne jamais inventer une commande absente de `package.json`. Si un script spécial
 | BCK-001 | P0 | IN_PROGRESS | 7 h | ARC-001 | `supabase/` fondation, schéma, RLS |
 | TRP-001 | P0 | DONE | 6 h | ARC-001, BCK-001, MOB-001 | identity/trips et routes associées |
 | OFF-001 | P0 | IN_PROGRESS | 5 h | ARC-001 | offline-trip-pack et SQLite |
-| PLS-001 | P0 | TODO | 6 h | ARC-001, MOB-001 | places, Geoapify, fonction dédiée |
-| ITN-001 | P0 | TODO | 7 h | ARC-001, MOB-001 | itinerary, MapKit et routes |
-| AI-001 | P0 | DONE | 8 h | BCK-001, PLS-001 | trip-assistant et Edge Function |
+| PLS-001 | P0 | CUT | 6 h | ARC-001, MOB-001 | décomposée en GEO-001 à GEO-007 |
+| GEO-001 | P0 | IN_PROGRESS | 4 h | ARC-001, BCK-001 | contrats domaine, persistence et validation géographique |
+| GEO-002 | P0 | IN_PROGRESS | 6 h | GEO-001 | Edge Function, Adapter Geoapify et quotas |
+| GEO-003 | P0 | IN_PROGRESS | 6 h | GEO-001, GEO-002, TRP-001, MOB-001 | création/édition Étape et sélecteur de position |
+| GEO-004 | P0 | IN_PROGRESS | 6 h | GEO-001, GEO-002 | POI proches, Explorer et détail lieu |
+| GEO-005 | P0 | IN_PROGRESS | 5 h | GEO-002, RSV-001 | reverse geocoding, épingle et imports |
+| GEO-006 | P0 | IN_PROGRESS | 5 h | GEO-003, GEO-004, GEO-005, ITN-001 | cartes, itinéraire, dashboard et adresses |
+| GEO-007 | P0 | IN_PROGRESS | 4 h | GEO-001 à GEO-006, OFF-001 | cache, attribution, quotas et appareil |
+| ITN-001 | P0 | IN_PROGRESS | 7 h | ARC-001, MOB-001 | itinerary, MapKit et routes |
+| AI-001 | P0 | DONE | 8 h | BCK-001, GEO-004 | trip-assistant et Edge Function |
+| AI-101 | P0 | IN_PROGRESS | 6–8 h | AI-001, ITN-001 | composition automatique d'une journée |
 | EXP-001 | P0 | TODO | 4 h | ARC-001, BCK-001, MOB-001 | expenses et routes |
+| PCK-101 | P0 | IN_PROGRESS | 6–8 h | TRP-001 | packing list collaborative |
 | GPS-001 | P0-Gate | DONE | 14 h | DEC-001, SPI-001, BCK-001 | trip-tracking, Adapter et ingestion |
 | GPS-002 | P0-Gate | BLOCKED | 6 h | GPS-001 | classification du mouvement et échantillonnage adaptatif |
 | RSV-001 | P0 | IN_PROGRESS | 7 h | ARC-001, BCK-001, MOB-001, SPI-002 | reservations et partage entrant |
 | DOC-001 | P0 | IN_PROGRESS | 8 h | ARC-001, BCK-001, TRP-001 | documents, fichiers, association aux Étapes et Storage |
-| OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, PLS-001 | Module Swift et extraction texte locale |
+| OCR-001 | P0-Stretch | IN_PROGRESS | 8 h | ARC-001, SPI-002, GEO-005 | Module Swift et extraction texte locale |
 | INT-001 | P0 | IN_PROGRESS | 7 h | DOC-001, fonctionnalités retenues, validations wave 4 | composition et tests d'intégration |
-| UI-001 | P0 | BLOCKED | À estimer | INT-001, dossier template fourni | écrans, `src/ui/`, thème et assets visuels |
+| UI-001 | P0 | IN_PROGRESS | 39 h estimées | INT-001, dossier template fourni | écrans, `src/ui/`, thème et assets visuels |
 | QA-001 | P0 | TODO | 8 h | UI-001 | tests E2E, sécurité et rapport |
 | REL-001 | P0 | TODO | 3 h | DEC-001, QA-001 | build TestFlight et runbook |
+
+## État de preuve au 31 août 2026
+
+- Implémenté localement : les modules et parcours présents dans le worktree pour Geoapify/Places, localisation d’Étape, résolution humaine des lieux de Réservation, itinéraire/routage, Packing list, Documents, assistant IA et composition UI ; les nouveaux modules sont composés par `src/bootstrap/app-modules.ts`.
+- Tests locaux : `pnpm verify` passe ; 64 fichiers de tests et 285 tests passent. ESLint ne signale plus que l’avertissement généré par `.expo/types/router.d.ts`.
+- Supabase restant : migrations `GEO-001`, `PCK-101` et destination images non exécutées ici ; les tests pgTAP/RLS et la vérification sur une instance Supabase réelle restent à faire.
+- Réseau réel restant : aucune validation n’est consignée contre Geoapify, Open-Meteo, les Edge Functions, l’analyse IA distante ou les quotas/erreurs d’un projet Supabase réel.
+- iPhone restant : aucune capture comparative 390/430 px, validation VoiceOver, permission/localisation, Share Extension, mode avion ou parcours sur les deux iPhone n’est consignée dans cette consolidation.
+- QA et release : `QA-001` et `REL-001` ne sont pas commencées ; aucune validation TestFlight n’a été effectuée.
 
 ## Tâches détaillées
 
@@ -446,6 +497,34 @@ Acceptation :
 
 Validation utilisateur : parcours Voyage, Étapes, membres/invitation et contrôle sur iPhone réel validés le 8 août 2026.
 
+### PCK-101 — Packing list collaborative
+
+- Priorité : `P0`
+- État : `IN_PROGRESS`
+- Timebox : 6–8 h
+- Dépendances : `TRP-001`
+- Possède : `src/modules/packing-list/**`, `src/adapters/supabase/packing-list/**`, route et écran Packing, migration `packing_items`
+
+Livrables :
+
+- liste partagée au niveau du Voyage, modifiable par le propriétaire et l'éditeur ;
+- ajout, préparation, réouverture et suppression d'un élément ;
+- catégories, quantité et association facultative à une Étape ;
+- progression, filtres et tri stable ;
+- persistance Supabase sécurisée par RLS ;
+- accès depuis le tableau de bord et les onglets Documents/Réservations/Packing.
+
+Acceptation :
+
+- propriétaire et éditeur voient les mêmes éléments après actualisation ;
+- un compte extérieur ne peut ni lire ni modifier la liste ;
+- une Étape associée appartient au même Voyage et un assigné éventuel est membre du Voyage ;
+- les mutations échouent proprement hors connexion sans perdre la dernière liste affichée ;
+- tests métier, Adapter et modèle d'écran passent ;
+- tests RLS et parcours réel sur les deux iPhone sont consignés.
+
+Audit du 17 août 2026 : Module, Adapter Supabase, migration/RLS, écran, route et navigation sont intégrés localement. Les tests Vitest ciblés passent. Il reste à exécuter la migration et les tests pgTAP, puis à valider la collaboration sur les deux comptes/iPhone avant passage à `DONE`.
+
 ### OFF-001 — TripPack SQLite atomique
 
 - Priorité : `P0`
@@ -469,33 +548,84 @@ Acceptation :
 
 Audit du 4 août 2026 : le module, le seam SQLite, les fakes, le staging/activation atomique et six tests sont intégrés dans le commit `6edddb0`; `pnpm verify` passe avec 28 tests. L'adaptateur réel `expo-sqlite` n'est pas installé et doit être ajouté par le propriétaire du lockfile avant validation sur appareil. La tâche reste `IN_PROGRESS`.
 
-### PLS-001 — Recherche et résolution de lieux
+### PLS-001 — Recherche et résolution de lieux (décomposée)
 
 - Priorité : `P0`
-- État : `TODO (STANDBY — décision utilisateur du 9 août 2026)`
-- Timebox : 6 h
-- Dépendances : `ARC-001`, `MOB-001`
-- Possède : implementation `places`, `src/adapters/geoapify/**`, `supabase/functions/places-search/**`, `app/(app)/places/**`
+- État : `CUT`
+- Remplacement : `GEO-001` à `GEO-007`
+- Référence détaillée : [`docs/tasks/geo-001-to-geo-007.md`](docs/tasks/geo-001-to-geo-007.md)
 
-Livrables :
+Le contrat initial était trop large pour être livré et vérifié comme une seule tâche. Les sous-tâches séparent désormais les contrats et migrations, le gateway Geoapify, la création/édition d’Étape, les POI, le reverse geocoding, l’intégration carte et la validation offline/appareil.
 
-- autocomplete, recherche proche d'une Étape et résolution par identifiant ;
-- clé Geoapify uniquement côté serveur ;
-- normalisation de `PlaceCandidate` et conservation des attributions ;
-- biais par pays, Étape et type de lieu ;
-- fallback épingle/lieu manuel.
+### GEO-001 — Contrats domaine et persistance géographique
 
-Acceptation :
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 4 h
+- Dépendances : `ARC-001`, `BCK-001`
+- Possède : contrats partagés, Module Places, migrations places/stops, fixtures et tests.
+- Acceptation : anciennes Étapes lisibles sans coordonnées, coordonnées validées, attribution conservée, aucun type fournisseur dans les interfaces métier.
 
-- réponses externes validées avant usage ;
-- résultats stockables hors ligne avec attribution ;
-- erreurs, quota et timeout visibles sans bloquer l'itinéraire ;
-- aéroports et lieux maritimes couverts par des fixtures.
+### GEO-002 — Gateway serveur Geoapify
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 6 h
+- Dépendances : `GEO-001`
+- Possède : Edge Function `places-search`, Adapter Geoapify et tests de contrat.
+- Acceptation : autocomplete, forward/reverse, Places API et Place Details derrière authentification Voyage; clé serveur, timeout/quota, réponses invalides et absence réseau traités.
+
+### GEO-003 — Création et édition d’une Étape
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 6 h
+- Dépendances : `GEO-001`, `GEO-002`, `TRP-001`, `MOB-001`
+- Possède : Nouvelle Étape, édition depuis le détail, sélecteur de position et tests UI.
+- Acceptation : sélection de suggestion obligatoire, pays/fuseau préremplis, épingle et position actuelle explicite, confirmation avant remplacement, dates/heures locales conservées.
+
+### GEO-004 — POI proches, Explorer et détail lieu
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 6 h
+- Dépendances : `GEO-001`, `GEO-002`
+- Possède : Explorer, catégories/rayons, liste/carte, détail lieu et ajout confirmé à l’itinéraire.
+- Acceptation : candidats réels seulement, distance/attribution affichées, maximum 20 résultats, aucune mutation automatique.
+
+### GEO-005 — Reverse geocoding et imports
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 5 h
+- Dépendances : `GEO-002`, `RSV-001`, `OCR-001` si conservé
+- Possède : résolution des adresses de réservation, épingle partagée et choix humain lieu/départ/arrivée.
+- Acceptation : aucune adresse détectée automatiquement confirmée, possibilité de rester non géolocalisé, attribution persistée.
+
+### GEO-006 — Cartes, itinéraire et adresses du Voyage
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 5 h
+- Dépendances : `GEO-003`, `GEO-004`, `GEO-005`, `ITN-001`
+- Possède : dashboard, détail Étape, carte itinéraire, onglet Adresses et tests de présentation.
+- Acceptation : seuls les lieux confirmés apparaissent sur la carte; aucun appel fournisseur dans l’écran; état dégradé et Plans/Waze fonctionnels.
+
+### GEO-007 — Offline, attribution, quotas et appareil
+
+- Priorité : `P0` · État : `IN_PROGRESS` · Timebox : 4 h
+- Dépendances : `GEO-001` à `GEO-006`, `OFF-001`
+- Possède : TripPack, cache des lieux, attribution, métriques de crédits et matrice iPhone.
+- Acceptation : lieux confirmés consultables en mode avion, secrets absents du bundle, attributions visibles, recherche désactivée proprement hors ligne.
+
+### Audit de réalisation GEO — 13 août 2026
+
+- `GEO-001` : contrats `Stop`/`PlaceCandidate`, validation, opérations Places et migration de localisation des Étapes implémentés.
+- `GEO-002` : gateway Geoapify étendu à autocomplete, reverse, nearby et Place Details avec authentification, validation, timeout, quota et cache court.
+- `GEO-003` : formulaire partagé de création/édition d’Étape, debounce 350 ms, sélection explicite, position actuelle avec permission et route d’édition implémentés.
+- `GEO-004` : Explorer utilise les POI proches par catégorie/rayon, affiche liste/carte, distance et attribution, puis conserve la confirmation d’ajout à l’itinéraire.
+- `GEO-005` : résolution humaine des lieux/départs/arrivées d’un import, reverse geocoding et option explicite « laisser non géolocalisé » implémentés.
+- `GEO-004` et `GEO-005` restent `IN_PROGRESS` jusqu’à l’exécution de la suite Vitest et à la validation appareil du parcours réseau/permission.
+- `GEO-006` : dashboard, détail d’Étape et carte globale incluent les ancres d’Étapes géocodées, les POI confirmés et l’onglet Adresses dédupliqué.
+- `GEO-006` reste `IN_PROGRESS` jusqu’à la suite Vitest et la validation visuelle/appareil.
+- `GEO-007` : attribution Geoapify/OpenStreetMap centralisée et affichée sur les détails et résultats ; l’état offline existant est conservé.
+- `GEO-007` reste `IN_PROGRESS` pour la désactivation réseau explicite, les métriques de quota et la validation iPhone.
+- `TripsModule` Supabase persiste et relit désormais coordonnées, adresse, identifiant fournisseur et attribution des Étapes.
+- Audit de consolidation du 31 août 2026 : `pnpm verify` passe avec 64 fichiers de tests et 285 tests. ESLint conserve un seul avertissement provenant du fichier généré `.expo/types/router.d.ts`; aucun avertissement du code source n’est restant.
+- Les migrations et tests pgTAP Supabase, les appels réseau réels, les captures 390/430 px, VoiceOver et les deux iPhone restent non validés.
 
 ### ITN-001 — Itinéraire local et carte
 
 - Priorité : `P0`
-- État : `TODO`
+- État : `IN_PROGRESS`
 - Timebox : 7 h
 - Dépendances : `ARC-001`, `MOB-001`
 - Possède : implementation `itinerary`, Adapter carte, `app/(app)/trips/[tripId]/itinerary/**`
@@ -520,7 +650,7 @@ Acceptation :
 - Priorité : `P0`
 - État : `DONE`
 - Timebox : 8 h
-- Dépendances : `BCK-001`, `PLS-001`
+- Dépendances : `BCK-001`, `GEO-004`
 - Possède : implementation `trip-assistant`, `supabase/functions/trip-assistant/**`, `app/(app)/trips/[tripId]/assistant/**`
 
 Livrables :
@@ -539,6 +669,38 @@ Acceptation :
 - tests de refus, timeout, sortie invalide et identifiant inconnu.
 
 Validation : écran intégré, sortie limitée aux candidats fournis, brouillons persistés dans Supabase, quota quotidien serveur et aucune mutation automatique de l’itinéraire ; 5 tests métier dédiés passent.
+
+### AI-101 — Composition automatique d’une journée
+
+- Priorité : `P0`
+- État : `IN_PROGRESS`
+- Timebox : 6–8 h
+- Dépendances : `AI-001`, `ITN-001`
+- Possède : `src/modules/day-planner/**`, `src/adapters/supabase/day-planner/**`, `supabase/functions/day-plan/**` et la section journée de l’Assistant
+
+Livrables :
+
+- choix d’une date appartenant à l’Étape ;
+- composition d’un brouillon de huit activités maximum à partir de lieux vérifiés ;
+- prise en compte de la météo et des éléments déjà confirmés ce jour-là ;
+- heures locales, durées et raisons validées avant affichage ;
+- confirmation humaine obligatoire avant ajout à l’itinéraire ;
+- refus des lieux absents, doublons, dates, heures et durées invalides.
+
+Acceptation :
+
+- aucun lieu, horaire d’ouverture, prix ou temps de trajet inventé ;
+- aucune mutation de l’itinéraire pendant la composition ;
+- une date hors de l’Étape et un candidat inconnu sont refusés ;
+- un brouillon vide reste affichable mais ne peut pas être confirmé ;
+- tests domaine, Adapter et modèle d’écran passent ;
+- composition réelle et confirmation durable validées sur iPhone.
+
+Audit du 17 août 2026 : Module, Adapter Supabase, Edge Function, section UI et câblage du parcours sont intégrés localement. `pnpm typecheck` passe, le lint ne contient aucune erreur et les 14 tests AI-101 ciblés passent. La tâche reste `IN_PROGRESS` jusqu’au déploiement/test réel de l’Edge Function et jusqu’à la persistance de l’itinéraire fournie par `ITN-001` ; le Module actuellement composé en production est encore en mémoire.
+
+Lot 1 du 19 août 2026 : la composition expose désormais des préférences typées et validées de bout en bout — mobilité et rayon 5/10 km, thèmes, budget, rythme, enfants, accessibilité, intérieur/extérieur, régimes alimentaires et plage horaire. Toute modification invalide le brouillon et son pool de candidats. La recherche multi-fournisseurs côté Edge Function reste réservée au lot 2 ; les candidats Geoapify éphémères sont conservés jusque-là pour éviter une régression du parcours existant.
+
+Lot 2 du 19 août 2026 : le parcours mobile ne recherche plus de lieux pendant la composition et n’envoie plus de candidats au serveur. L’Edge Function est désormais la source du pool de candidats et renvoie les candidats éphémères du brouillon pour que la confirmation utilise exactement les lieux sélectionnés par le serveur. La recherche mobile de `discover()` reste indépendante pour l’exploration. Le module Google Places/Geoapify, la déduplication et le fallback sont déployés avec `--use-api` ; le smoke test HTTP confirme que la fonction est active et protégée. L’activation Google Places reste conditionnelle à `GOOGLE_PLACES_API_KEY` et à un test réel authentifié. Sans ce secret, Geoapify est le fournisseur actif ; aucune activation Google n’est déclarée.
 
 ### EXP-001 — Budget global et Dépenses réelles
 
@@ -694,7 +856,7 @@ Validation supplémentaire : tests du Module Documents et du parcours d'import, 
 - Priorité : `P0-Stretch`
 - État : `IN_PROGRESS`
 - Timebox : 8 h
-- Dépendances : `ARC-001`, `SPI-002`, `PLS-001`
+- Dépendances : `ARC-001`, `SPI-002`, `GEO-005`
 - Possède : `modules/naveyo-documents/**`, `src/adapters/apple-document-analysis/**`, tests et fixtures OCR
 
 Livrables :
@@ -734,6 +896,7 @@ Lots de travail de la vague 5 :
 | INT-104 | Vérifier les états de démarrage et de dégradation | Démarrage en ligne, démarrage sans réseau avec données déjà chargées, erreur OpenCode lisible et réessayable |
 | INT-105 | Ajouter les tests d'intégration des parcours retenus | Fakes aux Seams externes, doublons d'import couverts, permissions et compte extérieur couverts |
 | INT-106 | Intégrer l'association Document–Étape au détail d'une Étape et au parcours d'import | Choix de l'Étape à l'import, confirmation humaine, Document visible dans l'Étape, déplacement vers une autre Étape et visibilité sur le second iPhone |
+| INT-107 | Intégrer la packing list collaborative | Ajout par le propriétaire, préparation par l'éditeur, progression identique après actualisation et refus du compte extérieur |
 
 Contraintes de la vague 5 :
 
@@ -751,6 +914,7 @@ Livrables :
 - parcours Dépense ;
 - parcours partage → Réservation → Document hors ligne ;
 - parcours GPS si conservé ;
+- parcours Packing propriétaire → éditeur ;
 - utilisation depuis le second compte.
 
 Acceptation :
@@ -899,10 +1063,8 @@ Le coordinateur met ensuite à jour l'état, les dépendances débloquées et le
 
 | ID | Tâche | Dépendances | Estimation |
 |---|---|---|---:|
-| AI-101 | Composer automatiquement une journée complète | AI-001, ITN-001 | 6–8 h |
 | OCR-101 | Fallback IA sur texte OCR ambigu, avec consentement | OCR-001, AI-001 | 6–8 h |
 | RSV-101 | Import par adresse email dédiée | RSV-001, DOC-001 | 20–30 h |
-| PCK-101 | Packing list collaborative | TRP-001 | 6–8 h |
 | OFF-101 | Mutations offline générales et résolution de conflits | OFF-001 | 14–20 h |
 | GPS-101 | Deux enregistreurs et fusion de traces | GPS-001 | 8–12 h |
 | IAM-101 | Rôles et permissions configurables | TRP-001 | 8–12 h |

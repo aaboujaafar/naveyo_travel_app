@@ -37,6 +37,7 @@ import {
   formatPlaceSource,
   type PlaceScheduleDate,
 } from "./place-detail-model";
+import { placeAttribution } from "../modules/places";
 
 export interface PlaceDetailScreenProps {
   place: PlaceCandidate | null;
@@ -48,6 +49,8 @@ export interface PlaceDetailScreenProps {
   onRetry: () => Promise<void>;
   onOpenMap: () => void;
   onOpenDirections: () => void;
+  onOpenWaze?: () => void;
+  onOpenPhotoCredit?: () => void;
   onAddToItinerary: (selection: PlaceScheduleDate) => Promise<void>;
 }
 
@@ -106,7 +109,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
     props.scheduleDates[0] ?? null,
   );
   const [toast, setToast] = useState<ToastData | null>(null);
-  const photoSources = getPhotoSources();
+  const photoSources = getPhotoSources(props.place?.imageUrl);
   const heroNavStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
     [insets.top],
@@ -166,7 +169,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
             source={photoSources[0]}
             resizeMode="cover"
             style={styles.heroImage}
-            accessibilityLabel="Photo illustrative à venir"
+            accessibilityLabel="Photo illustrative du lieu"
           />
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
@@ -194,9 +197,20 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
               />
             </View>
           </View>
-          <Badge label="Photo à venir" variant="gold" style={styles.photoFutureBadge} />
-          <Badge label="Horaires à venir" variant="gold" style={styles.closingBadge} />
         </View>
+
+        {place.imageCredit ? (
+          <Pressable
+            accessibilityRole="link"
+            onPress={props.onOpenPhotoCredit}
+            disabled={!props.onOpenPhotoCredit}
+            style={styles.photoCredit}
+          >
+            <AppText variant="caption" color="muted">
+              Photo par {place.imageCredit.photographer} · Unsplash
+            </AppText>
+          </Pressable>
+        ) : null}
 
         <View style={styles.infoWrap}>
           <View style={[styles.infoCard, shadows.lg]}>
@@ -208,6 +222,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
               {place.address ? <Meta icon="map-pin" label={place.address} /> : null}
               {category ? <AppText variant="caption" color="muted">{category}</AppText> : null}
               {place.countryCode ? <AppText variant="caption" color="muted">{place.countryCode}</AppText> : null}
+              {place.distanceMeters != null ? <AppText variant="caption" color="muted">{formatDistance(place.distanceMeters)}</AppText> : null}
             </View>
             <View style={styles.tags}>
               {category ? <Badge label={category} variant="accent" /> : null}
@@ -340,10 +355,15 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
           {place.countryCode ? (
             <InfoRow icon="info" label="Pays" value={place.countryCode} />
           ) : null}
+            <InfoRow
+              icon="info"
+              label="Source"
+              value={formatPlaceSource(place.provider)}
+            />
           <InfoRow
             icon="info"
-            label="Source"
-            value={formatPlaceSource(place.provider)}
+            label="Attribution"
+            value={placeAttribution(place.provider, place.attribution) ?? "Lieu ajouté manuellement"}
           />
           {!place.address && !place.countryCode ? (
             <InlineMessage title="Informations limitées" message="Le fournisseur n'a transmis ni adresse ni pays." />
@@ -369,6 +389,22 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
             </View>
             <Icon name="arrow-right" size={16} color={colors.muted} />
           </Pressable>
+          {props.onOpenWaze ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: mapPresentation.model === null }}
+              disabled={mapPresentation.model === null}
+              onPress={props.onOpenWaze}
+              style={({ pressed }) => [styles.transportOption, mapPresentation.model === null && styles.disabledAction, pressed && styles.pressed]}
+            >
+              <View style={styles.transportIcon}><Icon name="map-pin" size={20} color={colors.accent} /></View>
+              <View style={styles.flexOne}>
+                <AppText variant="label">Itinéraire dans Waze</AppText>
+                <AppText variant="caption" color="muted">Ouvrir la navigation avec les coordonnées vérifiées</AppText>
+              </View>
+              <Icon name="arrow-right" size={16} color={colors.muted} />
+            </Pressable>
+          ) : null}
         </Section>
 
         <ComingSoonFrame label="Lieux similaires">
@@ -408,10 +444,6 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
         >
           Ajouter au programme
         </Button>
-        <View style={styles.futureReserve}>
-          <Button disabled variant="secondary" onPress={() => undefined}>Réserver</Button>
-          <Badge label="À venir" variant="gold" style={styles.reserveBadge} />
-        </View>
       </View>
 
       <BottomSheet
@@ -452,9 +484,9 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   );
 }
 
-function getPhotoSources() {
+function getPhotoSources(imageUrl?: string) {
   return [
-    require("../../assets/restaurant-detail.png"),
+    imageUrl ? { uri: imageUrl } : require("../../assets/restaurant-detail.png"),
     require("../../assets/photo-album-3.png"),
     require("../../assets/photo-album-2.png"),
   ] as const;
@@ -465,12 +497,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function ComingSoonFrame({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={styles.futureFrame}>
-      <View pointerEvents="none" style={styles.futureContent}>{children}</View>
-      <Badge label="À venir" variant="gold" style={styles.futureBadge} />
-    </View>
-  );
+  void label;
+  void children;
+  return null;
 }
 
 function CircleAction({ label, icon, onPress }: { label: string; icon: ReactNode; onPress: () => void }) {
@@ -478,11 +507,14 @@ function CircleAction({ label, icon, onPress }: { label: string; icon: ReactNode
 }
 
 function FutureCircleAction({ label, icon }: { label: string; icon: ReactNode }) {
-  return <View style={styles.futureCircleWrap}><Pressable disabled accessibilityRole="button" accessibilityLabel={`${label}, à venir`} accessibilityState={{ disabled: true }} style={[styles.circleAction, styles.futureContent]}>{icon}</Pressable><View style={styles.actionFutureDot} /></View>;
+  void label;
+  void icon;
+  return null;
 }
 
 function FutureValue({ label }: { label: string }) {
-  return <View style={styles.futureValue}><AppText variant="label" color="gold">{label}</AppText><Badge label="À venir" variant="gold" /></View>;
+  void label;
+  return null;
 }
 
 function Meta({ icon, label }: { icon: "map-pin"; label: string }) {
@@ -503,6 +535,10 @@ function VoteButton({ icon, label }: { icon: string; label: string }) {
 
 function LinkAction({ icon, label, onPress, disabled = false }: { icon: "map"; label: string; onPress: () => void; disabled?: boolean }) {
   return <Pressable accessibilityRole="link" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.linkAction, disabled && styles.disabledAction, pressed && styles.pressed]}><Icon name={icon} size={16} color={disabled ? colors.muted : colors.teal} /><AppText variant="caption" color={disabled ? "muted" : "teal"}>{label}</AppText></Pressable>;
+}
+
+function formatDistance(value: number): string {
+  return value >= 1_000 ? `${(value / 1_000).toFixed(1)} km` : `${Math.round(value)} m`;
 }
 
 function PlaceDetailLoading() {
@@ -536,6 +572,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   photoStrip: { gap: spacing.sm, paddingBottom: spacing.sm },
   photoThumb: { width: spacing.xl * 4 + spacing.md - spacing.xs, height: spacing.xl * 3 + spacing.xs, borderRadius: radius.sm },
+  photoCredit: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm },
   mapPreview: { height: spacing.xl * 4 + spacing.md - spacing.xs, borderRadius: radius.md, overflow: "hidden", marginBottom: spacing.sm },
   mapUnavailable: { minHeight: spacing.xl * 4 + spacing.md - spacing.xs, justifyContent: "center", marginBottom: spacing.sm },
   infoRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, borderRadius: radius.sm, marginBottom: spacing.sm },

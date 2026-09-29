@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   ItineraryItem,
+  Stop,
   TrackPoint,
   TrackingStatus,
   UUID,
@@ -11,6 +12,7 @@ import {
   formatLocalItineraryDate,
   isTrackingAnotherTrip,
   itineraryPointCount,
+  itineraryRouteCoordinates,
   trackDistanceMeters,
 } from "./trip-map-model";
 
@@ -90,6 +92,58 @@ describe("trip map presentation model", () => {
       { latitude: 48.8566, longitude: 2.3522 },
       { latitude: 48.8575, longitude: 2.3522 },
     ]);
+  });
+
+  it("keeps a geocoded Step visible when it has no POI yet", () => {
+    const stop: Stop = {
+      id: "stop" as UUID,
+      tripId: "trip" as UUID,
+      name: "Lisbonne",
+      countryCode: "PT",
+      timeZone: "Europe/Lisbon" as Stop["timeZone"],
+      startDate: "2026-09-01",
+      endDate: "2026-09-02",
+      coordinates: { latitude: 38.7223, longitude: -9.1393 },
+    };
+    expect(buildItineraryMapModel([], [], [stop]).points).toEqual([
+      { id: "stop-stop", label: "Lisbonne", coordinates: stop.coordinates },
+    ]);
+  });
+
+  it("uses the planned route when no live GPS trace is available", () => {
+    const stop = {
+      id: "stop" as UUID,
+      tripId: "trip" as UUID,
+      name: "Paris",
+      countryCode: "FR",
+      timeZone: "Europe/Paris" as Stop["timeZone"],
+      startDate: "2026-09-01",
+      endDate: "2026-09-01",
+      coordinates: { latitude: 48.8566, longitude: 2.3522 },
+    } satisfies Stop;
+    const item = {
+      id: "item" as UUID,
+      tripId: "trip" as UUID,
+      stopId: stop.id,
+      title: "Musée",
+      date: "2026-09-01",
+      place: {
+        kind: "venue" as const,
+        label: "Musée",
+        coordinates: { latitude: 48.8584, longitude: 2.2945 },
+      },
+    } satisfies ItineraryItem;
+    const route = [
+      { latitude: 48.8566, longitude: 2.3522 },
+      { latitude: 48.857, longitude: 2.33 },
+      { latitude: 48.8584, longitude: 2.2945 },
+    ];
+
+    expect(itineraryRouteCoordinates([item], stop)).toEqual([
+      stop.coordinates,
+      item.place.coordinates,
+    ]);
+    expect(buildItineraryMapModel([item], [], [stop], route).polyline).toEqual(route);
   });
 
   it("ignores invalid coordinates and bounds a large trace for native rendering", () => {

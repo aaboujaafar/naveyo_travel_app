@@ -11,6 +11,22 @@ export interface SuggestPlacesInput {
   stopName?: string
   countryCode?: string
   timeZone?: string
+  weather?: SuggestionWeatherContext[]
+  existingItinerary?: SuggestionItineraryContext[]
+}
+
+export interface SuggestionWeatherContext {
+  date: string
+  temperatureMinC: number
+  temperatureMaxC: number
+  precipitationProbabilityMax?: number
+  weatherCode?: number
+}
+
+export interface SuggestionItineraryContext {
+  date: string
+  title: string
+  localTime?: string
 }
 
 export interface TripAssistant { suggestPlaces(input: SuggestPlacesInput): Promise<SuggestionDraft[]> }
