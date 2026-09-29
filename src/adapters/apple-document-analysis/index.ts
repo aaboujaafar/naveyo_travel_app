@@ -1,6 +1,6 @@
 import { requireNativeModule } from "expo";
-import type { DocumentAnalyzer, ReservationImportSource } from '../../modules/reservations'
-import type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, PendingShareImport } from './interface'
+import type { DocumentAnalyzer, OnDeviceAnalysisStatus, OnDeviceReservationAnalysis, OnDeviceReservationAnalyzer, ReservationImportSource } from '../../modules/reservations'
+import type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, PendingReservationImport } from './interface'
 import { assertPageLimit, parseDocumentAnalysisResult } from './validation'
 
 const nativeModule = (): AppleDocumentAnalysisModule => {
@@ -36,8 +36,38 @@ export const createAppleDocumentTextExtractor = (moduleOverride?: AppleDocumentA
   },
 })
 
+const onDeviceStatuses: readonly OnDeviceAnalysisStatus[] = ['available', 'deviceNotEligible', 'appleIntelligenceNotEnabled', 'modelNotReady', 'unavailable', 'unsupportedOS']
+
+const toOnDeviceAnalysis = (result: DocumentAnalysisResult): OnDeviceReservationAnalysis => {
+  const { evidence: _evidence, extractedText, pagesAnalyzed: _pages, draftSource, ...draft } = result
+  void _evidence
+  void _pages
+  return { draft, extractedText, source: draftSource }
+}
+
+/** OCR (Vision/PDFKit) and structuring (Apple Intelligence) without any network call. */
+export const createAppleOnDeviceReservationAnalyzer = (moduleOverride?: AppleDocumentAnalysisModule): OnDeviceReservationAnalyzer => {
+  const analyzer = createAppleDocumentAnalyzer(moduleOverride)
+  return {
+    async status() {
+      const module = moduleOverride ?? nativeModule()
+      if (!module.onDeviceAnalysisStatus) return 'unsupportedOS'
+      const value = await module.onDeviceAnalysisStatus()
+      return onDeviceStatuses.includes(value as OnDeviceAnalysisStatus) ? value as OnDeviceAnalysisStatus : 'unavailable'
+    },
+    async analyzeFile(fileUri, options) {
+      return toOnDeviceAnalysis(await analyzer.analyze(fileUri, options))
+    },
+    async analyzeText(text) {
+      const module = moduleOverride ?? nativeModule()
+      if (!module.analyzeText) throw new Error('Native text analysis is unavailable')
+      return toOnDeviceAnalysis(parseDocumentAnalysisResult(await module.analyzeText(text)))
+    },
+  }
+}
+
 export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModule) => ({
-  async list(): Promise<PendingShareImport[]> {
+  async list(): Promise<PendingReservationImport[]> {
     const module = moduleOverride ?? nativeModule()
     if (!module.listPendingShareImports) return []
     const value = await module.listPendingShareImports()
@@ -47,7 +77,7 @@ export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModu
         return { ...(item as Record<string, unknown>), status: 'seen' }
       }
       return item
-    }).filter((item): item is PendingShareImport => {
+    }).filter((item): item is PendingReservationImport => {
       if (!item || typeof item !== 'object') return false
       const candidate = item as Record<string, unknown>
       return typeof candidate.id === 'string' && (candidate.kind === 'file' || candidate.kind === 'text') && typeof candidate.uri === 'string' && typeof candidate.createdAt === 'string' && ['new', 'seen', 'processing', 'failed', 'confirmed'].includes(String(candidate.status))
@@ -57,11 +87,12 @@ export const createAppleShareInbox = (moduleOverride?: AppleDocumentAnalysisModu
     const module = moduleOverride ?? nativeModule()
     await module.removePendingShareImport?.(id)
   },
-  async updateStatus(id: string, status: PendingShareImport['status'], error?: string): Promise<void> {
+  async updateStatus(id: string, status: PendingReservationImport['status'], error?: string): Promise<void> {
     const module = moduleOverride ?? nativeModule()
     await module.updatePendingShareImportStatus?.(id, status, error)
   },
 })
 
-export type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, DocumentEvidence, PendingShareImport } from './interface'
+export type { AppleDocumentAnalysisModule, AppleDocumentAnalyzer, DocumentAnalysisOptions, DocumentAnalysisResult, DocumentEvidence, PendingReservationImport } from './interface'
+export type { PendingReservationImport as PendingShareImport } from './interface'
 export { assertDocumentSize, assertPageLimit, documentAnalysisLimits, parseDocumentAnalysisResult } from './validation'

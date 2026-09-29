@@ -1,6 +1,6 @@
-import type { PendingShareImport } from "../../../src/adapters/apple-document-analysis";
+import type { PendingReservationImport } from "./interface";
 
-export function recoverPendingImport(item: PendingShareImport): PendingShareImport {
+export function recoverPendingImport(item: PendingReservationImport): PendingReservationImport {
   return item.status === "processing" ? { ...item, status: "seen" } : item;
 }
 
@@ -8,7 +8,7 @@ export function describeAnalysisFailure(cause: unknown): {
   message: string;
   isOffline: boolean;
 } {
-  const raw = cause instanceof Error ? cause.message : "Analyse OpenCode impossible";
+  const raw = cause instanceof Error ? cause.message : "Analyse IA impossible";
   const normalized = raw.toLowerCase();
   const isOffline =
     normalized.includes("network") ||
@@ -21,14 +21,14 @@ export function describeAnalysisFailure(cause: unknown): {
   if (isOffline) {
     return {
       isOffline: true,
-      message: "Naveyo ne peut pas joindre OpenCode pour l’instant. Vérifiez la connexion puis réessayez.",
+      message: "Naveyo ne peut pas joindre le fournisseur IA pour l’instant. Vérifiez la connexion puis réessayez.",
     };
   }
 
   if (normalized.includes("invalid reservation draft")) {
     return {
       isOffline: false,
-      message: "OpenCode a renvoyé un brouillon incomplet. Vous pouvez relancer l’analyse avec le même document.",
+      message: "Le fournisseur IA a renvoyé un brouillon incomplet. Vous pouvez relancer l’analyse avec le même document.",
     };
   }
 

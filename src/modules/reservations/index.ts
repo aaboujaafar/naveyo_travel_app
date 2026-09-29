@@ -1,4 +1,14 @@
-export type { DocumentAnalyzer, ReservationsModule } from "./interface";
+export type {
+  DocumentAnalyzer,
+  OnDeviceAnalysisStatus,
+  OnDeviceReservationAnalysis,
+  OnDeviceReservationAnalyzer,
+  PendingReservationImport,
+  ReservationDocumentTextExtractor,
+  ReservationImportInbox,
+  ReservationTextAnalyzer,
+  ReservationsModule,
+} from "./interface";
 export type {
   ReservationConfirmation,
   ReservationImportResult,
@@ -14,3 +24,10 @@ export {
 } from "./module";
 export { sharedLocalReservations } from "./local";
 export { PersistentReservationsModule } from "./persistent";
+export {
+  applyReservationPlaceCandidate,
+  clearReservationPlaceLocation,
+  detectedReservationPlaces,
+  referenceFromCandidate,
+} from "./place-resolution";
+export type { ReservationPlaceCandidates, ReservationPlaceKey } from "./place-resolution";

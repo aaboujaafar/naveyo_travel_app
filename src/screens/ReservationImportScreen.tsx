@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { PendingShareImport } from "../adapters/apple-document-analysis";
-import type { ReservationDraft, Trip, UUID } from "../modules/_shared/model";
-import type { ReservationImportResult } from "../modules/reservations";
+import type { PlaceCandidate, ReservationDraft, Trip, UUID } from "../modules/_shared/model";
+import type { ReservationPlaceCandidates, ReservationPlaceKey } from "../modules/reservations/place-resolution";
+import type { OnDeviceAnalysisStatus, ReservationImportResult } from "../modules/reservations";
+import { describeOnDeviceStatus, type ReservationAnalysisMode } from "../modules/reservations/import-analysis";
 import { colors, radius, shadows, spacing } from "../theme";
 import {
   AppText,
@@ -47,8 +49,14 @@ export interface ReservationImportScreenProps {
   onClose: () => void;
   onInputChange: (input: ImportInput) => void;
   onChooseDocument: () => Promise<void>;
-  onAnalyze: () => Promise<void>;
+  onAnalyze: (options: { allowRemote: boolean }) => Promise<void>;
   onConfirm: (draft: ReservationDraft, confirmedFields: string[]) => Promise<void>;
+  /** Apple Intelligence availability, shown so travellers know whether text leaves the iPhone. */
+  onDeviceStatus?: OnDeviceAnalysisStatus | null;
+  analysisMode?: ReservationAnalysisMode | null;
+  placeCandidates?: ReservationPlaceCandidates;
+  onPlaceCandidateSelect?: (key: ReservationPlaceKey, candidate: PlaceCandidate) => void;
+  onLeavePlaceUnresolved?: (key: ReservationPlaceKey) => void;
   onSelectTrip: (tripId: UUID) => void;
   onOpenImport: (id: string) => void;
   onOpenDocuments: () => void;
@@ -72,6 +80,11 @@ export function ReservationImportScreen({
   onChooseDocument,
   onAnalyze,
   onConfirm,
+  onDeviceStatus,
+  analysisMode,
+  placeCandidates,
+  onPlaceCandidateSelect,
+  onLeavePlaceUnresolved,
   onSelectTrip,
   onOpenImport,
   onOpenDocuments,
@@ -127,6 +140,7 @@ export function ReservationImportScreen({
           onChange={onInputChange}
           onChooseDocument={onChooseDocument}
           onAnalyze={onAnalyze}
+          onDeviceStatus={onDeviceStatus ?? null}
         />
       )}
 
@@ -148,6 +162,10 @@ export function ReservationImportScreen({
       {result?.state === "needs-confirmation" ? (
         <DraftConfirmation
           draft={result.draft}
+          analysisMode={analysisMode ?? null}
+          placeCandidates={placeCandidates}
+          onPlaceCandidateSelect={onPlaceCandidateSelect}
+          onLeavePlaceUnresolved={onLeavePlaceUnresolved}
           saving={saving}
           onConfirm={onConfirm}
         />
@@ -163,7 +181,7 @@ export function ReservationImportScreen({
       <View style={styles.privacyNote}>
         <Icon name="info" size={20} color={colors.teal} />
         <AppText variant="caption" color="muted" style={styles.flexText}>
-          PDFKit et Vision extraient d’abord le texte sur l’iPhone. Le document original n’est pas envoyé à l’analyse distante et aucune donnée n’est confirmée automatiquement.
+          Le texte est lu sur l’iPhone, puis analysé sur l’iPhone avec Apple Intelligence quand c’est possible. Le texte n’est envoyé à l’assistant IA qu’avec votre accord, le document original jamais, et aucune donnée n’est confirmée automatiquement.
         </AppText>
       </View>
 
@@ -178,12 +196,14 @@ function ImportComposer({
   onChange,
   onChooseDocument,
   onAnalyze,
+  onDeviceStatus,
 }: {
   input: ImportInput;
   analyzing: boolean;
   onChange: (input: ImportInput) => void;
   onChooseDocument: () => Promise<void>;
-  onAnalyze: () => Promise<void>;
+  onAnalyze: (options: { allowRemote: boolean }) => Promise<void>;
+  onDeviceStatus: OnDeviceAnalysisStatus | null;
 }) {
   const hasSource = Boolean(input.file || input.text.trim());
   const [remoteAnalysisConsent, setRemoteAnalysisConsent] = useState(false);
@@ -227,21 +247,27 @@ function ImportComposer({
       <AppText variant="caption" color="muted">
         Une URL authentifiée est conservée comme lien et n’est jamais scrapée.
       </AppText>
+      {onDeviceStatus ? (
+        <View style={styles.onDeviceRow}>
+          <Icon name={onDeviceStatus === "available" ? "check" : "info"} size={16} color={onDeviceStatus === "available" ? colors.success : colors.muted} />
+          <AppText variant="caption" color="muted" style={styles.flexText}>{describeOnDeviceStatus(onDeviceStatus)}</AppText>
+        </View>
+      ) : null}
       <View style={styles.consentBox}>
         <Checkbox
           checked={remoteAnalysisConsent}
-          label="J’autorise l’envoi du texte extrait à OpenCode Go"
+          label={onDeviceStatus === "available" ? "Si l’iPhone n’y arrive pas, envoyer le texte à l’assistant IA" : "J’autorise l’envoi du texte extrait à l’assistant IA"}
           onChange={setRemoteAnalysisConsent}
         />
         <AppText variant="caption" color="muted" style={styles.consentDetail}>
-          Le texte utile est transmis à OpenCode Go via l’Edge Function Supabase de Naveyo. Le PDF ou l’image d’origine reste sur l’iPhone.
+          Seul le texte utile est transmis, via l’Edge Function Supabase de Naveyo. Le PDF ou l’image d’origine reste sur l’iPhone.
         </AppText>
       </View>
       <Button
         fullWidth
         loading={analyzing}
-        disabled={!hasSource || !remoteAnalysisConsent || analyzing}
-        onPress={() => void onAnalyze()}
+        disabled={!hasSource || analyzing}
+        onPress={() => void onAnalyze({ allowRemote: remoteAnalysisConsent })}
       >
         Analyser le brouillon
       </Button>
@@ -285,12 +311,20 @@ function TripPicker({
 
 function DraftConfirmation({
   draft,
+  analysisMode,
   saving,
   onConfirm,
+  placeCandidates,
+  onPlaceCandidateSelect,
+  onLeavePlaceUnresolved,
 }: {
   draft: ReservationDraft;
+  analysisMode: ReservationAnalysisMode | null;
   saving: boolean;
   onConfirm: (draft: ReservationDraft, confirmedFields: string[]) => Promise<void>;
+  placeCandidates?: ReservationPlaceCandidates;
+  onPlaceCandidateSelect?: (key: ReservationPlaceKey, candidate: PlaceCandidate) => void;
+  onLeavePlaceUnresolved?: (key: ReservationPlaceKey) => void;
 }) {
   const fields = useMemo(() => buildReservationDraftFields(draft), [draft]);
   const [confirmedFields, setConfirmedFields] = useState<Set<string>>(() => new Set());
@@ -313,7 +347,10 @@ function DraftConfirmation({
         </View>
         <View style={styles.flexText}>
           <AppText variant="h3">Relire le brouillon</AppText>
-          <AppText variant="caption" color="muted">{confidenceLabel(draft.confidence)}</AppText>
+          <AppText variant="caption" color="muted">
+            {confidenceLabel(draft.confidence)}
+            {analysisMode === "on-device" ? " · analysé sur l’iPhone" : analysisMode === "remote" ? " · analysé par l’assistant IA" : ""}
+          </AppText>
         </View>
         <Badge label="À CONFIRMER" variant="teal" />
       </View>
@@ -334,6 +371,23 @@ function DraftConfirmation({
             <AppText variant="bodySmall" color={field.value === "À préciser" ? "danger" : "fg"} style={styles.fieldValue}>
               {field.value}
             </AppText>
+            {isReservationPlaceKey(field.key) ? (
+              <PlaceResolutionChoices
+                field={field.key}
+                candidates={placeCandidates?.[field.key] ?? []}
+                selectedPlaceId={draft[field.key]?.placeId}
+                located={Boolean(draft[field.key]?.coordinates)}
+                onSelect={onPlaceCandidateSelect ? (key, candidate) => {
+                  // The value changed: the traveller must re-read it before confirming.
+                  toggle(key, false);
+                  onPlaceCandidateSelect(key, candidate);
+                } : undefined}
+                onLeaveUnresolved={onLeavePlaceUnresolved ? (key) => {
+                  toggle(key, false);
+                  onLeavePlaceUnresolved(key);
+                } : undefined}
+              />
+            ) : null}
           </View>
         ))}
       </View>
@@ -355,6 +409,44 @@ function DraftConfirmation({
       <AppText variant="caption" color="muted" align="center">
         {confirmedFields.size}/{fields.length} champs relus
       </AppText>
+    </View>
+  );
+}
+
+function isReservationPlaceKey(value: string): value is ReservationPlaceKey {
+  return value === "venue" || value === "origin" || value === "destination";
+}
+
+function PlaceResolutionChoices({
+  field,
+  candidates,
+  selectedPlaceId,
+  located,
+  onSelect,
+  onLeaveUnresolved,
+}: {
+  field: ReservationPlaceKey;
+  candidates: PlaceCandidate[];
+  selectedPlaceId?: string;
+  located: boolean;
+  onSelect?: (key: ReservationPlaceKey, candidate: PlaceCandidate) => void;
+  onLeaveUnresolved?: (key: ReservationPlaceKey) => void;
+}) {
+  if (!onSelect && !onLeaveUnresolved) return null;
+  return (
+    <View style={styles.placeChoices}>
+      {candidates.slice(0, 3).map((candidate) => {
+        const selected = candidate.id === selectedPlaceId;
+        return (
+          <Button key={candidate.id} size="sm" variant={selected ? "primary" : "secondary"} onPress={() => onSelect?.(field, candidate)}>
+            {selected ? `✓ ${candidate.name}` : `Utiliser « ${candidate.name} »`}
+          </Button>
+        );
+      })}
+      <Button size="sm" variant="ghost" onPress={() => onLeaveUnresolved?.(field)}>
+        {located ? "Laisser non géolocalisé" : "✓ Non géolocalisé"}
+      </Button>
+      {candidates.length === 0 ? <AppText variant="caption" color="muted">Aucun lieu correspondant : vous pouvez continuer sans coordonnées.</AppText> : null}
     </View>
   );
 }
@@ -417,40 +509,7 @@ function importStatusLabel(status: PendingShareImport["status"]): string {
 }
 
 function ComingSoonSection() {
-  return (
-    <View style={styles.sectionBlock}>
-      <View style={styles.sectionTitleRow}>
-        <AppText variant="h3">Préparer le Voyage</AppText>
-        <Badge label="À venir" variant="gold" />
-      </View>
-      <View accessible accessibilityLabel="Fonctions de préparation à venir" accessibilityState={{ disabled: true }} style={styles.comingSoonList}>
-        <View style={styles.comingSoonRow}>
-          <Icon name="check" size={22} color={colors.muted} />
-          <View style={styles.flexText}>
-            <AppText variant="label" color="muted">Checklist et packing list</AppText>
-            <AppText variant="caption" color="muted">Listes collaboratives et assignations</AppText>
-          </View>
-          <Badge label="À venir" variant="gold" />
-        </View>
-        <View style={styles.comingSoonRow}>
-          <Icon name="search" size={22} color={colors.muted} />
-          <View style={styles.flexText}>
-            <AppText variant="label" color="muted">Comparateurs et réservations intégrées</AppText>
-            <AppText variant="caption" color="muted">Vols, hôtels, voiture et activités</AppText>
-          </View>
-          <Badge label="À venir" variant="gold" />
-        </View>
-        <View style={styles.comingSoonRow}>
-          <Icon name="settings" size={22} color={colors.muted} />
-          <View style={styles.flexText}>
-            <AppText variant="label" color="muted">eSIM et connectivité</AppText>
-            <AppText variant="caption" color="muted">Offres partenaires et configuration APN</AppText>
-          </View>
-          <Badge label="À venir" variant="gold" />
-        </View>
-      </View>
-    </View>
-  );
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -473,6 +532,8 @@ const styles = StyleSheet.create({
   fieldRow: { paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   fieldCheckbox: { minHeight: 36 },
   fieldValue: { paddingLeft: spacing.xl },
+  onDeviceRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  placeChoices: { gap: spacing.xs, paddingLeft: spacing.xl, paddingTop: spacing.xs },
   sectionBlock: { gap: spacing.md },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   emptyCenter: { minHeight: 160, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },

@@ -23,6 +23,14 @@ public class NaveyoDocumentsModule: Module {
       try await self.analyze(fileUri: fileUri, options: options, includeDraft: false)
     }
 
+    AsyncFunction("analyzeText") { (text: String) async throws -> [String: Any] in
+      try await self.analyzeText(text)
+    }
+
+    AsyncFunction("onDeviceAnalysisStatus") { () -> String in
+      LocalReservationExtractor.status()
+    }
+
     AsyncFunction("listPendingShareImports") { () -> [[String: Any]] in
       NaveyoShareStore.list()
     }
@@ -73,10 +81,33 @@ public class NaveyoDocumentsModule: Module {
       "confidence": evidence.isEmpty ? "low" : "medium",
       "fieldsRequiringConfirmation": ["type", "title", "provider", "reference", "start", "end", "venue", "origin", "destination"]
     ]
-    let draft = await LocalReservationExtractor.extract(text: fullText, fallback: fallbackDraft) ?? fallbackDraft
+    let localDraft = await LocalReservationExtractor.extract(text: fullText)
     var result = extraction
-    result["draft"] = draft
+    result["draft"] = localDraft ?? fallbackDraft
+    result["draftSource"] = localDraft == nil ? "heuristic" : "on-device"
     return result
+  }
+
+  /// Structures pasted confirmation text on the iPhone without any network call.
+  private func analyzeText(_ text: String) async throws -> [String: Any] {
+    let trimmed = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(20_000))
+    guard !trimmed.isEmpty else { throw DocumentError.unsupportedDocument }
+    let pages = [(1, trimmed)]
+    let evidence = detectEvidence(in: pages)
+    let localDraft = await LocalReservationExtractor.extract(text: trimmed)
+    let fallbackDraft: [String: Any] = [
+      "type": inferType(from: trimmed),
+      "title": title(from: trimmed),
+      "confidence": "low",
+      "fieldsRequiringConfirmation": ["type", "title", "provider", "reference", "start", "end", "venue", "origin", "destination"]
+    ]
+    return [
+      "extractedText": trimmed,
+      "pagesAnalyzed": 1,
+      "evidence": evidence,
+      "draft": localDraft ?? fallbackDraft,
+      "draftSource": localDraft == nil ? "heuristic" : "on-device"
+    ]
   }
 
   private func recognizeText(image: CGImage) throws -> String {
@@ -87,6 +118,9 @@ public class NaveyoDocumentsModule: Module {
     }
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true
+    // Confirmations are mostly French or English; without this Vision favours English and drops accents.
+    request.recognitionLanguages = ["fr-FR", "en-US"]
+    if #available(iOS 16.0, *) { request.automaticallyDetectsLanguage = true }
     try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
     return result
   }

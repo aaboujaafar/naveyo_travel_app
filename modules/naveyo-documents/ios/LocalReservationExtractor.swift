@@ -32,24 +32,49 @@ private struct ReservationExtraction {
 #endif
 
 enum LocalReservationExtractor {
-  static func extract(text: String, fallback: [String: Any]) async -> [String: Any]? {
-    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return fallback }
+  /// Why on-device extraction is (un)available, so the app can explain the remote fallback.
+  static func status() -> String {
+    #if canImport(FoundationModels)
+    if #available(iOS 26.0, *) {
+      switch SystemLanguageModel.default.availability {
+      case .available:
+        return "available"
+      case .unavailable(.deviceNotEligible):
+        return "deviceNotEligible"
+      case .unavailable(.appleIntelligenceNotEnabled):
+        return "appleIntelligenceNotEnabled"
+      case .unavailable(.modelNotReady):
+        return "modelNotReady"
+      case .unavailable:
+        return "unavailable"
+      }
+    }
+    #endif
+    return "unsupportedOS"
+  }
+
+  /// Returns a draft produced entirely on the iPhone, or nil when the model is unavailable,
+  /// fails, or cannot identify at least a reservation type and title.
+  static func extract(text: String) async -> [String: Any]? {
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
 
     #if canImport(FoundationModels)
     if #available(iOS 26.0, *), SystemLanguageModel.default.isAvailable {
       do {
         let session = LanguageModelSession(instructions: """
-          You extract travel reservation data from OCR text.
+          You extract travel reservation data from OCR text, often written in French or English.
           Never invent a value. Return an empty string when the text does not contain the value.
           Preserve printed dates and times, and do not infer a timezone from the phone.
           Distinguish flight origin and destination from hotel or meeting addresses.
           The result is a draft only and always requires human confirmation.
           """)
+        // The on-device model has a ~4k-token window shared by instructions, input and output;
+        // confirmations carry their key data first, so keep roughly the first 8k characters.
         let response = try await session.respond(
-          to: "Extract the reservation from this document text:\n\n\(String(text.prefix(16_000)))",
+          to: "Extract the reservation from this document text:\n\n\(String(text.prefix(8_000)))",
           generating: ReservationExtraction.self
         )
-        return response.content.asDraft(fallback: fallback)
+        return response.content.asDraft()
       } catch {
         return nil
       }
@@ -63,11 +88,12 @@ enum LocalReservationExtractor {
 #if canImport(FoundationModels)
 @available(iOS 26.0, *)
 private extension ReservationExtraction {
-  func asDraft(fallback: [String: Any]) -> [String: Any] {
-    var draft = fallback
-    let normalizedType = ["accommodation", "flight", "train", "ferry", "activity", "other"].contains(type.lowercased()) ? type.lowercased() : nil
-    setIfPresent(&draft, key: "type", value: normalizedType)
-    setIfPresent(&draft, key: "title", value: title)
+  func asDraft() -> [String: Any]? {
+    let normalizedType = type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Same contract as the remote analysis: a type and a title are required.
+    guard ["accommodation", "flight", "train", "ferry", "activity", "other"].contains(normalizedType), !cleanedTitle.isEmpty else { return nil }
+    var draft: [String: Any] = ["type": normalizedType, "title": String(cleanedTitle.prefix(200))]
     setIfPresent(&draft, key: "provider", value: provider)
     setIfPresent(&draft, key: "reference", value: reference)
     setIfPresent(&draft, key: "venue", value: placeReference(venue))
@@ -91,7 +117,7 @@ private extension ReservationExtraction {
   }
 
   func localDateTime(local: String, timeZone: String) -> [String: String]? {
-    guard !local.isEmpty, !timeZone.isEmpty else { return nil }
+    guard !local.isEmpty, !timeZone.isEmpty, TimeZone(identifier: timeZone) != nil else { return nil }
     return ["local": local, "timeZone": timeZone]
   }
 

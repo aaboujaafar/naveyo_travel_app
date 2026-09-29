@@ -1,9 +1,9 @@
-import type { PendingShareImport } from "../../../src/adapters/apple-document-analysis";
+import type { PendingReservationImport } from "./interface";
 
 export function selectPendingImport(
-  items: PendingShareImport[],
+  items: PendingReservationImport[],
   pendingId?: string,
-): PendingShareImport | undefined {
+): PendingReservationImport | undefined {
   if (pendingId) return items.find((item) => item.id === pendingId);
   return items.find((item) => item.status !== "confirmed");
 }

@@ -14,7 +14,7 @@ interface RemoteDocumentAnalysisResponse {
 
 const defaultEndpoint = `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''}/functions/v1/document-analysis`
 
-export function createOpenCodeDocumentAnalyzer(
+export function createRemoteDocumentAnalyzer(
   client: SupabaseClientLike,
   endpoint = defaultEndpoint,
 ) {
@@ -30,32 +30,22 @@ export function createOpenCodeDocumentAnalyzer(
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({ tripId: input.tripId, extractedText: text }),
         })
         let body: RemoteDocumentAnalysisResponse
-        try {
-          body = (await response.json()) as RemoteDocumentAnalysisResponse
-        } catch {
-          throw new Error('Remote document analysis returned invalid JSON')
-        }
+        try { body = (await response.json()) as RemoteDocumentAnalysisResponse } catch { throw new Error('Remote document analysis returned invalid JSON') }
         if (!response.ok || body.draft === undefined) {
-          const message = typeof body.error === 'string' ? body.error : 'Remote document analysis failed'
-          throw new Error(message)
+          throw new Error(typeof body.error === 'string' ? body.error : 'Remote document analysis failed')
         }
         try {
           return parseReservationDraft(body.draft)
         } catch (error) {
-          throw new Error(`OpenCode returned an invalid reservation draft: ${error instanceof Error ? error.message : 'validation failed'}`)
+          throw new Error(`AI provider returned an invalid reservation draft: ${error instanceof Error ? error.message : 'validation failed'}`)
         }
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Remote document analysis timed out')
-        }
+        if (error instanceof DOMException && error.name === 'AbortError') throw new Error('Remote document analysis timed out')
         throw error
       } finally {
         clearTimeout(timeout)

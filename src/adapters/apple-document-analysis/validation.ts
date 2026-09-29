@@ -41,7 +41,9 @@ export const parseDocumentAnalysisResult = (value: unknown): DocumentAnalysisRes
 
   const extractedText = stringValue(candidate.extractedText, 'Extracted text')
   const draft = parseReservationDraft(candidate.draft) as ReservationDraft
-  return { ...draft, evidence, extractedText, pagesAnalyzed }
+  // Older native builds do not report the source; treat them as the weak heuristic.
+  const draftSource = candidate.draftSource === 'on-device' ? 'on-device' : 'heuristic'
+  return { ...draft, evidence, extractedText, pagesAnalyzed, draftSource }
 }
 
 export const assertDocumentSize = (byteSize: number): void => {
