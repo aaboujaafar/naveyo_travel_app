@@ -128,7 +128,7 @@ export default function PlaceDetailRoute() {
       onBack={() => router.back()}
       onRetry={load}
       onOpenMap={() =>
-        router.push(`/(app)/trips/${routeTripId}/itinerary`)
+        router.push(`/trips/${routeTripId}/itinerary`)
       }
       onOpenDirections={openDirections}
       onOpenWaze={openWaze}

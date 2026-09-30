@@ -27,7 +27,7 @@ export default function AcceptInvitationScreen() {
     setError(null);
     try {
       const invitation = await trips.acceptInvitation(token as UUID);
-      router.replace(`/(app)/trips/${invitation.tripId}`);
+      router.replace(`/trips/${invitation.tripId}`);
     } catch (cause: unknown) {
       setError(
         cause instanceof Error

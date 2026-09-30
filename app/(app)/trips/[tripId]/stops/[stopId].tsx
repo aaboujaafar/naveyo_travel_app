@@ -240,8 +240,8 @@ export default function StopDetailRoute() {
       onBack={() => router.back()}
       onRetry={refresh}
       onDownload={download}
-      onOpenItinerary={() => router.push(`/(app)/trips/${routeTripId}/itinerary`)}
-      onOpenDocuments={() => router.push(`/(app)/trips/${routeTripId}/documents?stopId=${routeStopId}`)}
+      onOpenItinerary={() => router.push(`/trips/${routeTripId}/itinerary`)}
+      onOpenDocuments={() => router.push(`/trips/${routeTripId}/documents?stopId=${routeStopId}`)}
       onOpenReservations={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
       onEditLocation={() => router.push(`/(app)/trips/${routeTripId}/stops/${routeStopId}/edit`)}
       onAddDiscovery={addDiscovery}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Image, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MapModel, MapPoint } from "../adapters/map";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
@@ -102,6 +103,7 @@ export function buildStopMapModel(itinerary: ItineraryItem[], stop?: Stop): MapM
 }
 
 export function StopDetailScreen(props: StopDetailScreenProps) {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<StopDetailTab>("itinerary");
   const [expandedItemId, setExpandedItemId] = useState<UUID | null>(null);
   const mapModel = useMemo(() => buildStopMapModel(props.itinerary, props.stop ?? undefined), [props.itinerary, props.stop]);
@@ -109,7 +111,7 @@ export function StopDetailScreen(props: StopDetailScreenProps) {
   if (props.loading && !props.stop) return <StopDetailLoading onBack={props.onBack} />;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <IconButton
@@ -397,7 +399,7 @@ function normalizeTime(value: string): string | undefined {
 function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && styles.pressed]}>
-      <AppText variant="caption" color={active ? "onAccent" : "muted"} align="center">{label}</AppText>
+      <AppText variant="caption" color={active ? "onAccent" : "muted"} align="center" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</AppText>
     </Pressable>
   );
 }
@@ -464,8 +466,9 @@ function formatWeatherDateLabel(value: string): string {
 }
 
 function StopDetailLoading({ onBack }: { onBack: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.loading}>
         <IconButton icon={<Icon name="arrow-left" size={20} />} onPress={onBack} accessibilityLabel="Retour au Voyage" />
         <Skeleton height={spacing["2xl"] * 3} borderRadius={radius.lg} />
@@ -483,7 +486,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: spacing.xs },
   message: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   hero: { position: "relative", overflow: "hidden", flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.lg, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.accent },
-  heroImage: { ...StyleSheet.absoluteFill, width: "100%", height: "100%" },
+  heroImage: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, width: undefined, height: undefined },
   heroImageOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(10, 30, 37, 0.58)" },
   heroIcon: { width: spacing["2xl"], height: spacing["2xl"], borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.overlay },
   heroText: { flex: 1, gap: spacing.xs },

@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     width: spacing["2xl"],
     height: spacing["2xl"],
     borderRadius: radius.full,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentStrong,
     borderWidth: 0,
     ...shadows.accent,
   },

@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PlaceReference, Reservation } from "../modules/_shared/model";
 import { colors, layout, radius, spacing } from "../theme";
 import { AppText, Badge, Button, Icon, InlineMessage, Skeleton } from "../ui";
@@ -19,9 +20,10 @@ export interface TripReservationsScreenProps {
 }
 
 export function TripReservationsScreen(props: TripReservationsScreenProps) {
+  const insets = useSafeAreaInsets();
   const sorted = [...props.items].sort((left, right) => (left.start?.local ?? "9999").localeCompare(right.start?.local ?? "9999"));
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <RecordsHeader title="Réservations" subtitle={props.tripName} onBack={props.onBack} />
         <RecordsTabs active="reservations" onOpenDocuments={props.onOpenDocuments} onOpenReservations={() => undefined} onOpenPacking={props.onOpenPacking} />

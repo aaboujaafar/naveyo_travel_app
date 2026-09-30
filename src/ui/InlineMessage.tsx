@@ -23,7 +23,7 @@ export function InlineMessage({
       ? colors.danger
       : variant === "success"
         ? colors.success
-        : colors.teal;
+        : colors.muted;
 
   return (
     <View
@@ -32,7 +32,7 @@ export function InlineMessage({
     >
       <Icon name={variant === "success" ? "check" : "info"} size={20} color={foreground} />
       <View style={styles.content}>
-        <AppText variant="label" color={variant === "error" ? "danger" : variant === "success" ? "success" : "teal"}>
+        <AppText variant="label" color={variant === "error" ? "danger" : variant === "success" ? "success" : "fg"}>
           {title}
         </AppText>
         {message ? (
@@ -55,8 +55,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   info: {
-    backgroundColor: colors.tealSoft,
-    borderColor: colors.teal,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   success: {
     backgroundColor: colors.surface,

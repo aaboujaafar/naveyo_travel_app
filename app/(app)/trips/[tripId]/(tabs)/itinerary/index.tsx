@@ -1,18 +1,19 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useEffect, useState } from "react";
-import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
+import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type {
   ItineraryItem,
   Stop,
   TrackPoint,
   UUID,
-} from "../../../../../src/modules/_shared/model";
-import type { OfflineTripPackLoad } from "../../../../../src/modules/offline-trip-pack";
-import { TripItineraryScreen } from "../../../../../src/screens/TripItineraryScreen";
+} from "../../../../../../src/modules/_shared/model";
+import type { OfflineTripPackLoad } from "../../../../../../src/modules/offline-trip-pack";
+import { TripItineraryScreen } from "../../../../../../src/screens/TripItineraryScreen";
 
 export default function ItineraryRoute() {
   const router = useRouter();
-  const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId: rawTripId } = useTripTabParams<{ tripId: string }>();
   const tripId = typeof rawTripId === "string" ? (rawTripId as UUID) : null;
   const bootstrap = useNaveyoBootstrap();
   const [stops, setStops] = useState<Stop[]>([]);
@@ -65,14 +66,9 @@ export default function ItineraryRoute() {
       offline={offline}
       loading={loading}
       error={error}
-      onBack={() => router.back()}
-      onOpenTrip={() => {
-        if (tripId) router.replace(`/(app)/trips/${tripId}`);
-        else router.back();
-      }}
       onOpenAssistant={(stopId) => {
         if (tripId) {
-          router.push(`/(app)/trips/${tripId}/assistant?stopId=${stopId}`);
+          router.push(`/trips/${tripId}/assistant?stopId=${stopId}&mode=day`);
         }
       }}
       onOpenTracking={() => {

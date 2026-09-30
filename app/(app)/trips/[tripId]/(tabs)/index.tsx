@@ -1,6 +1,7 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
 import { useCallback, useState } from "react";
-import { useNaveyoBootstrap } from "../../../../src/bootstrap";
+import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type {
   Coordinates,
   ItineraryItem,
@@ -8,15 +9,15 @@ import type {
   Stop,
   Trip,
   UUID,
-} from "../../../../src/modules/_shared/model";
-import { useTripsModule } from "../../../../src/modules/trips";
-import { TripDashboardScreen } from "../../../../src/screens/TripDashboardScreen";
-import type { DashboardWeatherState } from "../../../../src/screens/TripDashboardScreen";
-import { dashboardRouteCoordinates } from "../../../../src/screens/trip-dashboard-model";
+} from "../../../../../src/modules/_shared/model";
+import { useTripsModule } from "../../../../../src/modules/trips";
+import { TripDashboardScreen } from "../../../../../src/screens/TripDashboardScreen";
+import type { DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
+import { dashboardRouteCoordinates } from "../../../../../src/screens/trip-dashboard-model";
 
 export default function TripDetailRoute() {
   const router = useRouter();
-  const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId: rawTripId } = useTripTabParams<{ tripId: string }>();
   const trips = useTripsModule();
   const bootstrap = useNaveyoBootstrap();
   const tripId = rawTripId as UUID | undefined;
@@ -144,12 +145,17 @@ export default function TripDetailRoute() {
       onOpenAssistant={() =>
         stops[0]
           ? router.push(
-              `/(app)/trips/${routeTripId}/assistant?stopId=${stops[0].id}`,
+              `/trips/${routeTripId}/assistant?stopId=${stops[0].id}`,
             )
           : router.push(`/(app)/trips/${routeTripId}/stops/new`)
       }
+      onComposeDay={() =>
+        stops[0]
+          ? router.push(`/trips/${routeTripId}/assistant?stopId=${stops[0].id}&mode=day`)
+          : router.push(`/(app)/trips/${routeTripId}/stops/new`)
+      }
       onOpenItinerary={() =>
-        router.push(`/(app)/trips/${routeTripId}/itinerary`)
+        router.push(`/trips/${routeTripId}/itinerary`)
       }
       onOpenStop={(stop) =>
         router.push(`/(app)/trips/${routeTripId}/stops/${stop.id}`)
@@ -164,7 +170,7 @@ export default function TripDetailRoute() {
         router.push(`/(app)/trips/${routeTripId}/reservations`)
       }
       onOpenDocuments={() =>
-        router.push(`/(app)/trips/${routeTripId}/documents`)
+        router.push(`/trips/${routeTripId}/documents`)
       }
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)

@@ -4,7 +4,7 @@ import * as Location from "expo-location";
 import { useNaveyoBootstrap } from "../bootstrap";
 import type { PlaceCandidate, Stop, UUID } from "../modules/_shared/model";
 import { colors, radius, spacing } from "../theme";
-import { AppText, Button, DatePickerField, Input, ShellFrame, StatusPanel } from "../ui";
+import { AppText, Button, DatePickerField, Icon, IconButton, Input, ShellFrame, StatusPanel } from "../ui";
 import { describePlacesError } from "./places-error";
 
 export interface StopLocationFormScreenProps {
@@ -30,7 +30,24 @@ export function StopLocationFormScreen({ tripId, initialStop, onSaved, onCancel 
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showLocationDetails, setShowLocationDetails] = useState(false);
+  const [tripDates, setTripDates] = useState<{ startsOn?: string; endsOn?: string }>({});
   const requestId = useRef(0);
+
+  // A new Étape covers the whole Voyage by default; its dates stay within the Voyage.
+  useEffect(() => {
+    if (!trips) return;
+    let cancelled = false;
+    void trips.get(tripId).then((trip) => {
+      if (cancelled || !trip) return;
+      setTripDates({ startsOn: trip.startsOn, endsOn: trip.endsOn });
+      if (!initialStop) {
+        setStartDate((current) => current || trip.startsOn || "");
+        setEndDate((current) => current || trip.endsOn || "");
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [initialStop, tripId, trips]);
 
   useEffect(() => {
     const query = name.trim();
@@ -101,20 +118,50 @@ export function StopLocationFormScreen({ tripId, initialStop, onSaved, onCancel 
     finally { setSaving(false); }
   };
 
-  return <ShellFrame title={initialStop ? "Modifier l’Étape" : "Nouvelle Étape"} subtitle="Recherchez une ville pour obtenir ses coordonnées et son fuseau.">
-    <Input label="Ville ou lieu" value={name} onChangeText={(value) => { setName(value); setSelected(null); }} placeholder="Lisbonne" autoCorrect={false} />
+  const locationSummary = countryCode.trim() || selected
+    ? describeStopLocation(countryCode, timeZone)
+    : "Retrouvés dès que vous choisissez une ville";
+
+  return <ShellFrame
+    title={initialStop ? "Modifier l’Étape" : "Nouvelle Étape"}
+    subtitle="Choisissez une ville : le pays et l’heure locale sont retrouvés automatiquement."
+    leading={<IconButton icon={<Icon name="arrow-left" size={20} />} onPress={onCancel} accessibilityLabel="Retour" />}
+  >
+    <Input label="Ville" value={name} onChangeText={(value) => { setName(value); setSelected(null); }} placeholder="Lisbonne" autoCorrect={false} leftIcon={<Icon name="search" size={20} color={colors.muted} />} />
     {searching ? <AppText variant="caption" color="muted">Recherche…</AppText> : null}
-    {suggestions.length > 0 ? <View style={styles.suggestions}>{suggestions.map((candidate) => <Pressable key={candidate.id} onPress={() => choose(candidate)} style={styles.suggestion} accessibilityRole="button"><AppText variant="label">{candidate.name}</AppText><AppText variant="caption" color="muted">{candidate.address ?? candidate.countryCode ?? ""}</AppText></Pressable>)}</View> : null}
-    <Button fullWidth variant="secondary" loading={locating} onPress={() => void requestCurrentPosition()}>Utiliser ma position</Button>
-    {selected ? <View style={styles.confirmed}><AppText variant="caption" color="muted">Localisation sélectionnée</AppText><AppText variant="label">{selected.coordinates.latitude.toFixed(5)}, {selected.coordinates.longitude.toFixed(5)}</AppText></View> : null}
-    <Input label="Pays (ISO 3166-1 alpha-2)" value={countryCode} onChangeText={setCountryCode} placeholder="PT" autoCapitalize="characters" maxLength={2} />
-    <Input label="Fuseau IANA" value={timeZone} onChangeText={setTimeZone} placeholder="Europe/Lisbon" />
-    <DatePickerField label="Date de début" value={startDate} onChange={(value) => { setStartDate(value); if (endDate && endDate < value) setEndDate(""); }} />
-    <DatePickerField label="Date de fin" value={endDate} onChange={setEndDate} minimumDate={startDate || undefined} />
+    {suggestions.length > 0 ? <View style={styles.suggestions}>{suggestions.map((candidate) => <Pressable key={candidate.id} onPress={() => choose(candidate)} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`${candidate.name}, ${candidate.address ?? candidate.countryCode ?? ""}`}><Icon name="map-pin" size={20} color={colors.muted} /><View style={styles.flexOne}><AppText variant="label">{candidate.name}</AppText><AppText variant="caption" color="muted" numberOfLines={1}>{candidate.address ?? candidate.countryCode ?? ""}</AppText></View></Pressable>)}</View> : null}
+    {selected ? <View style={styles.confirmed}><Icon name="map-pin" size={20} color={colors.accentStrong} /><View style={styles.flexOne}><AppText variant="label">{selected.name}</AppText><AppText variant="caption" color="muted">{locationSummary}</AppText></View><Icon name="check" size={20} color={colors.accentStrong} /></View> : <Button variant="ghost" loading={locating} onPress={() => void requestCurrentPosition()} icon={<Icon name="map-pin" size={20} color={colors.accentStrong} />}>Utiliser ma position</Button>}
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showLocationDetails }} onPress={() => setShowLocationDetails((current) => !current)} style={({ pressed }) => [styles.detailsToggle, pressed && styles.pressed]}>
+      <View style={styles.flexOne}><AppText variant="label">Pays et fuseau horaire</AppText>{selected ? null : <AppText variant="caption" color="muted">{locationSummary}</AppText>}</View>
+      <AppText variant="label" color="accent">{showLocationDetails ? "Masquer" : "Modifier"}</AppText>
+    </Pressable>
+    {showLocationDetails ? <>
+      <Input label="Pays (code à 2 lettres)" value={countryCode} onChangeText={setCountryCode} placeholder="PT" autoCapitalize="characters" maxLength={2} />
+      <Input label="Fuseau horaire" value={timeZone} onChangeText={setTimeZone} placeholder="Europe/Lisbon" autoCapitalize="none" autoCorrect={false} />
+    </> : null}
+    <DatePickerField label="Arrivée" value={startDate} minimumDate={tripDates.startsOn} maximumDate={tripDates.endsOn} onChange={(value) => { setError(null); setStartDate(value); if (endDate && endDate < value) setEndDate(""); }} />
+    <DatePickerField label="Départ" value={endDate} onChange={(value) => { setError(null); setEndDate(value); }} minimumDate={startDate || tripDates.startsOn} maximumDate={tripDates.endsOn} />
+    {tripDates.startsOn && tripDates.endsOn ? <AppText variant="caption" color="muted">Seules les dates du Voyage sont proposées.</AppText> : null}
     {error ? <StatusPanel kind="error" title="Impossible d’enregistrer l’Étape" message={error} /> : null}
-    <Button fullWidth loading={saving} disabled={!trips || !name.trim()} onPress={() => void submit()}>{initialStop ? "Enregistrer les modifications" : "Ajouter l’Étape"}</Button>
-    <Button fullWidth variant="secondary" onPress={onCancel}>Annuler</Button>
+    <Button fullWidth loading={saving} disabled={!trips || !name.trim() || !startDate || !endDate} onPress={() => void submit()}>{initialStop ? "Enregistrer les modifications" : name.trim() ? `Ajouter ${name.trim()}` : "Ajouter l’Étape"}</Button>
   </ShellFrame>;
+}
+
+/** "Portugal · heure de Lisbon", readable without knowing ISO or IANA codes. */
+export function describeStopLocation(countryCode: string, timeZone: string): string {
+  const code = countryCode.trim().toUpperCase();
+  const zone = timeZone.trim();
+  let country = code;
+  try {
+    // Hermes may ship without Intl.DisplayNames; the code stays readable then.
+    const names = typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames(["fr"], { type: "region" }) : null;
+    country = (code.length === 2 ? names?.of(code) : undefined) ?? code;
+  } catch {
+    country = code;
+  }
+  const city = zone.split("/").pop()?.replace(/_/g, " ");
+  const parts = [country || "Pays à préciser", city ? `heure de ${city}` : "fuseau à préciser"];
+  return parts.join(" · ");
 }
 
 function describeStopSaveError(cause: unknown): string {
@@ -126,4 +173,11 @@ function describeStopSaveError(cause: unknown): string {
   return "Impossible d’enregistrer l’Étape. Réessayez.";
 }
 
-const styles = StyleSheet.create({ suggestions: { backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, overflow: "hidden", marginTop: -spacing.sm }, suggestion: { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }, confirmed: { padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.accentSoft, gap: 4 } });
+const styles = StyleSheet.create({
+  suggestions: { backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, overflow: "hidden", marginTop: -spacing.sm },
+  suggestion: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  confirmed: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.accentSoft },
+  detailsToggle: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  flexOne: { flex: 1 },
+  pressed: { opacity: 0.78 },
+});

@@ -28,6 +28,8 @@ export interface ShellFrameProps {
   subtitle?: string;
   children: React.ReactNode;
   headerAction?: React.ReactNode;
+  /** Shown before the title, typically a back button. */
+  leading?: React.ReactNode;
   footer?: React.ReactNode;
 }
 
@@ -36,6 +38,7 @@ export function ShellFrame({
   subtitle,
   children,
   headerAction,
+  leading,
   footer,
 }: ShellFrameProps) {
   const insets = useSafeAreaInsets();
@@ -59,6 +62,7 @@ export function ShellFrame({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
+          {leading}
           <View style={styles.headerText}>
             <Text style={styles.title} accessibilityRole="header">
               {title}

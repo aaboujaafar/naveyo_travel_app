@@ -5,7 +5,7 @@ export default function LegacyPlacesRoute() {
   const tripId = useNaveyoBootstrap()?.currentTripId;
   return (
     <Redirect
-      href={tripId ? `/(app)/trips/${tripId}` : "/(app)/trips"}
+      href={tripId ? `/trips/${tripId}` : "/(app)/trips"}
     />
   );
 }

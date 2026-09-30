@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Expense } from "../modules/expenses";
 import type { ISO4217 } from "../modules/_shared/model";
-import { formatExpenseDate, formatMoney, summarizeExpenseCategories } from "./trip-budget-model";
+import { formatExpenseDate, formatMoney, parseMoneyInput, summarizeExpenseCategories } from "./trip-budget-model";
 
 const currency = "EUR" as ISO4217;
 
 describe("trip budget model", () => {
+  it("reads amounts typed in euros as minor units", () => {
+    expect(parseMoneyInput("1 000")).toBe(100000);
+    expect(parseMoneyInput("12,5")).toBe(1250);
+    expect(parseMoneyInput("12.05 €")).toBe(1205);
+    expect(parseMoneyInput("0")).toBeNull();
+    expect(parseMoneyInput("12,345")).toBeNull();
+    expect(parseMoneyInput("abc")).toBeNull();
+  });
+
   it("formats integer minor units", () => {
     expect(formatMoney({ minorUnits: 123456, currency })).toContain("1 234,56");
   });

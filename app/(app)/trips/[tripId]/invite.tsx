@@ -106,7 +106,7 @@ export default function TripInviteScreen() {
         }
       }}
       onContinue={() => {
-        if (tripId) router.replace(`/(app)/trips/${tripId}`);
+        if (tripId) router.replace(`/trips/${tripId}`);
         else router.back();
       }}
     />

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type {
   DayPlanBudget,
   DayPlanDraft,
@@ -74,15 +74,12 @@ export function DayPlanSection({
     onChange?.(next);
   };
   const items = sortedDayPlanItems(draft?.items ?? []);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const preferencesSummary = summarizeDayPlanPreferences(currentPreferences);
 
   return (
     <View style={styles.section} accessibilityLabel="Itinéraire IA du jour">
-      <View style={styles.titleRow}>
-        <View style={styles.titleIcon}>
-          <Icon name="calendar" size={16} color={colors.accent} />
-        </View>
-        <AppText variant="sectionTitle" color="muted">ITINÉRAIRE IA DU JOUR</AppText>
-      </View>
+      <AppText variant="label">Quel jour ?</AppText>
 
       {dates.length > 0 ? (
         <ScrollView
@@ -107,19 +104,35 @@ export function DayPlanSection({
 
       {error ? <InlineMessage variant="error" title="Composition impossible" message={error} /> : null}
 
-      <DayPlanPreferencesForm
-        value={currentPreferences}
-        onChange={changePreferences}
-        disabled={loading || confirming}
-      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: preferencesOpen }}
+        accessibilityLabel={`Préférences : ${preferencesSummary}`}
+        onPress={() => setPreferencesOpen((open) => !open)}
+        style={styles.preferencesToggle}
+      >
+        <View style={styles.flexOne}>
+          <AppText variant="label">Préférences</AppText>
+          <AppText variant="caption" color="muted" numberOfLines={2}>{preferencesSummary}</AppText>
+        </View>
+        <AppText variant="label" color="accent">{preferencesOpen ? "Fermer" : "Modifier"}</AppText>
+      </Pressable>
+
+      {preferencesOpen ? (
+        <DayPlanPreferencesForm
+          value={currentPreferences}
+          onChange={changePreferences}
+          disabled={loading || confirming}
+        />
+      ) : null}
 
       <Button
-        variant="secondary"
+        variant={draft ? "secondary" : "primary"}
         fullWidth
         loading={loading}
         disabled={dates.length === 0 || !selectedDate || confirming}
         onPress={() => void onCompose()}
-        icon={<Icon name="sparkles" size={16} color={colors.accent} />}
+        icon={<Icon name="sparkles" size={16} color={draft ? colors.accentStrong : colors.white} />}
       >
         {draft ? "Recomposer la journée" : "Composer la journée"}
       </Button>
@@ -142,11 +155,7 @@ export function DayPlanSection({
               {items.map((item) => <DayPlanItem key={item.candidateId} item={item} candidate={draft.candidates.find((entry) => entry.id === item.candidateId)} />)}
             </View>
           )}
-          <InlineMessage
-            variant="info"
-            title="Aucune modification automatique"
-            message="Aucun élément n’est ajouté à l’itinéraire sans votre confirmation."
-          />
+          <AppText variant="caption" color="muted">Rien n’est ajouté à l’itinéraire sans votre confirmation.</AppText>
           {items.length > 0 ? (
             <Button
               fullWidth
@@ -159,11 +168,7 @@ export function DayPlanSection({
             </Button>
           ) : null}
         </View>
-      ) : (
-        <AppText variant="caption" color="muted" style={styles.hint}>
-          Composez un brouillon pour découvrir des activités adaptées à cette journée.
-        </AppText>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -196,13 +201,6 @@ function DayPlanPreferencesForm({
 
   return (
     <View style={styles.preferences} accessibilityLabel="Préférences de la journée">
-      <View style={styles.preferenceHeader}>
-        <View style={styles.preferenceTitle}>
-          <Icon name="settings" size={16} color={colors.accent} />
-          <AppText variant="label">Personnaliser la journée</AppText>
-        </View>
-        <AppText variant="caption" color="muted">Rayon et envies</AppText>
-      </View>
 
       <PreferenceGroup label="Déplacement">
         <View style={styles.chipRow}>
@@ -261,6 +259,18 @@ function DayPlanPreferencesForm({
   );
 }
 
+/** "À pied · 5 km · Mixte · Modéré · Équilibré", so the form can stay folded. */
+export function summarizeDayPlanPreferences(value: DayPlanPreferences): string {
+  const themes = value.themes.map((theme) => preferenceLabels.theme[theme]).join(", ");
+  return [
+    preferenceLabels.mobility[value.mobility],
+    `${value.radiusMeters / 1_000} km`,
+    themes,
+    preferenceLabels.budget[value.budget],
+    preferenceLabels.pace[value.pace],
+  ].filter(Boolean).join(" · ");
+}
+
 function PreferenceGroup({ label, children }: { label: string; children: ReactNode }) {
   return <View style={styles.preferenceGroup}><AppText variant="caption" color="muted">{label}</AppText>{children}</View>;
 }
@@ -304,8 +314,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  titleIcon: { width: 32, height: 32, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
+  preferencesToggle: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  flexOne: { flex: 1 },
   dateList: { gap: spacing.sm, paddingVertical: 2 },
   dateChip: { minHeight: layout.minimumTouchTarget },
   loading: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md },
@@ -315,10 +325,7 @@ const styles = StyleSheet.create({
   item: { flexDirection: "row", gap: spacing.md, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   itemTime: { width: 78, flexDirection: "row", alignItems: "center", gap: spacing.xs },
   itemContent: { flex: 1, gap: spacing.xs },
-  hint: { textAlign: "center", paddingHorizontal: spacing.sm },
   preferences: { gap: spacing.md, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.bg },
-  preferenceHeader: { gap: spacing.xs },
-  preferenceTitle: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   preferenceGroup: { gap: spacing.sm },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   optionChip: { minHeight: 40 },

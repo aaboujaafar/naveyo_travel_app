@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   AuthFrame,
   Button,
@@ -9,9 +9,7 @@ import {
   StatusPanel,
   useShellSession,
 } from "../../src/ui";
-import { colors } from "../../src/theme/colors";
 import { spacing } from "../../src/theme/spacing";
-import { typography } from "../../src/theme/typography";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -35,16 +33,9 @@ export default function SignInScreen() {
 
   return (
     <AuthFrame
-      title="Connexion"
-      subtitle="Retrouvez vos Voyages et toutes les informations utiles."
+      title="Bon retour"
+      subtitle="Connectez-vous pour retrouver vos Voyages."
     >
-      <View style={styles.branding}>
-        <Text style={styles.brand}>Bon retour</Text>
-        <Text style={styles.tagline}>
-          Connectez-vous à votre espace de voyage privé.
-        </Text>
-      </View>
-
       {error ? (
         <StatusPanel
           kind="error"
@@ -61,13 +52,17 @@ export default function SignInScreen() {
           placeholder="vous@exemple.com"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          autoComplete="email"
         />
         <Input
           label="Mot de passe"
           value={password}
           onChangeText={setPassword}
-          placeholder="••••••••"
           secureTextEntry
+          textContentType="password"
+          autoComplete="current-password"
         />
       </View>
 
@@ -98,17 +93,6 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  branding: {
-    gap: spacing.xs,
-  },
-  brand: {
-    ...typography.displayHero,
-    color: colors.fg,
-  },
-  tagline: {
-    ...typography.bodySmall,
-    color: colors.muted,
-  },
   form: {
     gap: spacing.md,
   },

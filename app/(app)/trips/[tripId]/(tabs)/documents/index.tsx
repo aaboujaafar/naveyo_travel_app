@@ -1,17 +1,18 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useCallback, useState } from "react";
-import type { TravelDocument, UUID } from "../../../../../src/modules/_shared/model";
-import { useDocuments } from "../../../../../src/modules/documents";
-import { useTripsModule } from "../../../../../src/modules/trips";
+import type { TravelDocument, UUID } from "../../../../../../src/modules/_shared/model";
+import { useDocuments } from "../../../../../../src/modules/documents";
+import { useTripsModule } from "../../../../../../src/modules/trips";
 import {
   TripDocumentsScreen,
   type DocumentFilter,
   type DocumentStopOption,
-} from "../../../../../src/screens/TripDocumentsScreen";
+} from "../../../../../../src/screens/TripDocumentsScreen";
 
 export default function DocumentsRoute() {
   const router = useRouter();
-  const { tripId: rawTripId, stopId: rawStopId } = useLocalSearchParams<{
+  const { tripId: rawTripId, stopId: rawStopId } = useTripTabParams<{
     tripId: string;
     stopId?: string;
   }>();
@@ -91,13 +92,12 @@ export default function DocumentsRoute() {
       error={error}
       downloadedId={downloadedId}
       canAssign={documents?.assign !== undefined}
-      onBack={() => router.back()}
       onRetry={load}
       onSelectFilter={setFilter}
       onDownload={download}
       onAssign={assign}
-      onOpenReservations={() => router.replace(`/(app)/trips/${routeTripId}/reservations`)}
-      onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
+      onOpenReservations={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
+      onOpenPacking={() => router.push(`/(app)/trips/${routeTripId}/packing`)}
       onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
     />
   );

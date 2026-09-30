@@ -117,7 +117,7 @@ export default function PackingRoute() {
     saving,
     error,
     onBack: () => router.back(),
-    onOpenDocuments: () => router.replace(`/(app)/trips/${rawTripId ?? ""}/documents`),
+    onOpenDocuments: () => router.dismissTo(`/trips/${rawTripId ?? ""}/documents`),
     onOpenReservations: () => router.replace(`/(app)/trips/${rawTripId ?? ""}/reservations`),
     onRetry: () => load(),
     onAddItem: add,

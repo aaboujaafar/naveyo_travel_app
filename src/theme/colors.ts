@@ -7,12 +7,16 @@ export const colors = {
 
   accent: "#e05a3a",
   accentSoft: "#fdf0ec",
+  /** Accent dark enough for white text and small text on light fills (WCAG AA). */
+  accentStrong: "#c4462a",
 
   teal: "#2a8f8f",
   tealSoft: "#edf7f7",
+  tealStrong: "#1f7171",
 
   gold: "#c99a2e",
   goldSoft: "#fdf6e8",
+  goldStrong: "#8a6414",
 
   success: "#2d8f5e",
   danger: "#d94040",

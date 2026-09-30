@@ -174,7 +174,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
               <LinearGradient id="place-overlay" x1="0" y1="0" x2="0" y2="1">
-                <GradientStop offset="0.4" stopColor={colors.transparent} />
+                <GradientStop offset="0.4" stopColor={colors.fg} stopOpacity={0} />
                 <GradientStop offset="1" stopColor={colors.fg} stopOpacity={0.62} />
               </LinearGradient>
             </Defs>

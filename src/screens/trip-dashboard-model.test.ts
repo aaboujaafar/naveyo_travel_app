@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Coordinates, ItineraryItem, Stop, Trip, UUID } from "../modules/_shared/model";
 import {
   buildDashboardMapPresentation,
+  buildPreparationSteps,
   dashboardRouteCoordinates,
   countTripDays,
   formatTripDateRange,
@@ -10,6 +11,14 @@ import {
 } from "./trip-dashboard-model";
 
 describe("trip dashboard model", () => {
+  it("lists what is left to prepare", () => {
+    const empty = buildPreparationSteps({ stops: 0, itineraryItems: 0, reservations: 0 });
+    expect(empty.map((step) => step.done)).toEqual([false, false, false]);
+    expect(empty[0]?.label).toBe("Ajouter une première Étape");
+    const started = buildPreparationSteps({ stops: 1, itineraryItems: 0, reservations: 2 });
+    expect(started.filter((step) => step.done).map((step) => step.key)).toEqual(["stop", "reservation"]);
+  });
+
   it("formats date-only values without using the device timezone", () => {
     expect(formatTripDateRange("2026-08-10", "2026-08-17")).toBe(
       "10–17 août",

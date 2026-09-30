@@ -69,7 +69,7 @@ export const typography = {
     fontSize: 11,
     fontWeight: "500",
     letterSpacing: 0.66,
-    lineHeight: 11,
+    lineHeight: 15,
   },
 } as const satisfies Record<string, TextStyle>;
 

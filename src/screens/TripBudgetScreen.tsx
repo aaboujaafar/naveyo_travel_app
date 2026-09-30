@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BudgetSummary, Expense, ExpenseCategory } from "../modules/expenses";
 import type { ISO4217 } from "../modules/_shared/model";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import { AppText, BottomSheet, Button, DatePickerField, Icon, InlineMessage, Input, ProgressBar, SectionTitle, Skeleton } from "../ui";
-import { expenseCategories, expenseCategoryLabels, formatExpenseDate, formatMoney, summarizeExpenseCategories } from "./trip-budget-model";
+import { expenseCategories, expenseCategoryLabels, formatExpenseDate, formatMoney, parseMoneyInput, summarizeExpenseCategories } from "./trip-budget-model";
 
 export interface AddExpenseForm {
   label: string;
@@ -30,6 +31,7 @@ export interface TripBudgetScreenProps {
 }
 
 export function TripBudgetScreen(props: TripBudgetScreenProps) {
+  const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
   const [filter, setFilter] = useState<ExpenseCategory | "all">("all");
   const [budgetValue, setBudgetValue] = useState("");
@@ -38,34 +40,36 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
   const [currency, setCurrency] = useState<string>(props.referenceCurrency);
   const [category, setCategory] = useState<ExpenseCategory>("other");
   const [date, setDate] = useState("");
-  const [paidBy, setPaidBy] = useState("");
   const categories = useMemo(() => summarizeExpenseCategories(props.expenses), [props.expenses]);
   const visibleExpenses = filter === "all" ? props.expenses : props.expenses.filter((expense) => expense.category === filter);
 
   if (props.loading && !props.summary) return <BudgetLoading />;
 
+  const budgetMinorUnits = parseMoneyInput(budgetValue);
+  const amountMinorUnits = parseMoneyInput(amount);
+
   async function saveBudget() {
-    await props.onSaveBudget(Number(budgetValue));
+    if (budgetMinorUnits === null) return;
+    await props.onSaveBudget(budgetMinorUnits);
     setBudgetValue("");
   }
 
   async function addExpense() {
+    if (amountMinorUnits === null) return;
     await props.onAddExpense({
       label,
-      amountMinorUnits: Number(amount),
+      amountMinorUnits,
       currency: currency.toUpperCase() as ISO4217,
       category,
       occurredOn: date,
-      paidBy: paidBy.trim() || undefined,
     });
     setLabel("");
     setAmount("");
-    setPaidBy("");
     setModalVisible(false);
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={props.onBack} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}><Icon name="arrow-left" size={20} /></Pressable>
@@ -84,12 +88,12 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
         ) : (
           <View style={[styles.overview, shadows.md]}>
             <AppText variant="h3">Définir le Budget global</AppText>
-            <Input label={`Montant en unité mineure · ${props.referenceCurrency}`} value={budgetValue} onChangeText={setBudgetValue} keyboardType="number-pad" placeholder="100000" hint="100000 correspond à 1 000,00" />
-            <Button fullWidth loading={props.saving} onPress={() => void saveBudget()}>Enregistrer le budget</Button>
+            <Input label={`Budget total · ${props.referenceCurrency}`} value={budgetValue} onChangeText={setBudgetValue} keyboardType="decimal-pad" placeholder="1 000" hint={budgetMinorUnits !== null ? `Soit ${formatMoney({ minorUnits: budgetMinorUnits, currency: props.referenceCurrency })}` : "Montant pour tout le Voyage"} />
+            <Button fullWidth loading={props.saving} disabled={budgetMinorUnits === null} onPress={() => void saveBudget()}>Enregistrer le budget</Button>
           </View>
         )}
 
-        <Section title="Répartition par catégorie">
+        {props.expenses.length > 0 ? <Section title="Répartition par catégorie">
           {categories.map((item) => (
             <View key={item.category} style={styles.categoryRow}>
               <View style={styles.categoryInfo}><AppText variant="label">{expenseCategoryLabels[item.category]}</AppText><AppText variant="caption" color="muted">{formatMoney({ minorUnits: item.minorUnits, currency: props.referenceCurrency })}</AppText></View>
@@ -97,7 +101,7 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
               <AppText variant="caption" color="muted">{Math.round(item.share * 100)}%</AppText>
             </View>
           ))}
-        </Section>
+        </Section> : null}
 
         <ComingSoon label="Répartition et règlements">
           <Section title="Qui paie quoi">
@@ -112,12 +116,12 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
         </ComingSoon>
 
         <Section title="Dépenses récentes">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          {props.expenses.length > 0 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             <FilterChip label="Tout" active={filter === "all"} onPress={() => setFilter("all")} />
             {expenseCategories.map((value) => <FilterChip key={value} label={expenseCategoryLabels[value]} active={filter === value} onPress={() => setFilter(value)} />)}
-          </ScrollView>
+          </ScrollView> : null}
           <View style={styles.expenseList}>
-            {visibleExpenses.length === 0 ? <InlineMessage title="Aucune Dépense" message="Ajoutez une Dépense réelle pour commencer le suivi." /> : visibleExpenses.map((expense) => <ExpenseRow key={expense.id} expense={expense} />)}
+            {visibleExpenses.length === 0 ? <AppText variant="bodySmall" color="muted">Aucune dépense pour l’instant. Touchez « + » pour ajouter la première.</AppText> : visibleExpenses.map((expense) => <ExpenseRow key={expense.id} expense={expense} />)}
           </View>
         </Section>
       </ScrollView>
@@ -126,15 +130,14 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
 
       <BottomSheet visible={modalVisible} onClose={() => setModalVisible(false)} title="Nouvelle Dépense" maxHeight={720}>
         <Input label="Titre" value={label} onChangeText={setLabel} placeholder="Dîner au restaurant" />
-        <Input label="Montant en unité mineure" value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder="2500" />
-        <Input label="Devise ISO 4217" value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} />
+        <Input label="Montant" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="25,00" />
+        <Input label="Devise" value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} hint="Code à 3 lettres : EUR, USD, GBP…" />
         <AppText variant="label">Catégorie</AppText>
         <View style={styles.categoryPicker}>{expenseCategories.map((value) => <FilterChip key={value} label={expenseCategoryLabels[value]} active={category === value} onPress={() => setCategory(value)} />)}</View>
         <DatePickerField label="Date locale" value={date} onChange={setDate} />
-        <Input label="Payé par · UUID facultatif" value={paidBy} onChangeText={setPaidBy} placeholder="Compte ayant payé" />
         <ComingSoon label="Justificatif photo"><View style={styles.receiptButton}><Icon name="image" size={20} color={colors.muted} /><AppText variant="label" color="muted">Ajouter un reçu</AppText></View></ComingSoon>
         {props.error ? <InlineMessage variant="error" title="Ajout impossible" message={props.error} /> : null}
-        <Button fullWidth loading={props.saving} onPress={() => void addExpense()}>Ajouter la Dépense</Button>
+        <Button fullWidth loading={props.saving} disabled={!label.trim() || amountMinorUnits === null || !date} onPress={() => void addExpense()}>Ajouter la Dépense</Button>
       </BottomSheet>
     </View>
   );
@@ -154,6 +157,6 @@ const styles = StyleSheet.create({
   horizontal: { paddingHorizontal: spacing.lg, gap: spacing.sm }, overview: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, gap: spacing.md }, moneyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: spacing.sm }, stats: { flexDirection: "row", gap: spacing.sm }, stat: { flex: 1, padding: spacing.sm, backgroundColor: colors.bg, borderRadius: radius.sm, gap: spacing.xs },
   section: { marginHorizontal: spacing.lg, marginTop: spacing.lg }, categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm }, categoryInfo: { width: "30%" }, categoryProgress: { flex: 1 }, futureCard: { padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, gap: spacing.xs }, alert: { padding: spacing.md, backgroundColor: colors.goldSoft, borderRadius: radius.sm },
   filters: { gap: spacing.sm, paddingBottom: spacing.sm }, chip: { minHeight: spacing["2xl"] - spacing.xs, paddingHorizontal: spacing.md - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, chipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft }, expenseList: { gap: spacing.sm, marginTop: spacing.md }, expenseRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md }, expenseIcon: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.sm, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" }, amount: { alignItems: "flex-end" },
-  fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, width: spacing["2xl"] + spacing.sm, height: spacing["2xl"] + spacing.sm, borderRadius: radius.full, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", zIndex: zIndex.fab }, categoryPicker: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, receiptButton: { minHeight: spacing["2xl"], borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, width: spacing["2xl"] + spacing.sm, height: spacing["2xl"] + spacing.sm, borderRadius: radius.full, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center", zIndex: zIndex.fab }, categoryPicker: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, receiptButton: { minHeight: spacing["2xl"], borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   futureWrap: { position: "relative" }, futureContent: { opacity: 0.5 }, futureBadge: { position: "absolute", top: spacing.xs, right: spacing.lg, zIndex: zIndex.sticky }, flexOne: { flex: 1 }, pressed: { transform: [{ scale: 0.97 }] }, loading: { flex: 1, padding: spacing.lg, gap: spacing.md, backgroundColor: colors.bg },
 });

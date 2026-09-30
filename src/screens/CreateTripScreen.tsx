@@ -60,6 +60,8 @@ export function CreateTripScreen({
 }: CreateTripScreenProps) {
   const insets = useSafeAreaInsets();
   const [values, setValues] = useState(initialValues);
+  // Errors wait for the person to leave the field, instead of greeting an empty form.
+  const [destinationTouched, setDestinationTouched] = useState(false);
   const duration = useMemo(
     () => calculateTripDuration(values.startsOn, values.endsOn),
     [values.endsOn, values.startsOn],
@@ -143,9 +145,10 @@ export function CreateTripScreen({
             <Input
               value={values.name}
               onChangeText={(name) => setValues((current) => ({ ...current, name }))}
+              onBlur={() => setDestinationTouched(true)}
               placeholder="Où partez-vous ?"
               leftIcon={<Icon name="map-pin" size={20} color={colors.muted} />}
-              error={values.name.trim().length === 0 ? "Veuillez choisir une destination" : undefined}
+              error={destinationTouched && values.name.trim().length === 0 ? "Indiquez une destination" : undefined}
             />
           </FormSection>
 
@@ -180,13 +183,13 @@ export function CreateTripScreen({
                   {duration.days} jours · {duration.nights} nuits
                 </AppText>
               </View>
-            ) : (
+            ) : values.startsOn && values.endsOn ? (
               <InlineMessage
                 variant="error"
                 title="Dates invalides"
                 message="La date de retour doit être après le départ."
               />
-            )}
+            ) : null}
             <ComingSoonFrame>
               <View style={styles.weatherCard}>
                 <AppText style={styles.weatherIcon}>☀️</AppText>

@@ -7,7 +7,7 @@ export default function LegacyItineraryRoute() {
     <Redirect
       href={
         tripId
-          ? `/(app)/trips/${tripId}/itinerary`
+          ? `/trips/${tripId}/itinerary`
           : "/(app)/trips"
       }
     />

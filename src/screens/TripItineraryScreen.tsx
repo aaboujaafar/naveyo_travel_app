@@ -38,8 +38,8 @@ export interface TripItineraryScreenProps {
   offline: OfflineTripPackLoad | null;
   loading: boolean;
   error?: string | null;
-  onBack: () => void;
-  onOpenTrip: () => void;
+  /** Absent when the screen is a tab: the tab bar is the way out. */
+  onBack?: () => void;
   onOpenAssistant: (stopId: Stop["id"]) => void;
   onOpenTracking: () => void;
   onCalculateRoute?: (coordinates: Coordinates[]) => Promise<Coordinates[] | null>;
@@ -58,7 +58,6 @@ export function TripItineraryScreen({
   loading,
   error,
   onBack,
-  onOpenTrip,
   onOpenAssistant,
   onOpenTracking,
   onCalculateRoute,
@@ -136,10 +135,6 @@ export function TripItineraryScreen({
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
     [insets.top],
   );
-  const navigationInsetStyle = useMemo(
-    () => ({ paddingBottom: Math.max(insets.bottom, spacing.sm) }),
-    [insets.bottom],
-  );
 
   return (
     <View style={styles.screen}>
@@ -148,13 +143,13 @@ export function TripItineraryScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.header, headerInsetStyle]}>
-          <IconButton
+          {onBack ? <IconButton
             icon={<Icon name="arrow-left" size={20} />}
             onPress={onBack}
             accessibilityLabel="Retour au Voyage"
-          />
-          <AppText variant="h3" style={styles.headerTitle}>
-            Carte & Itinéraire
+          /> : null}
+          <AppText variant={onBack ? "h3" : "h1"} style={styles.headerTitle}>
+            {onBack ? "Carte & Itinéraire" : "Carte"}
           </AppText>
           <IconButton
             icon={<Icon name="map-pin" size={20} color={colors.accent} />}
@@ -190,7 +185,7 @@ export function TripItineraryScreen({
               >
                 <AppText
                   variant="caption"
-                  color={day.date === activeDay?.date ? "onAccent" : "muted"}
+                  color={day.date === activeDay?.date ? "accent" : "muted"}
                 >
                   Jour {index + 1}
                 </AppText>
@@ -243,7 +238,7 @@ export function TripItineraryScreen({
               <AppText variant="h3">Itinéraire du jour</AppText>
               {activeDay ? (
                 <AppText variant="caption" color="muted">
-                  {formatLocalItineraryDate(activeDay.date)} · {activeDay.stop.name} · {activeDay.stop.timeZone}
+                  {formatLocalItineraryDate(activeDay.date)} · {activeDay.stop.name}
                 </AppText>
               ) : null}
             </View>
@@ -276,14 +271,14 @@ export function TripItineraryScreen({
               <Icon name="calendar" size={24} color={colors.muted} />
               <AppText variant="label">Aucun élément prévu</AppText>
               <AppText variant="caption" color="muted" align="center">
-                Ajoutez d’abord un lieu confirmé depuis les Suggestions IA.
+                Laissez l’IA composer cette journée, ou ajoutez un lieu depuis Explorer.
               </AppText>
               {activeDay ? (
                 <Button
-                  variant="secondary"
                   onPress={() => onOpenAssistant(activeDay.stop.id)}
+                  icon={<Icon name="sparkles" size={16} color={colors.white} />}
                 >
-                  Découvrir des lieux
+                  Composer la journée
                 </Button>
               ) : null}
             </View>
@@ -331,13 +326,6 @@ export function TripItineraryScreen({
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomNav, navigationInsetStyle]}>
-        <BottomNavItem icon="home" label="Accueil" onPress={onOpenTrip} />
-        <BottomNavItem icon="search" label="Explorer" comingSoon />
-        <BottomNavItem icon="image" label="Photos" comingSoon />
-        <BottomNavItem icon="file-text" label="Journal" comingSoon />
-        <BottomNavItem icon="map" label="Carte" active />
-      </View>
     </View>
   );
 }
@@ -434,37 +422,6 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function BottomNavItem({
-  icon,
-  label,
-  active = false,
-  comingSoon = false,
-  onPress,
-}: {
-  icon: "home" | "search" | "image" | "file-text" | "map";
-  label: string;
-  active?: boolean;
-  comingSoon?: boolean;
-  onPress?: () => void;
-}) {
-  if (comingSoon) return null;
-  const disabled = comingSoon || !onPress;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}${comingSoon ? ", à venir" : ""}`}
-      accessibilityState={{ selected: active, disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.bottomNavItem, comingSoon && styles.disabled]}
-    >
-      <Icon name={icon} size={20} color={active ? colors.accent : colors.muted} />
-      <AppText variant="badge" color={active ? "accent" : "muted"}>{label}</AppText>
-      {comingSoon ? <AppText variant="badge" color="gold">À venir</AppText> : null}
-    </Pressable>
-  );
-}
-
 function itineraryCategory(item: ItineraryItem): "Resto" | "Transport" | "Visite" | "Hôtel" {
   const category = item.place?.kind === "origin" || item.place?.kind === "destination"
     ? "transport"
@@ -494,7 +451,7 @@ const styles = StyleSheet.create({
   loadingDays: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   dayPills: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   dayPill: { minHeight: layout.minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  dayPillActive: { borderColor: colors.accent, backgroundColor: colors.accent, ...shadows.accent },
+  dayPillActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   horizontalSection: { paddingHorizontal: spacing.lg, marginVertical: spacing.md },
   mapContainer: { position: "relative", minHeight: spacing["2xl"] * 7, marginHorizontal: spacing.md, borderRadius: radius.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.tealSoft, ...shadows.md },
   mapView: { height: spacing["2xl"] * 7, width: "100%" },
@@ -535,6 +492,4 @@ const styles = StyleSheet.create({
   statItem: { flex: 1, minHeight: spacing["2xl"] * 2, alignItems: "center", justifyContent: "center", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   pressed: { transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.44 },
-  bottomNav: { position: "absolute", left: 0, right: 0, bottom: 0, maxWidth: layout.maxMobileWidth, alignSelf: "center", flexDirection: "row", paddingTop: spacing.sm, paddingHorizontal: spacing.sm, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, zIndex: zIndex.sticky, ...shadows.sm },
-  bottomNavItem: { flex: 1, minHeight: spacing["2xl"], alignItems: "center", justifyContent: "center", gap: spacing.xs },
 });

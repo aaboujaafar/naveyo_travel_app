@@ -30,9 +30,9 @@ export interface AppTextProps extends Omit<TextProps, "style"> {
 const colorStyles = StyleSheet.create({
   fg: { color: colors.fg },
   muted: { color: colors.muted },
-  accent: { color: colors.accent },
-  teal: { color: colors.teal },
-  gold: { color: colors.gold },
+  accent: { color: colors.accentStrong },
+  teal: { color: colors.tealStrong },
+  gold: { color: colors.goldStrong },
   success: { color: colors.success },
   danger: { color: colors.danger },
   onAccent: { color: colors.white },

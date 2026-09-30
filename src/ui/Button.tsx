@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   primary: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentStrong,
   },
   secondary: {
     backgroundColor: colors.surface,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     color: colors.fg,
   },
   text_ghost: {
-    color: colors.accent,
+    color: colors.accentStrong,
   },
   text_danger: {
     color: colors.white,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentStrong,
     alignItems: "center",
     justifyContent: "center",
   },

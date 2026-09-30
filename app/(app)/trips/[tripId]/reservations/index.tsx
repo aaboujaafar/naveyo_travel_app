@@ -63,7 +63,7 @@ export default function ReservationsRoute() {
       error={error}
       onBack={() => router.back()}
       onRetry={load}
-      onOpenDocuments={() => router.replace(`/(app)/trips/${routeTripId}/documents`)}
+      onOpenDocuments={() => router.dismissTo(`/trips/${routeTripId}/documents`)}
       onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
       onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
       onOpenNavigation={openNavigation}

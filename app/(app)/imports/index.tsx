@@ -321,7 +321,7 @@ export default function ReservationImportRoute() {
       }}
       onOpenImport={(id) => router.replace(`/(app)/imports?pendingId=${encodeURIComponent(id)}${tripId ? `&tripId=${tripId}` : ""}`)}
       onOpenDocuments={() => {
-        if (tripId) router.replace(`/(app)/trips/${tripId}/documents`);
+        if (tripId) router.replace(`/trips/${tripId}/documents`);
       }}
       onOpenReservations={() => {
         if (tripId) router.replace(`/(app)/trips/${tripId}/reservations`);

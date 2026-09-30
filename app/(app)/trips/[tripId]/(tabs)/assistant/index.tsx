@@ -1,41 +1,45 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useEffect, useState } from "react";
-import { describePlacesError } from "../../../../../src/screens/places-error";
-import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
-import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../src/modules/_shared/model";
+import { describePlacesError } from "../../../../../../src/screens/places-error";
+import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
+import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../../src/modules/_shared/model";
 import {
   confirmDayPlan,
   mapItineraryToDayPlanHistory,
   normalizeDayPlanPreferences,
   type DayPlanPreferences,
   type DayPlanDraft,
-} from "../../../../../src/modules/day-planner";
+} from "../../../../../../src/modules/day-planner";
 import {
   useTripAssistant,
   type SuggestionDraft,
   type SuggestionItineraryContext,
   type SuggestionWeatherContext,
-} from "../../../../../src/modules/trip-assistant";
-import { useTripsModule } from "../../../../../src/modules/trips";
-import { TripAssistantScreen } from "../../../../../src/screens/TripAssistantScreen";
-import { DayPlanSection } from "../../../../../src/screens/DayPlanSection";
-import { stopDates } from "../../../../../src/screens/day-plan-model";
+} from "../../../../../../src/modules/trip-assistant";
+import { useTripsModule } from "../../../../../../src/modules/trips";
+import { TripAssistantScreen } from "../../../../../../src/screens/TripAssistantScreen";
+import { DayPlanSection } from "../../../../../../src/screens/DayPlanSection";
+import { stopDates } from "../../../../../../src/screens/day-plan-model";
 import {
   assistantCategoryPlaceType,
   buildAssistantPreferences,
   type AssistantSearchValues,
-} from "../../../../../src/screens/trip-assistant-model";
+} from "../../../../../../src/screens/trip-assistant-model";
 
 export default function TripAssistantRoute() {
   const router = useRouter();
-  const { tripId, stopId } = useLocalSearchParams<{
+  const { tripId, stopId: requestedStopId, mode: requestedMode } = useTripTabParams<{
     tripId: string;
-    stopId: string;
+    stopId?: string;
+    mode?: string;
   }>();
   const assistant = useTripAssistant();
   const bootstrap = useNaveyoBootstrap();
   const trips = useTripsModule();
   const [stop, setStop] = useState<Stop | null>(null);
+  // Opened from the tab bar there is no stopId: the first Étape is explored by default.
+  const stopId = stop?.id ?? requestedStopId;
   const [drafts, setDrafts] = useState<SuggestionDraft[]>([]);
   const [nearbyCandidates, setNearbyCandidates] = useState<PlaceCandidate[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +69,13 @@ export default function TripAssistantRoute() {
   };
 
   useEffect(() => {
-    if (!trips || !tripId || !stopId) return;
+    if (!trips || !tripId) return;
     let active = true;
     trips
       .listStops(tripId as UUID)
       .then(async (stops) => {
         if (active) {
-          const selected = stops.find((candidate) => candidate.id === stopId) ?? null;
+          const selected = stops.find((candidate) => candidate.id === requestedStopId) ?? stops[0] ?? null;
           setStop(selected);
           if (selected) {
             setSelectedDayPlanDate(selected.startDate);
@@ -105,7 +109,7 @@ export default function TripAssistantRoute() {
     return () => {
       active = false;
     };
-  }, [bootstrap, stopId, tripId, trips]);
+  }, [bootstrap, requestedStopId, tripId, trips]);
 
   const discover = async (values: AssistantSearchValues) => {
     if (!tripId || !stopId) {
@@ -203,7 +207,7 @@ export default function TripAssistantRoute() {
       });
       setPlannedItems((current) => [...current, ...added]);
       setDayPlan(null);
-      router.push(`/(app)/trips/${tripId}/itinerary`);
+      router.push(`/trips/${tripId}/itinerary`);
     } catch (cause: unknown) {
       setDayPlanError(cause instanceof Error ? cause.message : "Confirmation indisponible");
     } finally {
@@ -214,6 +218,7 @@ export default function TripAssistantRoute() {
   return (
     <TripAssistantScreen
       stopName={stop?.name}
+      requestedMode={requestedMode === "day" || requestedMode === "places" ? requestedMode : undefined}
       drafts={drafts}
       nearbyCandidates={nearbyCandidates}
       loading={loading}
@@ -221,11 +226,6 @@ export default function TripAssistantRoute() {
       error={error}
       onDiscover={discover}
       onOpenPlace={(placeId) => router.push(`/(app)/trips/${tripId}/places/${placeId}`)}
-      onBack={() => router.back()}
-      onOpenTrip={() => {
-        if (tripId) router.replace(`/(app)/trips/${tripId}`);
-        else router.back();
-      }}
       planningContext={{ weather, plannedCount: displayedPlannedItems.length }}
       dayPlanSection={stop ? (
         <DayPlanSection

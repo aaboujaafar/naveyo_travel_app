@@ -50,13 +50,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   text_accent: {
-    color: colors.accent,
+    color: colors.accentStrong,
   },
   text_teal: {
-    color: colors.teal,
+    color: colors.tealStrong,
   },
   text_gold: {
-    color: "#8a6b1e",
+    color: colors.goldStrong,
   },
   text_success: {
     color: colors.success,

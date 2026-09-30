@@ -65,6 +65,34 @@ export function formatStopDates(stop: Stop): string {
   return formatTripDateRange(stop.startDate, stop.endDate);
 }
 
+export type PreparationStepKey = "stop" | "places" | "reservation";
+
+export interface PreparationStep {
+  key: PreparationStepKey;
+  label: string;
+  done: boolean;
+}
+
+/** What is left to prepare, in the order a person usually does it. */
+export function buildPreparationSteps(counts: {
+  stops: number;
+  itineraryItems: number;
+  reservations: number;
+}): PreparationStep[] {
+  return [
+    { key: "stop", label: counts.stops > 0 ? "Première Étape ajoutée" : "Ajouter une première Étape", done: counts.stops > 0 },
+    { key: "places", label: counts.itineraryItems > 0 ? "Lieux ajoutés à l’itinéraire" : "Choisir des lieux à visiter", done: counts.itineraryItems > 0 },
+    { key: "reservation", label: counts.reservations > 0 ? "Réservation importée" : "Importer une réservation", done: counts.reservations > 0 },
+  ];
+}
+
+/** "16 – 20 nov. · 5 jours" for a stop card, without the technical time zone. */
+export function formatStopSummary(stop: Stop): string {
+  const days = countTripDays(stop.startDate, stop.endDate);
+  const range = formatStopDates(stop);
+  return days ? `${range} · ${days} jour${days > 1 ? "s" : ""}` : range;
+}
+
 export interface DashboardMapPresentation {
   model: MapModel;
   confirmedPlaceCount: number;

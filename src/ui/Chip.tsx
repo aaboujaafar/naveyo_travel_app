@@ -108,12 +108,12 @@ const styles = StyleSheet.create({
     color: colors.fg,
   },
   textActive: {
-    color: colors.accent,
+    color: colors.accentStrong,
   },
   textTeal: {
-    color: colors.teal,
+    color: colors.tealStrong,
   },
   textGold: {
-    color: colors.gold,
+    color: colors.goldStrong,
   },
 });

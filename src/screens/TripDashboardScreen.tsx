@@ -8,10 +8,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
-import { ExpoMapsView } from "../adapters/map/expo-maps-view";
+import Svg, { Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
 import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
-import type { Coordinates, ItineraryItem, PlaceReference, Reservation, Stop, Trip } from "../modules/_shared/model";
+import type { Coordinates, ItineraryItem, Reservation, Stop, Trip } from "../modules/_shared/model";
 import {
   colors,
   componentMetrics,
@@ -24,14 +23,13 @@ import {
 import { AppText, Badge, Button, Icon, InlineMessage, Skeleton } from "../ui";
 import {
   countTripDays,
-  formatStopDates,
   formatTripDateRange,
-  buildDashboardMapPresentation,
+  buildPreparationSteps,
+  formatStopSummary,
   getTravelerCount,
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
 
-type DashboardTab = "today" | "map" | "addresses" | "budget";
 
 export interface TripDashboardScreenProps {
   trip: Trip | null;
@@ -44,6 +42,8 @@ export interface TripDashboardScreenProps {
   onOpenTrips: () => void;
   onOpenSettings: () => void;
   onOpenAssistant: () => void;
+  /** Opens Explorer on the AI day composer. Falls back to onOpenAssistant. */
+  onComposeDay?: () => void;
   onOpenItinerary: () => void;
   onOpenStop: (stop: Stop) => void;
   onOpenCreateStop: () => void;
@@ -58,31 +58,15 @@ export interface TripDashboardScreenProps {
 
 export interface DashboardWeatherState { status: "loading" | "ready" | "empty" | "error"; message?: string; updatedAt?: string; days?: { date: string; label: string; icon: string; temperatureMin: number; temperatureMax: number; precipitationProbabilityMax?: number }[] }
 
-const tabs: readonly { key: DashboardTab; label: string }[] = [
-  { key: "today", label: "Aujourd'hui" },
-  { key: "map", label: "Carte" },
-  { key: "addresses", label: "Adresses" },
-  { key: "budget", label: "Budget" },
-];
 
 export function TripDashboardScreen(props: TripDashboardScreenProps) {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<DashboardTab>("today");
   const [refreshing, setRefreshing] = useState(false);
   const [showMemberNotice, setShowMemberNotice] = useState(true);
-  const [fabOpen, setFabOpen] = useState(false);
   const sortedStops = useMemo(() => sortStopsByLocalDate(props.stops), [props.stops]);
   const topControlsStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
     [insets.top],
-  );
-  const navStyle = useMemo(
-    () => ({ paddingBottom: Math.max(insets.bottom, spacing.sm) }),
-    [insets.bottom],
-  );
-  const fabStyle = useMemo(
-    () => ({ bottom: Math.max(insets.bottom, spacing.sm) + spacing["2xl"] + spacing.lg }),
-    [insets.bottom],
   );
 
   async function refresh() {
@@ -150,7 +134,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
               <LinearGradient id="dashboard-overlay" x1="0" y1="0" x2="0" y2="1">
-                <GradientStop offset="0.35" stopColor={colors.transparent} />
+                <GradientStop offset="0.35" stopColor={colors.fg} stopOpacity={0} />
                 <GradientStop offset="1" stopColor={colors.fg} stopOpacity={0.78} />
               </LinearGradient>
             </Defs>
@@ -164,9 +148,9 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
               onPress={props.onOpenTrips}
             />
             <RoundAction
-              label="Actualiser"
-              icon={<Icon name="refresh" size={20} />}
-              onPress={() => void refresh()}
+              label="Réglages du Voyage"
+              icon={<Icon name="settings" size={20} />}
+              onPress={props.onOpenSettings}
             />
           </View>
 
@@ -185,32 +169,6 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
           </View>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabs}
-        >
-          {tabs.map((tab) => (
-            <Pressable
-              key={tab.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === tab.key }}
-              onPress={() => setActiveTab(tab.key)}
-              style={({ pressed }) => [
-                styles.tab,
-                activeTab === tab.key && styles.tabActive,
-                pressed && styles.pressed,
-              ]}
-            >
-              <AppText
-                variant="label"
-                color={activeTab === tab.key ? "onAccent" : "muted"}
-              >
-                {tab.label}
-              </AppText>
-            </Pressable>
-          ))}
-        </ScrollView>
 
         {props.error ? (
           <View style={styles.bannerWrap}>
@@ -225,13 +183,13 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
           />
         ) : null}
 
-        <DashboardWeather weather={props.weather} />
-
-        {activeTab === "today" ? (
-          <TodayPanel
+        <TodayPanel
+            onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             stops={sortedStops}
-            tripDays={tripDays}
+            itineraryItemCount={props.itineraryItems.length}
             reservations={props.reservations}
+            weather={props.weather}
+            onOpenExpenses={props.onOpenExpenses}
             onOpenAssistant={props.onOpenAssistant}
             onOpenItinerary={props.onOpenItinerary}
             onOpenStop={props.onOpenStop}
@@ -241,73 +199,37 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onOpenPacking={props.onOpenPacking}
             weatherByStopId={props.weatherByStopId}
           />
-        ) : null}
-        {activeTab === "map" ? (
-          <MapPanel
-            stops={sortedStops}
-            itineraryItems={props.itineraryItems}
-            routePolyline={props.routePolyline}
-            onOpen={props.onOpenItinerary}
-          />
-        ) : null}
-        {activeTab === "addresses" ? (
-          <AddressesPanel
-            items={props.itineraryItems}
-            reservations={props.reservations}
-            onOpenAssistant={props.onOpenAssistant}
-            onOpenItinerary={props.onOpenItinerary}
-          />
-        ) : null}
-        {activeTab === "budget" ? (
-          <BudgetPanel currency={trip.referenceCurrency} onOpen={props.onOpenExpenses} />
-        ) : null}
       </ScrollView>
 
-      <View style={[styles.fabContainer, fabStyle]} pointerEvents="box-none">
-        {fabOpen ? (
-          <View style={styles.fabMenu}>
-            <FabItem label="Lieu" icon="📍" onPress={props.onOpenAssistant} />
-            <FabItem label="Dépense" icon="€" onPress={props.onOpenExpenses} />
-          </View>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={fabOpen ? "Fermer les ajouts rapides" : "Ouvrir les ajouts rapides"}
-          onPress={() => setFabOpen((current) => !current)}
-          style={({ pressed }) => [styles.fab, shadows.lg, pressed && styles.pressed]}
-        >
-          <Icon name={fabOpen ? "close" : "plus"} size={24} color={colors.white} />
-        </Pressable>
-      </View>
-
-      <View style={[styles.bottomNav, navStyle]}>
-        <NavItem label="Voyages" icon="home" onPress={props.onOpenTrips} />
-        <NavItem label="Explorer" icon="search" onPress={props.onOpenAssistant} />
-        <NavItem label="Documents" icon="file-text" onPress={props.onOpenDocuments} />
-        <NavItem label="Réglages" icon="settings" onPress={props.onOpenSettings} />
-      </View>
     </View>
   );
 }
 
-function DashboardWeather({ weather }: { weather?: DashboardWeatherState }) {
-  if (!weather || weather.status === "empty") return <Section title="Météo"><InlineMessage title="Météo indisponible" message={weather?.message ?? "Ajoutez une Étape pour afficher les prévisions."} /></Section>;
-  if (weather.status === "loading") return <Section title="Météo"><Skeleton height={spacing.xl * 2} borderRadius={radius.md} /></Section>;
-  if (weather.status === "error") return <Section title="Météo"><InlineMessage variant="error" title="Météo indisponible" message={weather.message ?? "Impossible de charger la météo."} /></Section>;
-  return <Section title="Météo — Prévisions"><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherStrip}>{(weather.days ?? []).slice(0, 7).map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="h3">{day.icon}</AppText><AppText variant="label">{Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}°</AppText>{day.precipitationProbabilityMax !== undefined ? <AppText variant="badge" color="muted">Pluie {Math.round(day.precipitationProbabilityMax)}%</AppText> : null}</View>)}</ScrollView></Section>;
+function DashboardWeather({ weather, hasStops }: { weather?: DashboardWeatherState; hasStops: boolean }) {
+  if (!hasStops) return null;
+  if (weather?.status === "loading") return <Section title="Météo"><Skeleton height={spacing.xl * 2} borderRadius={radius.md} /></Section>;
+  const days = weather?.status === "ready" ? weather.days ?? [] : [];
+  if (days.length === 0) {
+    const message = weather?.status === "error" ? "Météo momentanément indisponible." : "La météo s’affichera 16 jours avant le départ.";
+    return <View style={styles.weatherNote}><Icon name="info" size={16} color={colors.muted} /><AppText variant="caption" color="muted" style={styles.flexOne}>{message}</AppText></View>;
+  }
+  return <Section title="Météo"><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherStrip}>{days.slice(0, 7).map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="h3">{day.icon}</AppText><AppText variant="label">{Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}°</AppText>{day.precipitationProbabilityMax !== undefined ? <AppText variant="badge" color="muted">Pluie {Math.round(day.precipitationProbabilityMax)}%</AppText> : null}</View>)}</ScrollView></Section>;
 }
 
 function StepWeatherPreview({ weather }: { weather?: DashboardWeatherState }) {
   if (!weather || weather.status === "loading") return <AppText variant="caption" color="muted">Météo : chargement…</AppText>;
-  if (weather.status !== "ready") return <AppText variant="caption" color="muted">Météo indisponible pour cette Étape</AppText>;
-  if (!weather.days?.length) return <AppText variant="caption" color="muted">Aucune journée dans la fenêtre de prévision</AppText>;
+  if (weather.status !== "ready") return null;
+  if (!weather.days?.length) return null;
   return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepWeatherStrip}>{weather.days.map((day) => <View key={day.date} style={styles.stepWeatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="label">{day.icon} {Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}° · Pluie {day.precipitationProbabilityMax ?? 0}%</AppText></View>)}</ScrollView>;
 }
 
 function TodayPanel({
+  onComposeDay,
   stops,
-  tripDays,
+  itineraryItemCount,
   reservations,
+  weather,
+  onOpenExpenses,
   onOpenAssistant,
   onOpenItinerary,
   onOpenStop,
@@ -317,9 +239,12 @@ function TodayPanel({
   onOpenPacking,
   weatherByStopId,
 }: {
+  onComposeDay: () => void;
   stops: Stop[];
-  tripDays: number | null;
+  itineraryItemCount: number;
   reservations: Reservation[];
+  weather?: DashboardWeatherState;
+  onOpenExpenses: () => void;
   onOpenAssistant: () => void;
   onOpenItinerary: () => void;
   onOpenStop: (stop: Stop) => void;
@@ -329,76 +254,69 @@ function TodayPanel({
   onOpenPacking: () => void;
   weatherByStopId?: Record<string, DashboardWeatherState>;
 }) {
-  const [selectedStopId, setSelectedStopId] = useState<string | null>(stops[0]?.id ?? null);
-  const effectiveSelectedStopId = selectedStopId ?? stops[0]?.id ?? null;
+  const steps = buildPreparationSteps({ stops: stops.length, itineraryItems: itineraryItemCount, reservations: reservations.length });
+  const doneCount = steps.filter((step) => step.done).length;
+  const stepActions = { stop: onOpenCreateStop, places: onComposeDay, reservation: onOpenReservations };
 
   return (
-    <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daySwitcher}>
-        {stops.length > 0 ? stops.map((stop, index) => (
-          <Pressable
-            key={stop.id}
-            accessibilityRole="button"
-            accessibilityState={{ selected: effectiveSelectedStopId === stop.id }}
-            onPress={() => setSelectedStopId(stop.id)}
-            style={({ pressed }) => [
-              styles.dayPill,
-              effectiveSelectedStopId === stop.id && styles.dayPillActive,
-              pressed && styles.pressed,
-            ]}
-          >
-            <AppText variant="caption" color={effectiveSelectedStopId === stop.id ? "accent" : "muted"}>
-              {`Étape ${index + 1}`}
-            </AppText>
+    <View style={styles.todayPanel}>
+      {stops.length > 0 && itineraryItemCount === 0 ? (
+        <Section>
+          <Pressable accessibilityRole="button" accessibilityLabel="Composer une journée avec l’IA" onPress={onComposeDay} style={({ pressed }) => [styles.aiDayCard, pressed && styles.pressed]}>
+            <View style={styles.aiDayIcon}><Icon name="sparkles" size={22} color={colors.white} /></View>
+            <View style={styles.flexOne}>
+              <AppText variant="h3" color="onAccent">Aucune activité prévue</AppText>
+              <AppText variant="bodySmall" color="onAccent">Laissez l’IA composer votre première journée à {stops[0]?.name}, avec des lieux réels et la météo.</AppText>
+              <View style={styles.aiDayAction}>
+                <AppText variant="label" color="teal">Composer une journée</AppText>
+                <Icon name="arrow-right" size={16} color={colors.tealStrong} />
+              </View>
+            </View>
           </Pressable>
-        )) : (
-          <View style={styles.dayPill}><AppText variant="caption" color="muted">Aucune Étape</AppText></View>
-        )}
-      </ScrollView>
+        </Section>
+      ) : null}
+
+      <Section title="Préparation">
+        <View style={styles.preparationCard}>
+          <View style={styles.preparationHeader}>
+            <AppText variant="h3">{doneCount === steps.length ? "Voyage prêt" : "Votre Voyage se prépare"}</AppText>
+            <AppText variant="label" color="teal">{`${doneCount} sur ${steps.length}`}</AppText>
+          </View>
+          <View style={styles.preparationBar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {steps.map((step) => <View key={step.key} style={[styles.preparationSegment, step.done && styles.preparationSegmentDone]} />)}
+          </View>
+          {steps.map((step) => step.done ? (
+            <View key={step.key} style={styles.preparationStep}>
+              <View style={[styles.preparationCheck, styles.preparationCheckDone]}><Icon name="check" size={14} color={colors.white} /></View>
+              <AppText variant="bodySmall" color="muted" style={styles.flexOne}>{step.label}</AppText>
+            </View>
+          ) : (
+            <Pressable key={step.key} accessibilityRole="button" accessibilityLabel={step.label} onPress={stepActions[step.key]} style={({ pressed }) => [styles.preparationStep, pressed && styles.pressed]}>
+              <View style={styles.preparationCheck} />
+              <AppText variant="label" style={styles.flexOne}>{step.label}</AppText>
+              <Icon name="arrow-right" size={16} color={colors.accentStrong} />
+            </Pressable>
+          ))}
+        </View>
+      </Section>
 
       <Section>
         <View style={styles.quickActions}>
-          <QuickAction icon="layers" label="Explorer IA" onPress={onOpenAssistant} />
-          <QuickAction icon="map-pin" label="Itinéraire" onPress={onOpenItinerary} />
-          <QuickAction icon="file-text" label="Documents" onPress={onOpenDocuments} />
+          <QuickAction icon="map" label="Itinéraire" onPress={onOpenItinerary} />
+          <QuickAction icon="sparkles" label="Explorer" onPress={onOpenAssistant} />
+          <QuickAction icon="wallet" label="Budget" onPress={onOpenExpenses} />
           <QuickAction icon="calendar" label="Réservations" onPress={onOpenReservations} />
+          <QuickAction icon="file-text" label="Documents" onPress={onOpenDocuments} />
           <QuickAction icon="check" label="Bagages" onPress={onOpenPacking} />
         </View>
       </Section>
 
-      <Section title="Progression du Voyage">
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenItinerary}
-          style={({ pressed }) => [styles.progressCard, pressed && styles.pressed]}
-        >
-          <View style={styles.progressRing}>
-            <Svg width="100%" height="100%" viewBox="0 0 72 72">
-              <Circle cx="36" cy="36" r="30" fill="none" stroke={colors.border} strokeWidth="6" />
-              <Circle cx="36" cy="36" r="30" fill="none" stroke={colors.accent} strokeWidth="6" strokeLinecap="round" strokeDasharray="188.5" strokeDashoffset="94.25" transform="rotate(-90 36 36)" />
-            </Svg>
-            <View style={styles.ringLabel}>
-              <AppText variant="label">{stops.length}</AppText>
-              <AppText variant="badge" color="muted">Étapes</AppText>
-            </View>
-          </View>
-          <View style={styles.progressInfo}>
-            <AppText variant="label">Votre Voyage se prépare</AppText>
-            <AppText variant="caption" color="muted">
-              {tripDays ? `${tripDays} jours planifiés. ` : ""}{"Consultez l'itinéraire confirmé."}
-            </AppText>
-            <View style={styles.inlineLink}>
-              <Icon name="arrow-right" size={14} color={colors.accent} />
-              <AppText variant="caption" color="accent">{"Ouvrir l'itinéraire"}</AppText>
-            </View>
-          </View>
-        </Pressable>
-      </Section>
+      <DashboardWeather weather={weather} hasStops={stops.length > 0} />
 
       <Section title="Étapes du Voyage">
         {stops.length === 0 ? (
           <View style={styles.emptyStopCard}>
-            <InlineMessage title="Aucune Étape" message="Commencez par choisir une ville. Le pays, le fuseau et les coordonnées seront proposés automatiquement." />
+            <AppText variant="bodySmall" color="muted">Choisissez une ville : le pays et l’heure locale sont retrouvés automatiquement.</AppText>
             <Button fullWidth onPress={onOpenCreateStop} icon={<Icon name="plus" size={16} color={colors.white} />}>
               Ajouter une Étape
             </Button>
@@ -418,15 +336,14 @@ function TodayPanel({
             <View style={styles.timelineBody}>
               <AppText variant="label">{stop.name}</AppText>
               <AppText variant="caption" color="muted">
-                {formatStopDates(stop)} · {stop.timeZone}
+                {formatStopSummary(stop)}
               </AppText>
               <StepWeatherPreview weather={weatherByStopId?.[stop.id]} />
-              <Badge label="Étape" variant="teal" />
             </View>
           </Pressable>
         ))}
         {stops.length > 0 ? (
-          <Button fullWidth variant="secondary" onPress={onOpenCreateStop} icon={<Icon name="plus" size={16} color={colors.teal} />}>
+          <Button fullWidth variant="secondary" onPress={onOpenCreateStop} icon={<Icon name="plus" size={16} color={colors.fg} />}>
             Ajouter une Étape
           </Button>
         ) : null}
@@ -462,122 +379,6 @@ function TodayPanel({
   );
 }
 
-function MapPanel({
-  stops,
-  itineraryItems,
-  routePolyline,
-  onOpen,
-}: {
-  stops: Stop[];
-  itineraryItems: ItineraryItem[];
-  routePolyline?: Coordinates[];
-  onOpen: () => void;
-}) {
-  const presentation = buildDashboardMapPresentation(stops, itineraryItems, routePolyline);
-
-  return (
-    <Section title="Carte du séjour">
-      {presentation.model.points.length > 0 ? (
-        <ExpoMapsView
-          model={presentation.model}
-          style={styles.mapPreview}
-          testID="dashboard-map-preview"
-        />
-      ) : (
-        <View style={styles.mapUnavailable} testID="dashboard-map-unavailable">
-          <InlineMessage
-            title={stops.length === 0 ? "Aucune Étape" : "Aucun lieu géolocalisé"}
-            message={
-              stops.length === 0
-                ? "Ajoutez une Étape pour afficher les lieux du Voyage."
-                : "Les lieux confirmés sans coordonnées restent visibles dans l’itinéraire."
-            }
-          />
-        </View>
-      )}
-      {presentation.unlocatedPlaceCount > 0 ? (
-        <View style={styles.mapDataNotice} testID="dashboard-map-partial-data">
-          <AppText variant="caption" color="muted">
-            {presentation.unlocatedPlaceCount} lieu
-            {presentation.unlocatedPlaceCount > 1 ? "x" : ""} confirmé
-            {presentation.unlocatedPlaceCount > 1 ? "s" : ""} sans coordonnées · liste conservée
-          </AppText>
-        </View>
-      ) : null}
-      <TextLink label="Ouvrir la carte complète de l'itinéraire" onPress={onOpen} icon="map" />
-    </Section>
-  );
-}
-
-function AddressesPanel({
-  items,
-  reservations,
-  onOpenAssistant,
-  onOpenItinerary,
-}: {
-  items: ItineraryItem[];
-  reservations: Reservation[];
-  onOpenAssistant: () => void;
-  onOpenItinerary: () => void;
-}) {
-  const references = useMemo(() => {
-    const result: PlaceReference[] = [];
-    const seen = new Set<string>();
-    const add = (reference?: PlaceReference) => {
-      if (!reference) return;
-      const key = reference.placeId ?? `${reference.label}|${reference.address ?? ""}|${reference.coordinates?.latitude ?? ""},${reference.coordinates?.longitude ?? ""}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      result.push(reference);
-    };
-    items.forEach((item) => add(item.place));
-    reservations.forEach((reservation) => {
-      add(reservation.venue);
-      add(reservation.origin);
-      add(reservation.destination);
-    });
-    return result;
-  }, [items, reservations]);
-
-  return (
-    <Section title="Adresses sauvegardées">
-      {references.length === 0 ? (
-        <>
-          <InlineMessage title="Aucune adresse disponible ici" message="Les lieux confirmés sont consultables depuis l'itinéraire et les Suggestions IA." />
-          <ActionPill label="Découvrir des lieux" onPress={onOpenAssistant} />
-        </>
-      ) : (
-        <View style={styles.addressList}>
-          {references.map((reference) => (
-            <Pressable key={`${reference.label}-${reference.address ?? ""}`} accessibilityRole="button" onPress={onOpenItinerary} style={({ pressed }) => [styles.addressCard, pressed && styles.pressed]}>
-              <View style={styles.addressIcon}><Icon name="map-pin" size={20} color={colors.teal} /></View>
-              <View style={styles.flexOne}>
-                <AppText variant="label" numberOfLines={1}>{reference.label}</AppText>
-                <AppText variant="caption" color="muted" numberOfLines={2}>{reference.address ?? (reference.coordinates ? `${reference.coordinates.latitude.toFixed(4)}, ${reference.coordinates.longitude.toFixed(4)}` : "Adresse à préciser")}</AppText>
-              </View>
-              {reference.coordinates ? <Badge label="GPS" variant="teal" /> : <Badge label="À préciser" variant="gold" />}
-            </Pressable>
-          ))}
-          <TextLink label="Ouvrir la carte complète" onPress={onOpenItinerary} icon="map" />
-        </View>
-      )}
-    </Section>
-  );
-}
-
-function BudgetPanel({ currency, onOpen }: { currency: string; onOpen: () => void }) {
-  return (
-    <Section title="Budget du séjour">
-      <View style={styles.budgetCard}>
-        <AppText variant="h2">— {currency}</AppText>
-        <AppText variant="caption" color="muted">Budget global et Dépenses réelles du Voyage</AppText>
-        <View style={styles.budgetTrack}><View style={styles.budgetFillEmpty} /></View>
-      </View>
-      <TextLink label="Voir le détail du budget" onPress={onOpen} icon="wallet" />
-    </Section>
-  );
-}
-
 function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
@@ -587,11 +388,11 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: "layers" | "file-text" | "map-pin" | "calendar" | "check"; label: string; onPress: () => void }) {
+function QuickAction({ icon, label, onPress }: { icon: "map" | "sparkles" | "wallet" | "file-text" | "calendar" | "check"; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
-      <Icon name={icon} size={22} color={colors.accent} />
-      <AppText variant="caption" align="center">{label}</AppText>
+      <Icon name={icon} size={22} color={colors.accentStrong} />
+      <AppText variant="caption" align="center" numberOfLines={1}>{label}</AppText>
     </Pressable>
   );
 }
@@ -616,14 +417,6 @@ function DismissibleBanner({ message, onDismiss }: { message: string; onDismiss:
       <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onDismiss} style={({ pressed }) => [styles.dismissButton, pressed && styles.pressed]}><Icon name="close" size={16} /></Pressable>
     </View>
   );
-}
-
-function FabItem({ label, icon, onPress }: { label: string; icon: string; onPress: () => void }) {
-  return <View style={styles.fabItem}><View style={styles.fabLabel}><AppText variant="caption">{label}</AppText></View><Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.fabItemButton, pressed && styles.pressed]}><AppText variant="label" color="accent">{icon}</AppText></Pressable></View>;
-}
-
-function NavItem({ label, icon, onPress }: { label: string; icon: "home" | "search" | "file-text" | "settings"; onPress: () => void }) {
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}><Icon name={icon} size={24} color={colors.muted} /><AppText variant="badge" color="muted">{label}</AppText></Pressable>;
 }
 
 function TextLink({ label, onPress, icon = "arrow-right" }: { label: string; onPress: () => void; icon?: "arrow-right" | "map" | "wallet" }) {
@@ -663,21 +456,26 @@ const styles = StyleSheet.create({
   dismissButton: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, alignItems: "center", justifyContent: "center" },
   alertStack: { gap: spacing.sm },
   futureAlert: { marginHorizontal: spacing.lg, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.goldSoft, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.gold, flexDirection: "row", alignItems: "center", gap: spacing.md },
-  daySwitcher: { gap: spacing.sm - spacing.xs / 2, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  dayPill: { minHeight: spacing["2xl"] - spacing.xs, paddingHorizontal: spacing.md - spacing.xs / 2, borderRadius: radius.full, borderWidth: componentMetrics.tripDashboard.outlinedBorderWidth, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  dayPillActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
-  quickActions: { flexDirection: "row", gap: spacing.sm },
-  quickAction: { flex: 1, minHeight: spacing["2xl"] * 2, paddingHorizontal: spacing.sm, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: spacing.sm - spacing.xs / 2, position: "relative" },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  quickAction: { width: "31.5%", flexGrow: 1, minHeight: spacing["2xl"] * 2, paddingHorizontal: spacing.sm, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: spacing.sm - spacing.xs / 2, position: "relative" },
   miniFutureBadge: { position: "absolute", top: spacing.xs, right: spacing.xs, transform: [{ scale: 0.7 }] },
-  progressCard: { flexDirection: "row", alignItems: "center", gap: spacing.lg, padding: spacing.lg, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  progressRing: { width: spacing.lg * 3, height: spacing.lg * 3, position: "relative" },
-  ringLabel: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center" },
-  progressInfo: { flex: 1, gap: spacing.xs },
-  inlineLink: { flexDirection: "row", alignItems: "center", gap: spacing.sm - spacing.xs / 2, marginTop: spacing.xs },
   timelineCard: { flexDirection: "row", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md, marginBottom: spacing.sm },
   emptyStopCard: { gap: spacing.md },
+  preparationCard: { padding: spacing.lg, gap: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
+  preparationHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  preparationBar: { flexDirection: "row", gap: spacing.xs },
+  preparationSegment: { flex: 1, height: spacing.xs + spacing.xs / 2, borderRadius: radius.full, backgroundColor: colors.border },
+  preparationSegmentDone: { backgroundColor: colors.tealStrong },
+  preparationStep: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md - spacing.xs },
+  preparationCheck: { width: spacing.lg - spacing.xs / 2, height: spacing.lg - spacing.xs / 2, borderRadius: radius.full, borderWidth: 2, borderColor: colors.accentStrong, alignItems: "center", justifyContent: "center" },
+  preparationCheckDone: { borderWidth: 0, backgroundColor: colors.tealStrong },
+  todayPanel: { paddingTop: spacing.lg },
+  aiDayCard: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealStrong },
+  aiDayIcon: { width: 44, height: 44, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.18)" },
+  aiDayAction: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.md, paddingHorizontal: spacing.md, minHeight: 40, borderRadius: radius.full, backgroundColor: colors.white },
+  weatherNote: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: -spacing.md, marginBottom: spacing.xl },
   timelineRail: { minWidth: spacing["2xl"], alignItems: "center" },
   timelineDot: { width: spacing.sm + spacing.xs / 2, height: spacing.sm + spacing.xs / 2, borderRadius: radius.full, backgroundColor: colors.teal, marginVertical: spacing.sm - spacing.xs / 2 },
   timelineLine: { width: spacing.xs / 2, flex: 1, minHeight: spacing.md, backgroundColor: colors.border, borderRadius: radius.full },
@@ -697,24 +495,13 @@ const styles = StyleSheet.create({
   addressList: { gap: spacing.sm },
   addressCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md },
   addressIcon: { width: spacing["2xl"] - spacing.sm, height: spacing["2xl"] - spacing.sm, borderRadius: radius.sm, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" },
-  budgetCard: { padding: spacing.lg, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md, gap: spacing.xs, marginBottom: spacing.md },
-  budgetTrack: { height: spacing.sm, borderRadius: radius.full, backgroundColor: colors.border, overflow: "hidden", marginTop: spacing.md },
-  budgetFillEmpty: { width: "0%", height: "100%", backgroundColor: colors.teal },
+  budgetCard: { padding: spacing.lg, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md, gap: spacing.sm, marginBottom: spacing.md },
   textLink: { minHeight: spacing["2xl"] - spacing.xs, flexDirection: "row", alignItems: "center", gap: spacing.sm - spacing.xs / 2, alignSelf: "flex-start" },
-  actionPill: { minHeight: spacing["2xl"], paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
+  actionPill: { minHeight: spacing["2xl"], paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
   comingSoonFrame: { position: "relative" },
   comingSoonInset: { marginBottom: spacing.sm },
   comingSoonBadge: { position: "absolute", top: spacing.xs, right: spacing.lg, zIndex: zIndex.sticky },
   futureContent: { opacity: componentMetrics.tripDashboard.comingSoonOpacity },
-  fabContainer: { position: "absolute", right: spacing.lg, alignItems: "flex-end", zIndex: zIndex.modal },
-  fabMenu: { gap: spacing.sm, marginBottom: spacing.sm },
-  fabItem: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: spacing.sm },
-  fabLabel: { paddingHorizontal: spacing.md - spacing.xs, paddingVertical: spacing.sm - spacing.xs / 2, borderRadius: radius.full, backgroundColor: colors.surface, ...shadows.md },
-  fabItemButton: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.full, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center", ...shadows.md },
-  fab: { width: spacing["2xl"] + spacing.sm, height: spacing["2xl"] + spacing.sm, borderRadius: radius.full, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
-  bottomNav: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "space-around", backgroundColor: colors.surface, borderTopWidth: componentMetrics.tripDashboard.thinBorderWidth, borderTopColor: colors.border, paddingTop: spacing.sm, zIndex: zIndex.sticky },
-  navItem: { flex: 1, minHeight: spacing["2xl"], alignItems: "center", justifyContent: "center", gap: spacing.xs, position: "relative" },
-  navFutureDot: { position: "absolute", top: 0, right: spacing.md, width: spacing.sm, height: spacing.sm, borderRadius: radius.full, backgroundColor: colors.gold },
   flexOne: { flex: 1 },
   pressed: { transform: [{ scale: 0.97 }] },
   centeredState: { flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: spacing.lg, gap: spacing.md },

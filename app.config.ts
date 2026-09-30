@@ -20,7 +20,8 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-dev-client',
     './plugins/withNaveyoTracking',
-    './plugins/withNaveyoDocuments'
+    './plugins/withNaveyoDocuments',
+    './plugins/withNaveyoSceneLifecycle'
   ],
   experiments: {
     typedRoutes: true

@@ -107,7 +107,7 @@ export function OnboardingScreen({
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
               <LinearGradient id="onboarding-overlay" x1="0" y1="0" x2="0" y2="1">
-                <GradientStop offset="0.32" stopColor={colors.transparent} />
+                <GradientStop offset="0.32" stopColor={colors.fg} stopOpacity={0} />
                 <GradientStop offset="1" stopColor={colors.fg} stopOpacity={0.82} />
               </LinearGradient>
             </Defs>
@@ -154,7 +154,7 @@ export function OnboardingScreen({
                   <Svg style={styles.slideOverlay} width="100%" height="100%">
                     <Defs>
                       <LinearGradient id={`slide-overlay-${index}`} x1="0" y1="0" x2="0" y2="1">
-                        <GradientStop offset="0.3" stopColor={colors.transparent} />
+                        <GradientStop offset="0.3" stopColor={colors.fg} stopOpacity={0} />
                         <GradientStop offset="1" stopColor={colors.fg} stopOpacity={0.86} />
                       </LinearGradient>
                     </Defs>
@@ -298,9 +298,9 @@ const styles = StyleSheet.create({
   stepsRow: { flexDirection: "row", alignItems: "flex-start" },
   step: { flex: 1, alignItems: "center", gap: spacing.sm },
   stepCircle: { width: spacing["2xl"] - spacing.sm, height: spacing["2xl"] - spacing.sm, borderRadius: radius.full, alignItems: "center", justifyContent: "center", ...shadows.sm },
-  stepCircle_accent: { backgroundColor: colors.accent },
-  stepCircle_teal: { backgroundColor: colors.teal },
-  stepCircle_gold: { backgroundColor: colors.gold },
+  stepCircle_accent: { backgroundColor: colors.accentStrong },
+  stepCircle_teal: { backgroundColor: colors.tealStrong },
+  stepCircle_gold: { backgroundColor: colors.goldStrong },
   stepConnector: { flex: 0.4, height: StyleSheet.hairlineWidth, marginTop: spacing.md + spacing.xs, backgroundColor: colors.border },
   actions: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   flexOne: { flex: 1 },

@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   AuthFrame,
   Button,
@@ -9,9 +9,7 @@ import {
   StatusPanel,
   useShellSession,
 } from "../../src/ui";
-import { colors } from "../../src/theme/colors";
 import { spacing } from "../../src/theme/spacing";
-import { typography } from "../../src/theme/typography";
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -41,15 +39,8 @@ export default function SignUpScreen() {
   return (
     <AuthFrame
       title="Créer votre compte"
-      subtitle="Commencez un Voyage ou rejoignez celui d’un proche."
+      subtitle="Préparez un Voyage ou rejoignez celui d’un proche."
     >
-      <View style={styles.branding}>
-        <Text style={styles.brand}>Bienvenue dans Naveyo</Text>
-        <Text style={styles.tagline}>
-          Un espace simple et privé pour préparer votre Voyage à deux.
-        </Text>
-      </View>
-
       <View style={styles.form}>
         <Input
           label="Nom complet"
@@ -57,6 +48,8 @@ export default function SignUpScreen() {
           onChangeText={setDisplayName}
           placeholder="Prénom Nom"
           autoCapitalize="words"
+          textContentType="name"
+          autoComplete="name"
         />
         <Input
           label="Adresse e-mail"
@@ -65,13 +58,18 @@ export default function SignUpScreen() {
           placeholder="vous@exemple.com"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          autoComplete="email"
         />
         <Input
           label="Mot de passe"
           value={password}
           onChangeText={setPassword}
-          placeholder="••••••••"
           secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          hint="6 caractères minimum"
         />
       </View>
 
@@ -86,7 +84,7 @@ export default function SignUpScreen() {
       >
         Créer le compte
       </Button>
-      <Button variant="secondary" onPress={() => router.back()} fullWidth>
+      <Button variant="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(auth)/sign-in"))} fullWidth>
         Retour à la connexion
       </Button>
 
@@ -99,17 +97,6 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  branding: {
-    gap: spacing.xs,
-  },
-  brand: {
-    ...typography.h1,
-    color: colors.fg,
-  },
-  tagline: {
-    ...typography.bodySmall,
-    color: colors.muted,
-  },
   form: {
     gap: spacing.md,
   },

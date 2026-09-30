@@ -79,7 +79,7 @@ export default function AccountRoute() {
       error={error}
       signingOut={signingOut}
       onBack={() => router.back()}
-      onOpenTrip={(tripId) => router.push(`/(app)/trips/${tripId}`)}
+      onOpenTrip={(tripId) => router.push(`/trips/${tripId}`)}
       onOpenTripSettings={(tripId) =>
         router.push(`/(app)/trips/${tripId}/settings`)
       }

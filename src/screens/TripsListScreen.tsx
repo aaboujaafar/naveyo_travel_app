@@ -24,7 +24,7 @@ export function TripsListScreen(props: TripsListScreenProps) {
   const ordered = useMemo(() => [...props.items].sort((a, b) => (a.startsOn ?? "9999").localeCompare(b.startsOn ?? "9999")), [props.items]);
   return (
     <Screen scroll contentStyle={styles.content}>
-      <TopBar title="Mes Voyages" actions={<View style={styles.headerActions}><IconButton size={40} onPress={props.onOpenAccount} accessibilityLabel="Ouvrir mon compte" icon={<Icon name="user" size={20} />} /><Button size="sm" onPress={props.onCreate} icon={<Icon name="plus" size={16} color={colors.white} />}>Nouveau</Button></View>} />
+      <TopBar title="Mes Voyages" actions={<View style={styles.headerActions}><IconButton size={40} onPress={props.onOpenAccount} accessibilityLabel="Ouvrir mon compte" icon={<Icon name="user" size={20} />} /><IconButton size={40} onPress={props.onCreate} accessibilityLabel="Créer un Voyage" icon={<Icon name="plus" size={20} color={colors.white} />} style={styles.createButton} /></View>} />
       <View style={styles.intro}><AppText variant="bodySmall" color="muted">Vos espaces privés de préparation et de consultation.</AppText></View>
       <View style={styles.shortcuts}>
         <Shortcut icon="file-text" label="Importer" detail="Ajouter une confirmation" onPress={props.onOpenImports} />
@@ -50,13 +50,13 @@ function TripCard({ trip, pack, onPress }: { trip: Trip; pack?: OfflineTripPackL
     <View style={styles.cardHeader}><View style={styles.titleWrap}><AppText variant="h3" numberOfLines={2}>{trip.name}</AppText><AppText variant="caption" color="muted">{formatTripsListDateRange(trip)}</AppText></View><Badge label={trip.referenceCurrency} variant="teal" /></View>
     <View style={styles.meta}><View style={styles.metaItem}><Icon name="users" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{memberCount} membre{memberCount > 1 ? "s" : ""}</AppText></View><View style={styles.metaItem}><Icon name="map-pin" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{trip.stopIds.length} Étape{trip.stopIds.length > 1 ? "s" : ""}</AppText></View></View>
     <View style={styles.progress}><View style={styles.progressLabels}><AppText variant="label">Préparation</AppText><AppText variant="caption" color="muted">{packReady ? "Paquet hors ligne prêt" : "À synchroniser"}</AppText></View><ProgressBar progress={packReady ? 1 : 0} color={packReady ? "teal" : "accent"} /></View>
-    <View style={styles.cardFooter}><Icon name="users" size={20} color={colors.teal} /><AppText variant="caption" color="muted">{memberCount} Compte{memberCount > 1 ? "s" : ""} autorisé{memberCount > 1 ? "s" : ""}</AppText><View style={styles.footerSpacer} /><Icon name="arrow-right" size={20} color={colors.accent} /></View>
   </Pressable>;
 }
 
 function LoadingList() { return <View style={styles.list}>{[1, 2].map((key) => <View key={key} style={styles.loadingCard}><Skeleton height={spacing.lg} width="55%" /><Skeleton height={spacing.sm} width="38%" /><Skeleton height={spacing.sm} /><Skeleton height={spacing.lg} /></View>)}</View>; }
 
 const styles = StyleSheet.create({
+  createButton: { backgroundColor: colors.accentStrong, borderWidth: 0 },
   content: { paddingHorizontal: 0, paddingVertical: 0, paddingBottom: spacing["2xl"] },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   intro: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
