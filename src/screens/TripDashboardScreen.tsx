@@ -29,6 +29,7 @@ import {
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
 import { formatDuration, type TodayEntry, type TodayPlan } from "./today-model";
+import type { ClimateSummary } from "../modules/weather";
 
 
 export interface TripDashboardScreenProps {
@@ -69,7 +70,7 @@ export interface DashboardSummary {
   packing?: { packed: number; total: number } | null;
 }
 
-export interface DashboardWeatherState { status: "loading" | "ready" | "empty" | "error"; message?: string; updatedAt?: string; days?: { date: string; label: string; icon: string; temperatureMin: number; temperatureMax: number; precipitationProbabilityMax?: number }[] }
+export interface DashboardWeatherState { status: "loading" | "ready" | "empty" | "error"; message?: string; updatedAt?: string; climate?: ClimateSummary; days?: { date: string; label: string; icon: string; temperatureMin: number; temperatureMax: number; precipitationProbabilityMax?: number }[] }
 
 
 export function TripDashboardScreen(props: TripDashboardScreenProps) {
@@ -228,6 +229,19 @@ function DashboardWeather({ weather, hasStops }: { weather?: DashboardWeatherSta
   if (!hasStops) return null;
   if (weather?.status === "loading") return <Section title="Météo"><Skeleton height={spacing.xl * 2} borderRadius={radius.md} /></Section>;
   const days = weather?.status === "ready" ? weather.days ?? [] : [];
+  if (days.length === 0 && weather?.climate) {
+    const climate = weather.climate;
+    return (
+      <Section title="Météo">
+        <View style={styles.climateCard}>
+          <AppText variant="h3">{`${climate.temperatureMaxC}° / ${climate.temperatureMinC}°`}</AppText>
+          <AppText variant="bodySmall" color="muted">
+            {`À ces dates en ${climate.year} : ${climate.rainyDays === 0 ? "aucun jour de pluie" : `${climate.rainyDays} jour${climate.rainyDays > 1 ? "s" : ""} de pluie sur ${climate.days}`}. Les prévisions arriveront 16 jours avant le départ.`}
+          </AppText>
+        </View>
+      </Section>
+    );
+  }
   if (days.length === 0) {
     const message = weather?.status === "error" ? "Météo momentanément indisponible." : "La météo s’affichera 16 jours avant le départ.";
     return <View style={styles.weatherNote}><Icon name="info" size={16} color={colors.muted} /><AppText variant="caption" color="muted" style={styles.flexOne}>{message}</AppText></View>;
@@ -577,6 +591,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  climateCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   summaryTrack: { height: 4, borderRadius: radius.full, backgroundColor: colors.border, overflow: "hidden", marginTop: spacing.xs },
   summaryFill: { height: "100%", borderRadius: radius.full, backgroundColor: colors.teal },

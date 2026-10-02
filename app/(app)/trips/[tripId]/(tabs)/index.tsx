@@ -151,8 +151,12 @@ export default function TripDetailRoute() {
         }
         if (!coordinates) return [stop.id, { status: "empty", message: "Étape sans coordonnées" } satisfies DashboardWeatherState] as const;
         try {
-          const forecast = await modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
-          return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) }] as const;
+          const input = { coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate };
+          const forecast = await modules.weather.forecast(input);
+          const days = forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax }));
+          // Outside the 16-day forecast window, last year's observations give an idea of the climate.
+          const climate = days.length === 0 ? await modules.weather.climate(input).catch(() => null) : null;
+          return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days, ...(climate ? { climate } : {}) }] as const;
         } catch (cause) {
           return [stop.id, { status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" } satisfies DashboardWeatherState] as const;
         }
