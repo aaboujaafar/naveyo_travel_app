@@ -1,10 +1,13 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
-import { useCallback, useState } from "react";
+import * as Location from "expo-location";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type {
   Coordinates,
   ItineraryItem,
+  Money,
   Reservation,
   Stop,
   Trip,
@@ -12,7 +15,8 @@ import type {
 } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripDashboardScreen } from "../../../../../src/screens/TripDashboardScreen";
-import type { DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
+import type { DashboardSummary, DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
+import { buildTodayPlan, localNow } from "../../../../../src/screens/today-model";
 import { dashboardRouteCoordinates } from "../../../../../src/screens/trip-dashboard-model";
 
 export default function TripDetailRoute() {
@@ -30,6 +34,9 @@ export default function TripDetailRoute() {
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
   const [weatherByStopId, setWeatherByStopId] = useState<Record<string, DashboardWeatherState>>({});
   const [routePolyline, setRoutePolyline] = useState<Coordinates[]>([]);
+  const [summary, setSummary] = useState<DashboardSummary>({});
+  const [offlineSnapshot, setOfflineSnapshot] = useState(false);
+  const [travelToNext, setTravelToNext] = useState<{ key: string; seconds: number } | null>(null);
 
   const load = useCallback(async () => {
     if (!trips || !bootstrap || !tripId) {
@@ -43,57 +50,108 @@ export default function TripDetailRoute() {
       setLoading(false);
       return;
     }
+    const { modules } = bootstrap;
+
+    // The last offline download paints the screen at once; the network then refreshes it.
+    const pack = await modules.offlineTripPack.get(tripId).catch(() => null);
+    if (pack) {
+      setTrip((current) => current ?? pack.trip);
+      setStops((current) => (current.length > 0 ? current : pack.stops));
+      setItineraryItems((current) => (current.length > 0 ? current : pack.itinerary));
+      setReservations((current) => (current.length > 0 ? current : pack.reservations));
+      setLoading(false);
+    }
 
     setError(null);
+    let nextStops: Stop[];
     try {
-      const [nextTrip, nextStops] = await Promise.all([
+      const [nextTrip, loadedStops] = await Promise.all([
         trips.get(tripId),
         trips.listStops(tripId),
       ]);
+      nextStops = loadedStops;
       setTrip(nextTrip);
-      setStops(nextStops);
-      let loadedItinerary: ItineraryItem[] = [];
-      try {
-        loadedItinerary = await bootstrap.modules.itinerary.list(tripId);
+      setStops(loadedStops);
+      setOfflineSnapshot(false);
+    } catch (cause: unknown) {
+      setOfflineSnapshot(pack !== null);
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de charger le Voyage.",
+      );
+      setLoading(false);
+      return;
+    }
+    setLoading(false);
+
+    const itineraryTask = modules.itinerary.list(tripId).then(
+      async (loadedItinerary) => {
         setItineraryItems(loadedItinerary);
-        if (bootstrap.modules.routing) {
-          const routeCoordinates = dashboardRouteCoordinates(nextStops, loadedItinerary);
-          if (routeCoordinates.length >= 2) {
-            try {
-              const route = await bootstrap.modules.routing.calculate({
-                tripId,
-                coordinates: routeCoordinates,
-                mode: "drive",
-              });
-              setRoutePolyline(route?.geometry ?? []);
-            } catch {
-              setRoutePolyline([]);
-            }
-          } else {
-            setRoutePolyline([]);
-          }
-        } else {
-          setRoutePolyline([]);
-        }
-      } catch {
-        setItineraryItems([]);
+        await loadRoute(nextStops, loadedItinerary);
+        return loadedItinerary;
+      },
+      () => {
         setError(
           "Le Voyage et ses Étapes sont chargés, mais les lieux de la carte sont temporairement indisponibles.",
         );
+        return [] as ItineraryItem[];
+      },
+    );
+
+    await Promise.all([
+      itineraryTask.then((loadedItinerary) => loadWeather(nextStops, loadedItinerary)),
+      modules.reservations.list(tripId).then(setReservations, () => {
+        setError("Le Voyage est chargé, mais les Réservations sont temporairement indisponibles.");
+      }),
+      loadSummary(),
+    ]);
+
+    async function loadRoute(loadedStops: Stop[], loadedItinerary: ItineraryItem[]) {
+      if (!modules.routing || !tripId) return setRoutePolyline([]);
+      const routeCoordinates = dashboardRouteCoordinates(loadedStops, loadedItinerary);
+      if (routeCoordinates.length < 2) return setRoutePolyline([]);
+      try {
+        const route = await modules.routing.calculate({ tripId, coordinates: routeCoordinates, mode: "drive" });
+        setRoutePolyline(route?.geometry ?? []);
+      } catch {
+        setRoutePolyline([]);
       }
-      const weatherEntries = await Promise.all(nextStops.map(async (stop) => {
+    }
+
+    async function loadSummary() {
+      if (!tripId) return;
+      const [budget, packing] = await Promise.all([
+        modules.expenses.summarize(tripId).catch(() => null),
+        modules.packingList.list(tripId).catch(() => null),
+      ]);
+      setSummary({
+        budget: budget
+          ? {
+              spent: formatCompactMoney(budget.spent),
+              planned: budget.planned.minorUnits > 0 ? formatCompactMoney(budget.planned) : null,
+              progress: budget.progress,
+            }
+          : null,
+        packing: packing ? { packed: packing.filter((item) => item.packed).length, total: packing.length } : null,
+      });
+    }
+
+    async function loadWeather(loadedStops: Stop[], loadedItinerary: ItineraryItem[]) {
+      if (!tripId) return;
+      const weatherEntries = await Promise.all(loadedStops.map(async (stop) => {
         const itineraryItem = loadedItinerary.find((item) => item.stopId === stop.id && item.place?.coordinates);
         let coordinates = itineraryItem?.place?.coordinates ?? stop.coordinates;
         if (!coordinates) {
           try {
-            coordinates = (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
+            coordinates = (await modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
           } catch {
             coordinates = undefined;
           }
         }
         if (!coordinates) return [stop.id, { status: "empty", message: "Étape sans coordonnées" } satisfies DashboardWeatherState] as const;
         try {
-          const forecast = await bootstrap.modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
+          const forecast = await modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
           return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) }] as const;
         } catch (cause) {
           return [stop.id, { status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" } satisfies DashboardWeatherState] as const;
@@ -101,25 +159,48 @@ export default function TripDetailRoute() {
       }));
       const weatherMap = Object.fromEntries(weatherEntries) as Record<string, DashboardWeatherState>;
       setWeatherByStopId(weatherMap);
-      setWeather(nextStops[0] ? weatherMap[nextStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
-      try {
-        setReservations(await bootstrap.modules.reservations.list(tripId));
-      } catch {
-        setReservations([]);
-        setError(
-          "Le Voyage est chargé, mais les Réservations sont temporairement indisponibles.",
-        );
-      }
-    } catch (cause: unknown) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Impossible de charger le Voyage.",
-      );
-    } finally {
-      setLoading(false);
+      setWeather(loadedStops[0] ? weatherMap[loadedStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
     }
   }, [bootstrap, tripId, trips]);
+
+  // While the Voyage is under way, the dashboard follows the local day of the current Étape.
+  const today = useMemo(() => {
+    if (!trip) return null;
+    const timeZone = stops.find((stop) => {
+      const date = localNow(stop.timeZone).slice(0, 10);
+      return stop.startDate <= date && date <= stop.endDate;
+    })?.timeZone ?? stops[0]?.timeZone;
+    if (!timeZone) return null;
+    return buildTodayPlan({ trip, stops, items: itineraryItems, reservations, now: localNow(timeZone) });
+  }, [trip, stops, itineraryItems, reservations]);
+
+  const nextCoordinates = today?.next?.item.place?.coordinates;
+  const nextKey = nextCoordinates ? `${nextCoordinates.latitude},${nextCoordinates.longitude}` : null;
+  // A duration computed for a previous "next" activity is never shown for the new one.
+  const travelToNextSeconds = travelToNext && travelToNext.key === nextKey ? travelToNext.seconds : null;
+  useEffect(() => {
+    if (!nextCoordinates || !nextKey || !tripId || !bootstrap?.modules.routing) return;
+    let active = true;
+    void (async () => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (!permission.granted) return;
+        const position = await Location.getLastKnownPositionAsync();
+        if (!position || !active) return;
+        const route = await bootstrap.modules.routing?.calculate({
+          tripId,
+          mode: "walk",
+          coordinates: [{ latitude: position.coords.latitude, longitude: position.coords.longitude }, nextCoordinates],
+        });
+        if (active && route?.durationSeconds != null) setTravelToNext({ key: nextKey, seconds: route.durationSeconds });
+      } catch {
+        // The "Y aller" button still works without a duration.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, nextCoordinates, nextKey, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -178,6 +259,17 @@ export default function TripDetailRoute() {
       weather={weather}
       weatherByStopId={weatherByStopId}
       routePolyline={routePolyline}
+      today={today}
+      travelToNextSeconds={travelToNextSeconds}
+      onOpenDirections={(entry) => {
+        const coordinates = entry.item.place?.coordinates;
+        if (!coordinates) return;
+        void Linking.openURL(
+          `http://maps.apple.com/?daddr=${coordinates.latitude},${coordinates.longitude}&dirflg=w&q=${encodeURIComponent(entry.item.title)}`,
+        );
+      }}
+      summary={summary}
+      offlineSnapshot={offlineSnapshot}
     />
   );
 }
@@ -195,4 +287,12 @@ function weatherIcon(code: number): string {
 function formatWeatherDate(value: string, timeZone: string): string {
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("fr-FR", { weekday: "short", timeZone }).format(date);
+}
+
+function formatCompactMoney(money: Money): string {
+  try {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: money.currency, maximumFractionDigits: 0 }).format(money.minorUnits / 100);
+  } catch {
+    return `${Math.round(money.minorUnits / 100)} ${money.currency}`;
+  }
 }

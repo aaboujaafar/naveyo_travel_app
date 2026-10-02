@@ -28,6 +28,7 @@ import {
   getTravelerCount,
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
+import { formatDuration, type TodayEntry, type TodayPlan } from "./today-model";
 
 
 export interface TripDashboardScreenProps {
@@ -53,6 +54,19 @@ export interface TripDashboardScreenProps {
   weather?: DashboardWeatherState;
   weatherByStopId?: Record<string, DashboardWeatherState>;
   routePolyline?: Coordinates[];
+  /** Set while the Voyage is under way: the dashboard becomes the day. */
+  today?: TodayPlan | null;
+  /** Walking time to the next activity of the day, when it could be computed. */
+  travelToNextSeconds?: number | null;
+  onOpenDirections?: (entry: TodayEntry) => void;
+  summary?: DashboardSummary;
+  /** True when the screen shows the last offline download because the network failed. */
+  offlineSnapshot?: boolean;
+}
+
+export interface DashboardSummary {
+  budget?: { spent: string; planned: string | null; progress: number } | null;
+  packing?: { packed: number; total: number } | null;
 }
 
 export interface DashboardWeatherState { status: "loading" | "ready" | "empty" | "error"; message?: string; updatedAt?: string; days?: { date: string; label: string; icon: string; temperatureMin: number; temperatureMax: number; precipitationProbabilityMax?: number }[] }
@@ -168,7 +182,11 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
         </View>
 
 
-        {props.error ? (
+        {props.offlineSnapshot ? (
+          <View style={styles.bannerWrap}>
+            <InlineMessage title="Hors connexion" message="Affichage du dernier téléchargement du Voyage." />
+          </View>
+        ) : props.error ? (
           <View style={styles.bannerWrap}>
             <InlineMessage variant="error" title="Actualisation incomplète" message={props.error} />
           </View>
@@ -182,13 +200,16 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
         ) : null}
 
         <TodayPanel
+            today={props.today ?? null}
+            travelToNextSeconds={props.travelToNextSeconds ?? null}
+            onOpenDirections={props.onOpenDirections}
+            summary={props.summary}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             stops={sortedStops}
             itineraryItemCount={props.itineraryItems.length}
             reservations={props.reservations}
             weather={props.weather}
             onOpenExpenses={props.onOpenExpenses}
-            onOpenAssistant={props.onOpenAssistant}
             onOpenItinerary={props.onOpenItinerary}
             onOpenStop={props.onOpenStop}
             onOpenCreateStop={props.onOpenCreateStop}
@@ -222,13 +243,16 @@ function StepWeatherPreview({ weather }: { weather?: DashboardWeatherState }) {
 }
 
 function TodayPanel({
+  today,
+  travelToNextSeconds,
+  onOpenDirections,
+  summary,
   onComposeDay,
   stops,
   itineraryItemCount,
   reservations,
   weather,
   onOpenExpenses,
-  onOpenAssistant,
   onOpenItinerary,
   onOpenStop,
   onOpenCreateStop,
@@ -237,13 +261,16 @@ function TodayPanel({
   onOpenPacking,
   weatherByStopId,
 }: {
+  today: TodayPlan | null;
+  travelToNextSeconds: number | null;
+  onOpenDirections?: (entry: TodayEntry) => void;
+  summary?: DashboardSummary;
   onComposeDay: () => void;
   stops: Stop[];
   itineraryItemCount: number;
   reservations: Reservation[];
   weather?: DashboardWeatherState;
   onOpenExpenses: () => void;
-  onOpenAssistant: () => void;
   onOpenItinerary: () => void;
   onOpenStop: (stop: Stop) => void;
   onOpenCreateStop: () => void;
@@ -258,7 +285,17 @@ function TodayPanel({
 
   return (
     <View style={styles.todayPanel}>
-      {stops.length > 0 && itineraryItemCount === 0 ? (
+      {today ? (
+        <TodaySection
+          today={today}
+          travelToNextSeconds={travelToNextSeconds}
+          onOpenDirections={onOpenDirections}
+          onComposeDay={onComposeDay}
+          onOpenItinerary={onOpenItinerary}
+        />
+      ) : null}
+
+      {!today && stops.length > 0 && itineraryItemCount === 0 ? (
         <Section>
           <Pressable accessibilityRole="button" accessibilityLabel="Composer une journée avec l’IA" onPress={onComposeDay} style={({ pressed }) => [styles.aiDayCard, pressed && styles.pressed]}>
             <View style={styles.aiDayIcon}><Icon name="sparkles" size={22} color={colors.white} /></View>
@@ -274,7 +311,7 @@ function TodayPanel({
         </Section>
       ) : null}
 
-      <Section title="Préparation">
+      {today ? null : <Section title="Préparation">
         <View style={styles.preparationCard}>
           <View style={styles.preparationHeader}>
             <AppText variant="h3">{doneCount === steps.length ? "Voyage prêt" : "Votre Voyage se prépare"}</AppText>
@@ -296,16 +333,34 @@ function TodayPanel({
             </Pressable>
           ))}
         </View>
-      </Section>
+      </Section>}
 
+      {/* Itinéraire, Explorer and Documents have their own tab: only what has no tab is summarised here. */}
       <Section>
         <View style={styles.quickActions}>
-          <QuickAction icon="map" label="Itinéraire" onPress={onOpenItinerary} />
-          <QuickAction icon="sparkles" label="Explorer" onPress={onOpenAssistant} />
-          <QuickAction icon="wallet" label="Budget" onPress={onOpenExpenses} />
-          <QuickAction icon="calendar" label="Réservations" onPress={onOpenReservations} />
-          <QuickAction icon="file-text" label="Documents" onPress={onOpenDocuments} />
-          <QuickAction icon="check" label="Bagages" onPress={onOpenPacking} />
+          <SummaryCard
+            icon="wallet"
+            label="Budget"
+            value={summary?.budget ? summary.budget.spent : "—"}
+            detail={summary?.budget ? (summary.budget.planned ? `sur ${summary.budget.planned}` : "dépensés") : "Aucune dépense"}
+            progress={summary?.budget?.planned ? summary.budget.progress : undefined}
+            onPress={onOpenExpenses}
+          />
+          <SummaryCard
+            icon="check"
+            label="Bagages"
+            value={summary?.packing && summary.packing.total > 0 ? `${summary.packing.packed}/${summary.packing.total}` : "—"}
+            detail={summary?.packing && summary.packing.total > 0 ? "prêts" : "Liste vide"}
+            progress={summary?.packing && summary.packing.total > 0 ? summary.packing.packed / summary.packing.total : undefined}
+            onPress={onOpenPacking}
+          />
+          <SummaryCard
+            icon="calendar"
+            label="Réservations"
+            value={String(reservations.length)}
+            detail={reservations.length > 1 ? "confirmées" : "confirmée"}
+            onPress={onOpenReservations}
+          />
         </View>
       </Section>
 
@@ -386,12 +441,77 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: "map" | "sparkles" | "wallet" | "file-text" | "calendar" | "check"; label: string; onPress: () => void }) {
+function SummaryCard({ icon, label, value, detail, progress, onPress }: { icon: "wallet" | "calendar" | "check"; label: string; value: string; detail: string; progress?: number; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
-      <Icon name={icon} size={22} color={colors.accentStrong} />
-      <AppText variant="caption" align="center" numberOfLines={1}>{label}</AppText>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label} : ${value} ${detail}`} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
+      <View style={styles.summaryHeader}>
+        <Icon name={icon} size={16} color={colors.accentStrong} />
+        <AppText variant="caption" color="muted" numberOfLines={1}>{label}</AppText>
+      </View>
+      <AppText variant="h3" numberOfLines={1} adjustsFontSizeToFit>{value}</AppText>
+      <AppText variant="caption" color="muted" numberOfLines={1}>{detail}</AppText>
+      {progress !== undefined ? (
+        <View style={styles.summaryTrack}>
+          <View style={[styles.summaryFill, { width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }, progress > 1 && styles.summaryOver]} />
+        </View>
+      ) : null}
     </Pressable>
+  );
+}
+
+function TodaySection({ today, travelToNextSeconds, onOpenDirections, onComposeDay, onOpenItinerary }: {
+  today: TodayPlan;
+  travelToNextSeconds: number | null;
+  onOpenDirections?: (entry: TodayEntry) => void;
+  onComposeDay: () => void;
+  onOpenItinerary: () => void;
+}) {
+  const next = today.next;
+  return (
+    <Section title={`Aujourd’hui · jour ${today.dayNumber} sur ${today.dayCount}`}>
+      {next ? (
+        <View style={styles.nextCard}>
+          <AppText variant="badge" color="onAccent">{`À ${next.time}`}</AppText>
+          <AppText variant="h3" color="onAccent" numberOfLines={2}>{next.item.title}</AppText>
+          {next.item.place?.address ? <AppText variant="caption" color="onAccent" numberOfLines={1}>{next.item.place.address}</AppText> : null}
+          {next.item.place?.coordinates && onOpenDirections ? (
+            <Pressable accessibilityRole="button" onPress={() => onOpenDirections(next)} style={({ pressed }) => [styles.nextAction, pressed && styles.pressed]}>
+              <Icon name="map-pin" size={16} color={colors.tealStrong} />
+              <AppText variant="label" color="teal">
+                {travelToNextSeconds != null ? `Y aller · ${formatDuration(travelToNextSeconds)} à pied` : "Y aller"}
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {today.entries.length === 0 ? (
+        <Pressable accessibilityRole="button" onPress={onComposeDay} style={({ pressed }) => [styles.bookingCard, pressed && styles.pressed]}>
+          <View style={styles.bookingIcon}><Icon name="sparkles" size={20} color={colors.gold} /></View>
+          <View style={styles.flexOne}>
+            <AppText variant="label">Rien de prévu aujourd’hui</AppText>
+            <AppText variant="caption" color="muted">{`Composer la journée${today.stop ? ` à ${today.stop.name}` : ""} avec l’IA`}</AppText>
+          </View>
+          <Icon name="arrow-right" size={16} color={colors.fg} />
+        </Pressable>
+      ) : (
+        <Pressable accessibilityRole="button" accessibilityLabel="Voir le programme du jour sur la carte" onPress={onOpenItinerary} style={({ pressed }) => [styles.todayList, pressed && styles.pressed]}>
+          {today.entries.map((entry) => (
+            <View key={entry.item.id} style={styles.todayRow}>
+              <AppText variant="label" color={entry.status === "next" ? "accent" : "muted"} style={styles.todayTime}>{entry.time ?? "—"}</AppText>
+              <AppText variant="bodySmall" color={entry.status === "done" ? "muted" : "fg"} style={[styles.flexOne, entry.status === "done" && styles.todayDone]} numberOfLines={1}>{entry.item.title}</AppText>
+            </View>
+          ))}
+          {today.reservations.map((reservation) => (
+            <View key={reservation.id} style={styles.todayRow}>
+              <AppText variant="label" color="muted" style={styles.todayTime}>{reservation.start?.local.slice(11, 16) ?? "—"}</AppText>
+              <AppText variant="bodySmall" style={styles.flexOne} numberOfLines={1}>{reservation.title}</AppText>
+              <Badge label="Réservé" variant="gold" />
+            </View>
+          ))}
+        </Pressable>
+      )}
+    </Section>
   );
 }
 
@@ -457,7 +577,17 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  quickAction: { width: "31.5%", flexGrow: 1, minHeight: spacing["2xl"] * 2, paddingHorizontal: spacing.sm, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: spacing.sm - spacing.xs / 2, position: "relative" },
+  summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  summaryTrack: { height: 4, borderRadius: radius.full, backgroundColor: colors.border, overflow: "hidden", marginTop: spacing.xs },
+  summaryFill: { height: "100%", borderRadius: radius.full, backgroundColor: colors.teal },
+  summaryOver: { backgroundColor: colors.accentStrong },
+  nextCard: { gap: spacing.xs, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.tealStrong, marginBottom: spacing.sm },
+  nextAction: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, backgroundColor: colors.white },
+  todayList: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
+  todayRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  todayTime: { width: spacing["2xl"] + spacing.xs },
+  todayDone: { textDecorationLine: "line-through" },
+  quickAction: { width: "31.5%", flexGrow: 1, minHeight: spacing["2xl"] * 2, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface, gap: spacing.xs },
   miniFutureBadge: { position: "absolute", top: spacing.xs, right: spacing.xs, transform: [{ scale: 0.7 }] },
   timelineCard: { flexDirection: "row", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, borderRadius: radius.md, marginBottom: spacing.sm },
   emptyStopCard: { gap: spacing.md },
