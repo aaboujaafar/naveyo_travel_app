@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import type { Trip } from "../modules/_shared/model";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import { colors, radius, shadows, spacing } from "../theme";
 import { AppText, Badge, Button, EmptyState, Icon, IconButton, InlineMessage, ProgressBar, Skeleton, Screen, TopBar } from "../ui";
-import { formatTripsListDateRange, tripMemberCount } from "./trips-list-model";
-import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
+import { formatTripsListDateRange, localToday, tripMemberCount, tripTiming } from "./trips-list-model";
+import { DestinationImage } from "../ui/DestinationImage";
 
 export interface TripsListScreenProps {
   items: Trip[];
@@ -45,11 +45,18 @@ function Shortcut({ icon, label, detail, onPress }: { icon: "file-text" | "user-
 function TripCard({ trip, pack, onPress }: { trip: Trip; pack?: OfflineTripPackLoad; onPress: () => void }) {
   const packReady = pack?.state === "ready";
   const memberCount = tripMemberCount(trip);
+  const timing = tripTiming(trip, localToday());
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, shadows.sm, pressed && styles.pressed]}>
-    <Image source={destinationImageSource(trip.name, trip.imageUrl)} style={styles.cover} resizeMode="cover" accessibilityLabel={destinationImageLabel(trip.name, trip.imageUrl)} />
+    <DestinationImage name={trip.name} imageUrl={trip.imageUrl} style={styles.cover} />
     <View style={styles.cardHeader}><View style={styles.titleWrap}><AppText variant="h3" numberOfLines={2}>{trip.name}</AppText><AppText variant="caption" color="muted">{formatTripsListDateRange(trip)}</AppText></View><Badge label={trip.referenceCurrency} variant="teal" /></View>
     <View style={styles.meta}><View style={styles.metaItem}><Icon name="users" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{memberCount} membre{memberCount > 1 ? "s" : ""}</AppText></View><View style={styles.metaItem}><Icon name="map-pin" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{trip.stopIds.length} Étape{trip.stopIds.length > 1 ? "s" : ""}</AppText></View></View>
-    <View style={styles.progress}><View style={styles.progressLabels}><AppText variant="label">Préparation</AppText><AppText variant="caption" color="muted">{packReady ? "Paquet hors ligne prêt" : "À synchroniser"}</AppText></View><ProgressBar progress={packReady ? 1 : 0} color={packReady ? "teal" : "accent"} /></View>
+    <View style={styles.progress}>
+      <View style={styles.progressLabels}>
+        <AppText variant="label" color={timing.phase === "ongoing" ? "accent" : "fg"}>{timing.label}</AppText>
+        {packReady ? <AppText variant="caption" color="teal">Disponible hors ligne</AppText> : null}
+      </View>
+      {timing.phase === "ongoing" ? <ProgressBar progress={timing.progress} color="accent" /> : null}
+    </View>
   </Pressable>;
 }
 

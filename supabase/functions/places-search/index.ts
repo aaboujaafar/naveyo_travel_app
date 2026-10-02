@@ -242,6 +242,8 @@ Deno.serve(async (request) => {
     url.searchParams.set("apiKey", apiKey);
     // Keep the provider response shape stable for the mobile normalizer.
     url.searchParams.set("format", "geojson");
+    // French names and addresses ("Lisbonne", not "Lisbon") for a French-only app.
+    url.searchParams.set("lang", "fr");
     url.searchParams.set("limit", input.operation === "nearby" ? "20" : "5");
     if (providerPlaceId) url.searchParams.set("id", providerPlaceId);
     const source = input.coordinates && typeof input.coordinates === "object" && !Array.isArray(input.coordinates)

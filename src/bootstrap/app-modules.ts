@@ -16,7 +16,7 @@ import { createSupabaseItineraryModule } from "../adapters/supabase/itinerary";
 import { createSupabaseExpensesStore } from "../adapters/supabase/expenses";
 import { Expenses } from "../modules/expenses/module";
 import { InMemoryTripPackFileStore } from "../adapters/sqlite/in-memory-file-store";
-import { InMemoryTripPackStore } from "../adapters/sqlite/in-memory-trip-pack-store";
+import { fileTripPackStore } from "../adapters/file-system/trip-pack-store";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
@@ -71,7 +71,7 @@ export function createAppModules() {
     },
   });
   const offlineTripPack = new OfflineTripPack(
-    new InMemoryTripPackStore(),
+    fileTripPackStore,
     new InMemoryTripPackFileStore(),
   );
   const nativeTripTracking = createExpoLocationTrackingModule();

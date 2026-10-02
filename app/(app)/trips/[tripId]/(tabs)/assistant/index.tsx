@@ -128,6 +128,7 @@ export default function TripAssistantRoute() {
       setNearbyCandidates(candidates);
       const assistantQuery = values.query.trim() || values.category;
       if (assistant && assistantQuery.length >= 2) {
+        // The places are already listed: an unavailable AI only hides its suggestions.
         const result = await assistant.suggestPlaces({
           tripId: tripId as UUID,
           stopId: stopId as UUID,
@@ -139,7 +140,7 @@ export default function TripAssistantRoute() {
           timeZone: stop?.timeZone,
           weather,
           existingItinerary: displayedPlannedItems.map((item): SuggestionItineraryContext => ({ date: item.date, title: item.title, localTime: item.time?.local })),
-        });
+        }).catch(() => []);
         setDrafts(result);
       } else setDrafts([]);
     } catch (cause: unknown) {

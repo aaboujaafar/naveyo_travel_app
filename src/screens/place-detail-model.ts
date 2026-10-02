@@ -33,14 +33,80 @@ export function buildPlaceScheduleDates(stops: readonly Stop[]): PlaceScheduleDa
     );
 }
 
+// Geoapify category keys, most specific first within each family.
+const categoryLabels: Record<string, string> = {
+  "catering.restaurant": "Restaurant",
+  "catering.cafe": "Café",
+  "catering.bar": "Bar",
+  "catering.pub": "Pub",
+  "catering.fast_food": "Restauration rapide",
+  "catering.ice_cream": "Glacier",
+  "catering.biergarten": "Brasserie",
+  "catering.food_court": "Aire de restauration",
+  catering: "Restaurant",
+  "accommodation.hotel": "Hôtel",
+  "accommodation.hostel": "Auberge de jeunesse",
+  "accommodation.guest_house": "Maison d’hôtes",
+  "accommodation.apartment": "Appartement",
+  "accommodation.motel": "Motel",
+  accommodation: "Hébergement",
+  "tourism.sights": "À voir",
+  "tourism.attraction": "Attraction",
+  "tourism.information": "Office de tourisme",
+  tourism: "Tourisme",
+  "entertainment.museum": "Musée",
+  "entertainment.culture": "Culture",
+  "entertainment.zoo": "Zoo",
+  "entertainment.aquarium": "Aquarium",
+  "entertainment.theme_park": "Parc d’attractions",
+  entertainment: "Loisirs",
+  "leisure.park": "Parc",
+  "leisure.picnic": "Pique-nique",
+  leisure: "Loisirs",
+  "beach": "Plage",
+  "natural": "Nature",
+  "heritage": "Patrimoine",
+  "religion": "Lieu de culte",
+  "commercial.supermarket": "Supermarché",
+  "commercial.marketplace": "Marché",
+  commercial: "Commerce",
+  "activity": "Activité",
+  "sport": "Sport",
+  "airport": "Aéroport",
+  "public_transport.train": "Gare",
+  "public_transport": "Transport",
+  "commercial.port": "Port",
+  "populated_place": "Ville",
+};
+
+/** French label for a provider category such as `catering.restaurant.portuguese`. */
 export function formatPlaceCategory(category?: string): string | null {
-  const value = category?.trim();
+  const value = category?.trim().toLowerCase();
   if (!value) return null;
-  return value
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
-    .join(" ");
+  const parts = value.split(".");
+  for (let length = parts.length; length > 0; length -= 1) {
+    const label = categoryLabels[parts.slice(0, length).join(".")];
+    if (label) return label;
+  }
+  const words = parts[parts.length - 1]!.split(/[\s_-]+/).filter(Boolean);
+  if (words.length === 0) return null;
+  const label = words.join(" ");
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
+const countryNames: Record<string, string> = {
+  PT: "Portugal", ES: "Espagne", FR: "France", IT: "Italie", DE: "Allemagne", BE: "Belgique",
+  CH: "Suisse", NL: "Pays-Bas", GB: "Royaume-Uni", IE: "Irlande", MA: "Maroc", GR: "Grèce",
+  HR: "Croatie", AT: "Autriche", US: "États-Unis", CA: "Canada", JP: "Japon", TN: "Tunisie",
+  DZ: "Algérie", TR: "Turquie", LU: "Luxembourg", DK: "Danemark", SE: "Suède", NO: "Norvège",
+};
+
+/** Country name with its flag, falling back to the ISO code when the name is unknown. */
+export function formatCountry(countryCode?: string): string | null {
+  const code = countryCode?.trim().toUpperCase();
+  if (!code || !/^[A-Z]{2}$/.test(code)) return null;
+  const flag = String.fromCodePoint(...[...code].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65));
+  return `${flag} ${countryNames[code] ?? code}`;
 }
 
 export function formatPlaceSource(provider: PlaceCandidate["provider"]): string {

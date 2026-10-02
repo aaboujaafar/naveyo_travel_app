@@ -36,6 +36,7 @@ export interface TripItineraryScreenProps {
   items: ItineraryItem[];
   trackPoints: TrackPoint[];
   offline: OfflineTripPackLoad | null;
+  onDownloadOffline?: () => Promise<void>;
   loading: boolean;
   error?: string | null;
   /** Absent when the screen is a tab: the tab bar is the way out. */
@@ -55,6 +56,7 @@ export function TripItineraryScreen({
   items,
   trackPoints,
   offline,
+  onDownloadOffline,
   loading,
   error,
   onBack,
@@ -292,7 +294,7 @@ export function TripItineraryScreen({
           </ComingSoonFrame>
         </View>
 
-        <OfflineCard offline={offline} />
+        <OfflineCard offline={offline} onDownload={onDownloadOffline} />
 
         <ComingSoonSection title="Famille en temps réel">
           <View style={styles.familyRow}>
@@ -313,7 +315,9 @@ export function TripItineraryScreen({
           <View style={styles.trackingInfo}>
             <AppText variant="label">Trace de trajet</AppText>
             <AppText variant="caption" color="muted">
-              {trackPoints.length} point{trackPoints.length > 1 ? "s" : ""} enregistré{trackPoints.length > 1 ? "s" : ""} par cet appareil
+              {trackPoints.length === 0
+                ? "Aucun point enregistré sur cet iPhone"
+                : `${trackPoints.length} point${trackPoints.length > 1 ? "s" : ""} enregistré${trackPoints.length > 1 ? "s" : ""} sur cet iPhone`}
             </AppText>
           </View>
           <Button size="sm" onPress={onOpenTracking}>Ouvrir</Button>
@@ -373,32 +377,59 @@ function TimelineItem({
   );
 }
 
-function OfflineCard({ offline }: { offline: OfflineTripPackLoad | null }) {
+function OfflineCard({ offline, onDownload }: { offline: OfflineTripPackLoad | null; onDownload?: () => Promise<void> }) {
   const ready = offline?.state === "ready";
+  const [downloading, setDownloading] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const download = async () => {
+    if (!onDownload) return;
+    setDownloading(true);
+    setFailure(null);
+    try {
+      await onDownload();
+    } catch (cause) {
+      setFailure(cause instanceof Error ? cause.message : "Téléchargement impossible. Réessayez avec une connexion.");
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <View style={styles.offlineCard}>
       <View style={styles.offlineHeader}>
         <View style={[styles.offlineCheck, !ready && styles.offlineCheckInactive]}>
           <Icon name={ready ? "check" : "info"} size={14} color={ready ? colors.success : colors.gold} />
         </View>
-        <AppText variant="label">
-          {ready ? "Paquet de voyage disponible" : "Paquet hors ligne indisponible"}
-        </AppText>
+        <AppText variant="label" style={styles.flexOne}>Voyage hors ligne</AppText>
+        <Badge label={ready ? "Prêt" : "Non téléchargé"} variant={ready ? "success" : "gold"} />
       </View>
       <AppText variant="caption" color="muted">
         {ready && offline?.manifest
-          ? `Généré le ${offline.manifest.generatedAt} · révision ${offline.manifest.serverRevision}`
-          : offline?.reason ?? "Téléchargez le Voyage avant de partir."}
+          ? `Téléchargé ${formatGeneratedAt(offline.manifest.generatedAt)}. Étapes, programme, réservations et dépenses restent consultables sans réseau.`
+          : "Téléchargez le Voyage avant de partir : étapes, programme, réservations et dépenses resteront consultables sans réseau."}
       </AppText>
-      <View style={styles.offlineStatusRow}>
-        <AppText variant="label">Consultation hors ligne</AppText>
-        <Badge label={ready ? "Prête" : "Non prête"} variant={ready ? "success" : "gold"} />
-      </View>
       <AppText variant="caption" color="muted">
-        Le fond MapKit n’est jamais garanti hors connexion ; les lieux, coordonnées et traces restent listés.
+        Le fond de carte peut rester vide sans connexion ; les lieux et leurs adresses restent listés.
       </AppText>
+      {failure ? <InlineMessage variant="error" title="Téléchargement impossible" message={failure} /> : null}
+      {onDownload ? (
+        <Button
+          variant={ready ? "secondary" : "primary"}
+          fullWidth
+          loading={downloading}
+          onPress={() => void download()}
+          icon={<Icon name={ready ? "refresh" : "arrow-right"} size={20} color={ready ? colors.fg : colors.white} />}
+        >
+          {ready ? "Mettre à jour" : "Télécharger pour le hors-ligne"}
+        </Button>
+      ) : null}
     </View>
   );
+}
+
+function formatGeneratedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "récemment";
+  return `le ${date.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function ComingSoonFrame({ label, children }: { label: string; children: React.ReactNode }) {
@@ -472,6 +503,7 @@ const styles = StyleSheet.create({
   comingSoonContent: { opacity: 0.46 },
   comingSoonBadge: { position: "absolute", top: spacing.sm, right: spacing.sm, zIndex: zIndex.sticky },
   addStopPreview: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md, marginLeft: spacing["2xl"], borderRadius: radius.full, borderWidth: 1, borderStyle: "dashed", borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  flexOne: { flex: 1 },
   offlineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, gap: spacing.sm, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },
   offlineHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offlineCheck: { width: spacing.lg, height: spacing.lg, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.tealSoft },

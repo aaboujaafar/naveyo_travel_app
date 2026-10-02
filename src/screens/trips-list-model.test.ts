@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../modules/_shared/model";
-import { formatTripsListDateRange, tripMemberCount } from "./trips-list-model";
+import { formatTripsListDateRange, tripMemberCount, tripTiming } from "./trips-list-model";
 
 const trip = (overrides: Partial<Trip> = {}): Trip => ({
   id: "trip" as Trip["id"], name: "Portugal", referenceCurrency: "EUR" as Trip["referenceCurrency"],
@@ -17,5 +17,13 @@ describe("trips list model", () => {
   });
   it("uses travelers before members when available", () => {
     expect(tripMemberCount(trip({ travelers: ["a" as Trip["id"], "b" as Trip["id"]] }))).toBe(2);
+  });
+  it("counts down to the departure, then follows the days of the Voyage", () => {
+    const dated = { startsOn: "2026-11-16", endsOn: "2026-11-20" };
+    expect(tripTiming(dated, "2026-10-02")).toEqual({ phase: "upcoming", daysUntil: 45, label: "Départ dans 45 jours" });
+    expect(tripTiming(dated, "2026-11-15").label).toBe("Départ demain");
+    expect(tripTiming(dated, "2026-11-17")).toEqual({ phase: "ongoing", progress: 0.4, label: "En cours · jour 2 sur 5" });
+    expect(tripTiming(dated, "2026-11-21").phase).toBe("past");
+    expect(tripTiming({}, "2026-10-02").phase).toBe("undated");
   });
 });

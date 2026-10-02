@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,7 +8,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop as GradientStop } from "react-native-svg";
-import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
+import { DestinationImage } from "../ui/DestinationImage";
 import type { Coordinates, ItineraryItem, Reservation, Stop, Trip } from "../modules/_shared/model";
 import {
   colors,
@@ -125,11 +124,10 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
         }
       >
         <View style={styles.hero}>
-          <Image
-            source={destinationImageSource(props.stops[0]?.name ?? trip.name, props.stops[0]?.imageUrl ?? trip.imageUrl)}
-            resizeMode="cover"
+          <DestinationImage
+            name={trip.name}
+            imageUrl={trip.imageUrl ?? props.stops[0]?.imageUrl}
             style={styles.heroImage}
-            accessibilityLabel={destinationImageLabel(props.stops[0]?.name ?? trip.name, props.stops[0]?.imageUrl ?? trip.imageUrl)}
           />
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>

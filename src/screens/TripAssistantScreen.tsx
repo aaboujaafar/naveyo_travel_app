@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PlaceCandidate } from "../modules/_shared/model";
 import { DEFAULT_GEOAPIFY_ATTRIBUTION, placeAttribution } from "../modules/places";
+import { formatPlaceCategory } from "./place-detail-model";
 import type { SuggestionDraft, SuggestionWeatherContext } from "../modules/trip-assistant";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import {
@@ -113,6 +114,12 @@ export function TripAssistantScreen({
     void discover(next);
   };
 
+  // The default category is already selected, so opening Lieux shows its results at once.
+  const openMode = (next: ExploreMode) => {
+    setMode(next);
+    if (next === "places" && !searched) void discover();
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -137,8 +144,8 @@ export function TripAssistantScreen({
         </View>
 
         <View style={styles.segmented} accessibilityRole="tablist">
-          <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => setMode("day")} />
-          <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => setMode("places")} />
+          <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => openMode("day")} />
+          <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => openMode("places")} />
         </View>
 
         {mode === "day" ? (
@@ -210,7 +217,7 @@ export function TripAssistantScreen({
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}><Icon name="search" size={24} color={colors.tealStrong} /></View>
                 <AppText variant="label" align="center">Que cherchez-vous ?</AppText>
-                <AppText variant="bodySmall" color="muted" align="center">Choisissez une catégorie ou tapez une envie : les lieux proches de votre Étape s’affichent ici.</AppText>
+                <AppText variant="bodySmall" color="muted" align="center">Touchez une catégorie ou tapez une envie : les lieux proches de votre Étape s’affichent ici.</AppText>
               </View>
             ) : (
               <>
@@ -304,10 +311,16 @@ function SuggestionCard({ draft, onPlan }: { draft: SuggestionDraft; onPlan?: ()
 }
 
 function ResultCard({ place, onPress }: { place: PlaceCandidate; onPress?: () => void }) {
-  const meta = [place.distanceMeters != null ? formatDistance(place.distanceMeters) : null, place.address].filter(Boolean).join(" · ");
+  const meta = [formatPlaceCategory(place.category), place.distanceMeters != null ? formatDistance(place.distanceMeters) : null, place.address].filter(Boolean).join(" · ");
   return (
     <Pressable accessibilityRole="button" onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.resultCard, pressed && styles.pressed]}>
-      <Image source={placeImageSource(place)} style={styles.resultImage} resizeMode="cover" />
+      {place.imageUrl ? (
+        <Image source={{ uri: place.imageUrl }} style={styles.resultImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.resultImage, styles.resultPlaceholder, { backgroundColor: placeVisual(place).background }]}>
+          <AppText variant="h3">{placeVisual(place).emoji}</AppText>
+        </View>
+      )}
       <View style={styles.resultBody}>
         <AppText variant="label" numberOfLines={1}>{place.name}</AppText>
         {meta ? <AppText variant="caption" color="muted" numberOfLines={2}>{meta}</AppText> : null}
@@ -330,11 +343,19 @@ function ResultCard({ place, onPress }: { place: PlaceCandidate; onPress?: () =>
 
 function formatRadius(value: number): string { return value >= 1_000 ? `${value / 1_000} km` : `${value} m`; }
 function formatDistance(value: number): string { return value >= 1_000 ? `${(value / 1_000).toFixed(1)} km` : `${Math.round(value)} m`; }
-function placeImageSource(place: PlaceCandidate) {
-  if (place.imageUrl) return { uri: place.imageUrl };
+/** Without a real photo, a category pictogram beats repeating one stock photo on every row. */
+function placeVisual(place: PlaceCandidate): { emoji: string; background: string } {
   const category = place.category?.toLowerCase() ?? "";
-  if (category.includes("restaurant") || category.includes("catering")) return require("../../assets/restaurant-detail.png");
-  return category.includes("activity") || category.includes("sport") ? require("../../assets/photo-album-3.png") : require("../../assets/photo-album-2.png");
+  if (/cafe|coffee/.test(category)) return { emoji: "☕️", background: colors.goldSoft };
+  if (/bar|pub|biergarten/.test(category)) return { emoji: "🍷", background: colors.accentSoft };
+  if (/ice_cream|dessert|pastry|bakery/.test(category)) return { emoji: "🍦", background: colors.goldSoft };
+  if (/catering|restaurant|food/.test(category)) return { emoji: "🍽️", background: colors.accentSoft };
+  if (/accommodation|hotel|hostel/.test(category)) return { emoji: "🛏️", background: colors.tealSoft };
+  if (/museum|culture|heritage/.test(category)) return { emoji: "🏛️", background: colors.tealSoft };
+  if (/park|natural|leisure|beach/.test(category)) return { emoji: "🌳", background: colors.tealSoft };
+  if (/religion/.test(category)) return { emoji: "⛪️", background: colors.goldSoft };
+  if (/activity|sport|entertainment/.test(category)) return { emoji: "🎟️", background: colors.accentSoft };
+  return { emoji: "📍", background: colors.tealSoft };
 }
 
 function LoadingResults() {
@@ -389,6 +410,7 @@ const styles = StyleSheet.create({
   resultsList: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   resultCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   resultImage: { width: 72, height: 72, borderRadius: radius.sm, backgroundColor: colors.border },
+  resultPlaceholder: { alignItems: "center", justifyContent: "center" },
   resultBody: { flex: 1, gap: 2 },
   credit: { fontSize: 11 },
   mapPreview: { height: 360, marginHorizontal: spacing.lg, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.tealSoft },

@@ -8,7 +8,7 @@ import type {
   TrackPoint,
   UUID,
 } from "../../../../../../src/modules/_shared/model";
-import type { OfflineTripPackLoad } from "../../../../../../src/modules/offline-trip-pack";
+import { downloadTripPack, type OfflineTripPackLoad } from "../../../../../../src/modules/offline-trip-pack";
 import { TripItineraryScreen } from "../../../../../../src/screens/TripItineraryScreen";
 
 export default function ItineraryRoute() {
@@ -66,6 +66,28 @@ export default function ItineraryRoute() {
       offline={offline}
       loading={loading}
       error={error}
+      onDownloadOffline={async () => {
+        if (!bootstrap || !tripId) return;
+        const { modules } = bootstrap;
+        await downloadTripPack(
+          tripId,
+          {
+            getTrip: (id) => modules.trips.get(id),
+            listStops: (id) => modules.trips.listStops(id),
+            listItinerary: (id) => modules.itinerary.list(id),
+            getPlace: (placeId, id) => modules.places.getById(placeId, id),
+            listReservations: (id) => modules.reservations.list(id),
+            listDocuments: (id) => modules.documents.list(id),
+            // The pack format requires a payer; an expense without one stays online only.
+            listExpenses: async (id) =>
+              (await modules.expenses.list(id)).flatMap((expense) =>
+                expense.paidBy ? [{ ...expense, paidBy: expense.paidBy }] : [],
+              ),
+          },
+          modules.offlineTripPack,
+        );
+        setOffline(await modules.offlineTripPack.load(tripId));
+      }}
       onOpenAssistant={(stopId) => {
         if (tripId) {
           router.push(`/trips/${tripId}/assistant?stopId=${stopId}&mode=day`);

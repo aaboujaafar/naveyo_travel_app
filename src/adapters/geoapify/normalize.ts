@@ -22,6 +22,16 @@ const text = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
+/** Keeps the deepest category of the first family, e.g. `catering.restaurant.portuguese`. */
+function mostSpecificCategory(values: unknown[]): string | undefined {
+  const categories = values.map(text).filter((value): value is string => value !== undefined);
+  const family = categories[0]?.split(".")[0];
+  if (!family) return undefined;
+  return categories
+    .filter((value) => value === family || value.startsWith(`${family}.`))
+    .reduce((best, value) => (value.split(".").length > best.split(".").length ? value : best));
+}
+
 const stableId = (providerId: string): UUID => {
   let first = 2166136261;
   let second = 2246822519;
@@ -68,7 +78,7 @@ export function normalizeGeoapifyResponse(
     )
       throw new Error("Incomplete Geoapify place");
     const category = Array.isArray(properties.categories)
-      ? text(properties.categories[0])
+      ? mostSpecificCategory(properties.categories)
       : text(properties.category);
     const datasource = properties.datasource as Record<string, unknown> | undefined;
     const imageUrl = text(properties.image) ?? text(properties.photo) ?? text(datasource?.image);
