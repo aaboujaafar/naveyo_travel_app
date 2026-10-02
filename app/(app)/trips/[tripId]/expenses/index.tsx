@@ -1,10 +1,12 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { BudgetSummary, Expense } from "../../../../../src/modules/expenses";
 import type { ISO4217, Trip, UUID } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screens/TripBudgetScreen";
+import { budgetAlerts, computeSharing } from "../../../../../src/screens/budget-sharing-model";
+import { localToday } from "../../../../../src/screens/trips-list-model";
 
 const fallbackCurrency = "EUR" as ISO4217;
 
@@ -20,6 +22,7 @@ export default function ExpensesRoute() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<UUID | null>(null);
 
   const load = useCallback(async () => {
     if (!tripId || !trips) {
@@ -29,7 +32,12 @@ export default function ExpensesRoute() {
     }
     setError(null);
     try {
-      setTrip(await trips.get(tripId));
+      const [nextTrip, account] = await Promise.all([
+        trips.get(tripId),
+        bootstrap?.modules.identity.currentAccount().catch(() => null) ?? Promise.resolve(null),
+      ]);
+      setTrip(nextTrip);
+      setAccountId(account?.id ?? null);
       if (!bootstrap) {
         setError("Le Module Dépenses n'est pas encore exposé par la composition de l'application.");
         return;
@@ -87,8 +95,23 @@ export default function ExpensesRoute() {
     }
   }
 
+  // Members have no display name yet: "Vous" for this account, then the same numbering as the settings.
+  const members = useMemo(() => {
+    const ids = trip?.members.map((member) => member.accountId) ?? [];
+    const labelled = ids.map((id, index) => ({ id, label: id === accountId ? "Vous" : `Compte ${index + 1}` }));
+    return [...labelled.filter((member) => member.id === accountId), ...labelled.filter((member) => member.id !== accountId)];
+  }, [accountId, trip]);
+  const sharing = useMemo(() => (members.length > 1 ? computeSharing(expenses, members.map((member) => member.id)) : null), [expenses, members]);
+  const alerts = useMemo(
+    () => budgetAlerts({ summary, startsOn: trip?.startsOn, endsOn: trip?.endsOn, today: localToday() }),
+    [summary, trip],
+  );
+
   return (
     <TripBudgetScreen
+      members={members}
+      sharing={sharing}
+      alerts={alerts}
       tripName={trip?.name ?? "Voyage"}
       referenceCurrency={trip?.referenceCurrency ?? fallbackCurrency}
       summary={summary}
