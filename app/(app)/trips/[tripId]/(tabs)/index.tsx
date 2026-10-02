@@ -36,6 +36,7 @@ export default function TripDetailRoute() {
   const [routePolyline, setRoutePolyline] = useState<Coordinates[]>([]);
   const [summary, setSummary] = useState<DashboardSummary>({});
   const [offlineSnapshot, setOfflineSnapshot] = useState(false);
+  const [offlineReady, setOfflineReady] = useState<boolean | undefined>(undefined);
   const [travelToNext, setTravelToNext] = useState<{ key: string; seconds: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -54,6 +55,7 @@ export default function TripDetailRoute() {
 
     // The last offline download paints the screen at once; the network then refreshes it.
     const pack = await modules.offlineTripPack.get(tripId).catch(() => null);
+    setOfflineReady(pack !== null);
     if (pack) {
       setTrip((current) => current ?? pack.trip);
       setStops((current) => (current.length > 0 ? current : pack.stops));
@@ -275,6 +277,7 @@ export default function TripDetailRoute() {
       }}
       summary={summary}
       offlineSnapshot={offlineSnapshot}
+      offlineReady={offlineReady}
     />
   );
 }

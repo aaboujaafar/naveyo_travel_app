@@ -66,6 +66,8 @@ export interface TripDashboardScreenProps {
   onOpenRecap?: () => void;
   /** True when the screen shows the last offline download because the network failed. */
   offlineSnapshot?: boolean;
+  /** Whether an offline download of the Voyage exists on this device. */
+  offlineReady?: boolean;
 }
 
 export interface DashboardSummary {
@@ -220,6 +222,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             travelToNextSeconds={props.travelToNextSeconds ?? null}
             onOpenDirections={props.onOpenDirections}
             summary={props.summary}
+            offlineReady={props.offlineReady}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             stops={sortedStops}
             itineraryItemCount={props.itineraryItems.length}
@@ -276,6 +279,7 @@ function TodayPanel({
   travelToNextSeconds,
   onOpenDirections,
   summary,
+  offlineReady,
   onComposeDay,
   stops,
   itineraryItemCount,
@@ -294,6 +298,7 @@ function TodayPanel({
   travelToNextSeconds: number | null;
   onOpenDirections?: (entry: TodayEntry) => void;
   summary?: DashboardSummary;
+  offlineReady?: boolean;
   onComposeDay: () => void;
   stops: Stop[];
   itineraryItemCount: number;
@@ -308,9 +313,9 @@ function TodayPanel({
   onOpenPacking: () => void;
   weatherByStopId?: Record<string, DashboardWeatherState>;
 }) {
-  const steps = buildPreparationSteps({ stops: stops.length, itineraryItems: itineraryItemCount, reservations: reservations.length });
+  const steps = buildPreparationSteps({ stops: stops.length, itineraryItems: itineraryItemCount, reservations: reservations.length, offlineReady });
   const doneCount = steps.filter((step) => step.done).length;
-  const stepActions = { stop: onOpenCreateStop, places: onComposeDay, reservation: onOpenReservations };
+  const stepActions = { stop: onOpenCreateStop, places: onComposeDay, reservation: onOpenReservations, offline: onOpenItinerary };
 
   return (
     <View style={styles.todayPanel}>
