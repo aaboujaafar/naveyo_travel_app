@@ -226,6 +226,22 @@ export const createSupabaseItineraryModule = (
       const item = await insertItem(input, placeId);
       return input.place ? { ...item, place: input.place } : item;
     },
+    async move(input) {
+      // The clock time is kept; the time zone follows the Étape of the new day.
+      const timezone = await stopTimeZone(input.tripId, input.stopId);
+      await query(
+        client
+          .from("itinerary_items")
+          .update({ stop_id: input.stopId, local_date: input.date, timezone })
+          .eq("trip_id", input.tripId)
+          .eq("id", input.itemId),
+      );
+    },
+    async remove(tripId, itemId) {
+      const table = client.from("itinerary_items");
+      if (!table.delete) throw new Error("Deleting itinerary items is not supported");
+      await query(table.delete().eq("trip_id", tripId).eq("id", itemId));
+    },
     async addConfirmedPlace(input: ConfirmedPlaceInput) {
       const { place, ...rest } = input;
       const placeId = await savePlace(input.tripId, input.stopId, place);

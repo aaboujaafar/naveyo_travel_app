@@ -77,6 +77,16 @@ export default function ItineraryRoute() {
       placeCategories={placeCategories}
       loading={loading}
       error={error}
+      onMoveItem={bootstrap?.modules.itinerary.move && tripId ? async (item, target) => {
+        const itinerary = bootstrap.modules.itinerary;
+        await itinerary.move?.({ tripId, itemId: item.id, stopId: target.stopId, date: target.date });
+        setItems(await itinerary.list(tripId));
+      } : undefined}
+      onRemoveItem={bootstrap?.modules.itinerary.remove && tripId ? async (item) => {
+        const itinerary = bootstrap.modules.itinerary;
+        await itinerary.remove?.(tripId, item.id);
+        setItems(await itinerary.list(tripId));
+      } : undefined}
       onDownloadOffline={async () => {
         if (!bootstrap || !tripId) return;
         const { modules } = bootstrap;

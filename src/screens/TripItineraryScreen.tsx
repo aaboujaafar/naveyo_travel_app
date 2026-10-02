@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MapAdapter } from "../adapters/map/interface";
 import { ExpoMapsAdapter } from "../adapters/map/expo-maps-adapter";
@@ -16,6 +16,7 @@ import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import {
   AppText,
   Badge,
+  BottomSheet,
   Button,
   Chip,
   Icon,
@@ -39,6 +40,9 @@ export interface TripItineraryScreenProps {
   placeCategories?: Record<string, string>;
   offline: OfflineTripPackLoad | null;
   onDownloadOffline?: () => Promise<void>;
+  /** Present when the itinerary can be edited (online, with an editor role). */
+  onMoveItem?: (item: ItineraryItem, target: { stopId: Stop["id"]; date: string }) => Promise<void>;
+  onRemoveItem?: (item: ItineraryItem) => Promise<void>;
   loading: boolean;
   error?: string | null;
   /** Absent when the screen is a tab: the tab bar is the way out. */
@@ -60,6 +64,8 @@ export function TripItineraryScreen({
   offline,
   placeCategories,
   onDownloadOffline,
+  onMoveItem,
+  onRemoveItem,
   loading,
   error,
   onBack,
@@ -73,6 +79,24 @@ export function TripItineraryScreen({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<MapFilter>("Tous");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [movingItem, setMovingItem] = useState<ItineraryItem | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const runEdit = async (edit: () => Promise<void>) => {
+    setEditError(null);
+    try {
+      await edit();
+      setMovingItem(null);
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "Modification impossible. Réessayez avec une connexion.");
+    }
+  };
+  const confirmRemove = (item: ItineraryItem) => {
+    if (!onRemoveItem) return;
+    Alert.alert("Retirer cette activité ?", `${item.title} sera retiré du programme pour tous les Membres du Voyage.`, [
+      { text: "Annuler", style: "cancel" },
+      { text: "Retirer", style: "destructive", onPress: () => void runEdit(() => onRemoveItem(item)) },
+    ]);
+  };
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const activeDay =
     days.find((day) => day.date === selectedDate) ?? days[0] ?? null;
@@ -250,6 +274,9 @@ export function TripItineraryScreen({
             <Badge label={`${visibleItems.length} prévu${visibleItems.length > 1 ? "s" : ""}`} variant="teal" />
           </View>
 
+          {editError && movingItem === null ? (
+            <InlineMessage variant="error" title="Modification impossible" message={editError} />
+          ) : null}
           {activeDay && visibleItems.length > 0 ? (
             <View style={styles.timeline}>
               <View style={styles.timelineLine} />
@@ -258,6 +285,8 @@ export function TripItineraryScreen({
                   key={item.id}
                   item={item}
                   placeCategory={item.place?.placeId ? placeCategories?.[item.place.placeId] : undefined}
+                  onMove={onMoveItem ? () => setMovingItem(item) : undefined}
+                  onRemove={onRemoveItem ? () => confirmRemove(item) : undefined}
                   expanded={expandedItemId === item.id}
                   onPress={() => {
                     setSelectedPointId(
@@ -334,17 +363,43 @@ export function TripItineraryScreen({
         </View>
       </ScrollView>
 
+      <BottomSheet visible={movingItem !== null} onClose={() => setMovingItem(null)} title="Changer de jour" maxHeight={640}>
+        {movingItem ? <AppText variant="bodySmall" color="muted">{`${movingItem.title} garde son heure et rejoint le jour choisi.`}</AppText> : null}
+        {editError ? <InlineMessage variant="error" title="Modification impossible" message={editError} /> : null}
+        <View style={styles.dayChoices}>
+          {days.map((day, index) => {
+            const current = movingItem?.date === day.date && movingItem.stopId === day.stop.id;
+            return (
+              <Button
+                key={`${day.stop.id}-${day.date}`}
+                variant={current ? "primary" : "secondary"}
+                disabled={current}
+                onPress={() => {
+                  const item = movingItem;
+                  if (item && onMoveItem) void runEdit(() => onMoveItem(item, { stopId: day.stop.id, date: day.date }));
+                }}
+              >
+                {`Jour ${index + 1} · ${formatLocalItineraryDate(day.date)} · ${day.stop.name}`}
+              </Button>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </View>
   );
 }
 
 function TimelineItem({
   placeCategory,
+  onMove,
+  onRemove,
   item,
   expanded,
   onPress,
 }: {
   placeCategory?: string;
+  onMove?: () => void;
+  onRemove?: () => void;
   item: ItineraryItem;
   expanded: boolean;
   onPress: () => void;
@@ -377,6 +432,12 @@ function TimelineItem({
             </AppText>
           ) : null}
           {item.notes ? <AppText variant="caption" color="muted">{item.notes}</AppText> : null}
+          {onMove || onRemove ? (
+            <View style={styles.itemActions}>
+              {onMove ? <Button size="sm" variant="secondary" onPress={onMove}>Changer de jour</Button> : null}
+              {onRemove ? <Button size="sm" variant="ghost" onPress={onRemove}>Retirer</Button> : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </Pressable>
@@ -521,6 +582,8 @@ const styles = StyleSheet.create({
   comingSoonBadge: { position: "absolute", top: spacing.sm, right: spacing.sm, zIndex: zIndex.sticky },
   addStopPreview: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md, marginLeft: spacing["2xl"], borderRadius: radius.full, borderWidth: 1, borderStyle: "dashed", borderColor: colors.accent, backgroundColor: colors.accentSoft },
   flexOne: { flex: 1 },
+  itemActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  dayChoices: { gap: spacing.sm },
   offlineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, gap: spacing.sm, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },
   offlineHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offlineCheck: { width: spacing.lg, height: spacing.lg, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.tealSoft },

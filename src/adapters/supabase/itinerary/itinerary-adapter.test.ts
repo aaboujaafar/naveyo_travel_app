@@ -121,4 +121,23 @@ describe("Supabase itinerary adapter", () => {
     const insert = calls.find((call) => call.table === "itinerary_items" && call.op === "insert");
     expect(insert?.values).toMatchObject({ timezone: "Europe/Lisbon", local_time: null, item_type: "note", place_id: null });
   });
+
+  it("moves an activity to another day with the time zone of its new Étape", async () => {
+    const { client, calls } = fakeClient((call) =>
+      call.table === "stops" ? { data: { timezone: "Europe/Madrid" }, error: null } : { data: null, error: null },
+    );
+    await createSupabaseItineraryModule(client).move?.({ tripId, itemId, stopId, date: "2026-09-07" });
+    const update = calls.find((call) => call.op === "update");
+    expect(update).toMatchObject({
+      table: "itinerary_items",
+      values: { stop_id: stopId, local_date: "2026-09-07", timezone: "Europe/Madrid" },
+      filters: [["trip_id", tripId], ["id", itemId]],
+    });
+  });
+
+  it("removes an activity of the Voyage only", async () => {
+    const { client, calls } = fakeClient(() => ({ data: null, error: null }));
+    await createSupabaseItineraryModule(client).remove?.(tripId, itemId);
+    expect(calls).toEqual([{ table: "itinerary_items", op: "delete", filters: [["trip_id", tripId], ["id", itemId]] }]);
+  });
 });
