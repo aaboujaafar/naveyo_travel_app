@@ -9,7 +9,25 @@ import { TripReservationsScreen } from "../../../../../src/screens/TripReservati
 export default function ReservationsRoute() {
   const router = useRouter();
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
-  const tripId = rawTripId as UUID | undefined;
+  const routeTripId = rawTripId ?? "";
+  return (
+    <ReservationsPanel
+      tripId={rawTripId as UUID | undefined}
+      onBack={() => router.back()}
+      onOpenDocuments={() => router.dismissTo(`/trips/${routeTripId}/documents`)}
+      onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
+    />
+  );
+}
+
+/** Confirmed reservations, either as their own screen or inside the Documents tab. */
+export function ReservationsPanel({ tripId, onBack, onOpenDocuments, onOpenPacking }: {
+  tripId: UUID | undefined;
+  onBack?: () => void;
+  onOpenDocuments: () => void;
+  onOpenPacking: () => void;
+}) {
+  const router = useRouter();
   const trips = useTripsModule();
   const bootstrap = useNaveyoBootstrap();
   const [tripName, setTripName] = useState("Voyage");
@@ -54,18 +72,17 @@ export default function ReservationsRoute() {
     await Linking.openURL(url);
   }, []);
 
-  const routeTripId = rawTripId ?? "";
   return (
     <TripReservationsScreen
       tripName={tripName}
       items={items}
       loading={loading}
       error={error}
-      onBack={() => router.back()}
+      onBack={onBack}
       onRetry={load}
-      onOpenDocuments={() => router.dismissTo(`/trips/${routeTripId}/documents`)}
-      onOpenPacking={() => router.replace(`/(app)/trips/${routeTripId}/packing`)}
-      onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
+      onOpenDocuments={onOpenDocuments}
+      onOpenPacking={onOpenPacking}
+      onImport={() => router.push(`/(app)/imports?tripId=${tripId ?? ""}`)}
       onOpenNavigation={openNavigation}
     />
   );

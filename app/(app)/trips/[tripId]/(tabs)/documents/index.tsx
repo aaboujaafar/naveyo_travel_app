@@ -9,6 +9,8 @@ import {
   type DocumentFilter,
   type DocumentStopOption,
 } from "../../../../../../src/screens/TripDocumentsScreen";
+import { PackingPanel } from "../../packing";
+import { ReservationsPanel } from "../../reservations";
 
 export default function DocumentsRoute() {
   const router = useRouter();
@@ -28,6 +30,8 @@ export default function DocumentsRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadedId, setDownloadedId] = useState<string | null>(null);
+  // The three segments switch in place: the tab bar stays and there is no back stack to unwind.
+  const [segment, setSegment] = useState<"documents" | "reservations" | "packing">("documents");
 
   const load = useCallback(async () => {
     if (!tripId || !documents || !trips) {
@@ -82,6 +86,13 @@ export default function DocumentsRoute() {
 
   const routeTripId = rawTripId ?? "";
 
+  if (segment === "packing") {
+    return <PackingPanel tripId={tripId} onOpenDocuments={() => setSegment("documents")} onOpenReservations={() => setSegment("reservations")} />;
+  }
+  if (segment === "reservations") {
+    return <ReservationsPanel tripId={tripId} onOpenDocuments={() => setSegment("documents")} onOpenPacking={() => setSegment("packing")} />;
+  }
+
   return (
     <TripDocumentsScreen
       tripName={tripName}
@@ -96,8 +107,8 @@ export default function DocumentsRoute() {
       onSelectFilter={setFilter}
       onDownload={download}
       onAssign={assign}
-      onOpenReservations={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
-      onOpenPacking={() => router.push(`/(app)/trips/${routeTripId}/packing`)}
+      onOpenReservations={() => setSegment("reservations")}
+      onOpenPacking={() => setSegment("packing")}
       onImport={() => router.push(`/(app)/imports?tripId=${routeTripId}`)}
     />
   );

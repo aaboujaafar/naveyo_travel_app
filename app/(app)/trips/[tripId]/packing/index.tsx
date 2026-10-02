@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   AddPackingItemInput,
   PackingItem,
@@ -11,6 +11,7 @@ import { useTripsModule } from "../../../../../src/modules/trips";
 import {
   TripPackingScreen,
 } from "../../../../../src/screens/TripPackingScreen";
+import { suggestPackingItems, type PackingSuggestion } from "../../../../../src/screens/packing-suggestions";
 
 type AddPackingItem = Omit<AddPackingItemInput, "tripId">;
 
@@ -21,19 +22,37 @@ interface PackingScreenProps {
   loading: boolean;
   saving: boolean;
   error: string | null;
-  onBack: () => void;
+  onBack?: () => void;
   onOpenDocuments: () => void;
   onOpenReservations: () => void;
   onRetry: () => Promise<void>;
   onAddItem: (input: AddPackingItem) => Promise<boolean>;
   onTogglePacked: (item: PackingItem, packed: boolean) => Promise<void>;
   onRemoveItem: (item: PackingItem) => Promise<void>;
+  suggestions: PackingSuggestion[];
+  onAddSuggestions: (selection: PackingSuggestion[]) => Promise<boolean>;
 }
 
 export default function PackingRoute() {
   const router = useRouter();
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string }>();
-  const tripId = typeof rawTripId === "string" ? (rawTripId as UUID) : undefined;
+  return (
+    <PackingPanel
+      tripId={typeof rawTripId === "string" ? (rawTripId as UUID) : undefined}
+      onBack={() => router.back()}
+      onOpenDocuments={() => router.dismissTo(`/trips/${rawTripId ?? ""}/documents`)}
+      onOpenReservations={() => router.replace(`/(app)/trips/${rawTripId ?? ""}/reservations`)}
+    />
+  );
+}
+
+/** The packing list, either as its own screen or inside the Documents tab. */
+export function PackingPanel({ tripId, onBack, onOpenDocuments, onOpenReservations }: {
+  tripId: UUID | undefined;
+  onBack?: () => void;
+  onOpenDocuments: () => void;
+  onOpenReservations: () => void;
+}) {
   const trips = useTripsModule();
   const packingList = usePackingList();
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -94,6 +113,27 @@ export default function PackingRoute() {
     });
   }, [packingList, runMutation, tripId]);
 
+  const addSuggestions = useCallback((selection: PackingSuggestion[]) => {
+    if (!packingList || !tripId) return Promise.resolve(false);
+    return runMutation(async () => {
+      for (const suggestion of selection) {
+        await packingList.add({ tripId, label: suggestion.label, category: suggestion.category, quantity: suggestion.quantity });
+      }
+    });
+  }, [packingList, runMutation, tripId]);
+
+  const suggestions = useMemo(
+    () => (trip
+      ? suggestPackingItems({
+          startsOn: trip.startsOn,
+          endsOn: trip.endsOn,
+          countryCodes: stops.map((stop) => stop.countryCode),
+          existingLabels: items.map((item) => item.label),
+        })
+      : []),
+    [items, stops, trip],
+  );
+
   const update = useCallback(async (itemId: UUID, changes: UpdatePackingItemInput) => {
     if (!packingList || !tripId) return;
     // Optimistic toggle: the checkbox reacts immediately, the silent refresh reconciles.
@@ -116,11 +156,13 @@ export default function PackingRoute() {
     loading,
     saving,
     error,
-    onBack: () => router.back(),
-    onOpenDocuments: () => router.dismissTo(`/trips/${rawTripId ?? ""}/documents`),
-    onOpenReservations: () => router.replace(`/(app)/trips/${rawTripId ?? ""}/reservations`),
+    onBack,
+    onOpenDocuments,
+    onOpenReservations,
     onRetry: () => load(),
     onAddItem: add,
+    suggestions,
+    onAddSuggestions: addSuggestions,
     onTogglePacked: (item, packed) => update(item.id, { packed }),
     onRemoveItem: (item) => remove(item.id),
   };
