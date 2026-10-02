@@ -29,6 +29,7 @@ import {
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
 import { formatDuration, type TodayEntry, type TodayPlan } from "./today-model";
+import { localToday, tripTiming } from "./trips-list-model";
 import type { ClimateSummary } from "../modules/weather";
 
 
@@ -61,6 +62,8 @@ export interface TripDashboardScreenProps {
   travelToNextSeconds?: number | null;
   onOpenDirections?: (entry: TodayEntry) => void;
   summary?: DashboardSummary;
+  /** Shown once the Voyage is over. */
+  onOpenRecap?: () => void;
   /** True when the screen shows the last offline download because the network failed. */
   offlineSnapshot?: boolean;
 }
@@ -198,6 +201,18 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             message={`${trip.members.length} Comptes ont accès à ce Voyage privé.`}
             onDismiss={() => setShowMemberNotice(false)}
           />
+        ) : null}
+
+        {props.onOpenRecap && tripTiming(trip, localToday()).phase === "past" ? (
+          <View style={styles.bannerWrap}>
+            <Pressable accessibilityRole="button" onPress={props.onOpenRecap} style={({ pressed }) => [styles.aiDayCard, pressed && styles.pressed]}>
+              <View style={styles.aiDayIcon}><Icon name="layers" size={22} color={colors.white} /></View>
+              <View style={styles.flexOne}>
+                <AppText variant="h3" color="onAccent">Le récap est prêt</AppText>
+                <AppText variant="bodySmall" color="onAccent">Étapes, activités, kilomètres et dépenses du Voyage, à garder ou partager.</AppText>
+              </View>
+            </Pressable>
+          </View>
         ) : null}
 
         <TodayPanel

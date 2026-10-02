@@ -89,6 +89,9 @@ export default function AccountRoute() {
       onOpenExpenses={(tripId) =>
         router.push(`/(app)/trips/${tripId}/expenses`)
       }
+      onOpenRecap={(tripId) =>
+        router.push(`/(app)/trips/${tripId}/recap`)
+      }
       onSignOut={changeAccount}
     />
   );

@@ -257,6 +257,7 @@ export default function TripDetailRoute() {
       onOpenDocuments={() =>
         router.push(`/trips/${routeTripId}/documents`)
       }
+      onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
       }

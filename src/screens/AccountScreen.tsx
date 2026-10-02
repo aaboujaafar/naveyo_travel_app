@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Account } from "../modules/identity";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import type { Trip } from "../modules/trips";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
-import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
+import { DestinationImage } from "../ui/DestinationImage";
+import { formatTripsListDateRange, localToday, tripTiming } from "./trips-list-model";
 import {
   AppText,
   Badge,
@@ -21,6 +22,7 @@ import {
   accountDisplayName,
   accountInitials,
   currentTripForAccount,
+  pastTrips,
   tripDateLabel,
 } from "./account-screen-model";
 
@@ -38,6 +40,7 @@ export interface AccountScreenProps {
   onOpenTripSettings: (tripId: Trip["id"]) => void;
   onOpenInvitation: (tripId: Trip["id"]) => void;
   onOpenExpenses: (tripId: Trip["id"]) => void;
+  onOpenRecap?: (tripId: Trip["id"]) => void;
   onSignOut: () => Promise<void>;
 }
 
@@ -55,11 +58,14 @@ export function AccountScreen({
   onOpenTripSettings,
   onOpenInvitation,
   onOpenExpenses,
+  onOpenRecap,
   onSignOut,
 }: AccountScreenProps) {
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const currentTrip = currentTripForAccount(trips);
+  const finishedTrips = pastTrips(trips);
+  const timing = currentTrip ? tripTiming(currentTrip, localToday()) : null;
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.lg) }),
     [insets.top],
@@ -124,7 +130,7 @@ export function AccountScreen({
           </View>
         ) : currentTrip ? (
           <View style={styles.activeTripCard}>
-            <Image source={destinationImageSource(currentTrip.name, currentTrip.imageUrl)} style={styles.activeTripCover} resizeMode="cover" accessibilityLabel={destinationImageLabel(currentTrip.name, currentTrip.imageUrl)} />
+            <DestinationImage name={currentTrip.name} imageUrl={currentTrip.imageUrl} style={styles.activeTripCover} />
             <View style={styles.activeTripHeader}>
               <View style={styles.activeTripTitle}>
                 <AppText variant="h3">{currentTrip.name}</AppText>
@@ -132,7 +138,12 @@ export function AccountScreen({
               </View>
               <Badge label="Voyage privé" variant="accent" />
             </View>
-            <View style={styles.activeTripProgress}><ProgressBar progress={0} /></View>
+            {timing ? (
+              <View style={styles.activeTripProgress}>
+                <AppText variant="caption" color={timing.phase === "ongoing" ? "accent" : "muted"}>{timing.label}</AppText>
+                {timing.phase === "ongoing" ? <ProgressBar progress={timing.progress} color="accent" /> : null}
+              </View>
+            ) : null}
             <View style={styles.quickLinks}>
               <QuickLink icon="home" label="Dashboard" onPress={() => onOpenTrip(currentTrip.id)} />
               <QuickLink icon="image" label="Photos" comingSoon />
@@ -156,20 +167,28 @@ export function AccountScreen({
           </View>
         )}
 
-        <ComingSoonSection title="Mes voyages archivés">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.archivedTrips}>
-            {['Barcelone 2025', 'Rome 2024', 'Amsterdam 2024'].map((name) => (
-              <View key={name} style={styles.archivedTripCard}>
-                <View style={styles.archivedThumb}>
-                  <AppText variant="label" color="onAccent">{name}</AppText>
-                </View>
-                <View style={styles.archivedBody}>
-                  <AppText variant="caption" color="muted">Récap disponible après le Voyage</AppText>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </ComingSoonSection>
+        {finishedTrips.length > 0 ? (
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeader}><AppText variant="h3">Voyages passés</AppText></View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.archivedTrips}>
+              {finishedTrips.map((trip) => (
+                <Pressable
+                  key={trip.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Récap de ${trip.name}`}
+                  onPress={() => (onOpenRecap ?? onOpenTrip)(trip.id)}
+                  style={({ pressed }) => [styles.archivedTripCard, pressed && styles.pressedCard]}
+                >
+                  <DestinationImage name={trip.name} imageUrl={trip.imageUrl} style={styles.archivedThumb} />
+                  <View style={styles.archivedBody}>
+                    <AppText variant="label" numberOfLines={1}>{trip.name}</AppText>
+                    <AppText variant="caption" color="muted">{formatTripsListDateRange(trip)} · Voir le récap</AppText>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
@@ -223,15 +242,17 @@ export function AccountScreen({
               detail={offline?.state === "ready" ? "Disponible ✓" : "Non disponible"}
               ready={offline?.state === "ready"}
             />
-            <StorageRow
-              name="Documents attendus"
-              detail={`${offline?.manifest?.files.length ?? 0} fichier(s)`}
-              ready={offline?.state === "ready"}
-            />
+            {offline?.pack ? (
+              <StorageRow
+                name="Contenu"
+                detail={`${offline.pack.stops.length} étape(s) · ${offline.pack.itinerary.length} activité(s) · ${offline.pack.reservations.length} réservation(s)`}
+                ready
+              />
+            ) : null}
             <AppText variant="caption" color="muted" align="center">
               {offline?.manifest
-                ? `Dernière génération : ${offline.manifest.generatedAt}`
-                : "Aucun manifeste actif pour ce Voyage."}
+                ? `Téléchargé le ${new Date(offline.manifest.generatedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`
+                : "Téléchargez le Voyage depuis l’onglet Carte pour le consulter sans réseau."}
             </AppText>
           </View>
         </View>
@@ -338,7 +359,7 @@ const styles = StyleSheet.create({
   activeTripCover: { width: "100%", height: spacing["2xl"] * 3, backgroundColor: colors.tealSoft },
   activeTripHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md, paddingHorizontal: spacing.lg },
   activeTripTitle: { flex: 1, gap: spacing.xs },
-  activeTripProgress: { marginHorizontal: spacing.lg },
+  activeTripProgress: { marginHorizontal: spacing.lg, gap: spacing.xs },
   quickLinks: { flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg },
   quickLink: { flex: 1, minHeight: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.bg },
   sectionBlock: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
@@ -346,8 +367,9 @@ const styles = StyleSheet.create({
   sectionCard: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   archivedTrips: { gap: spacing.md, paddingBottom: spacing.sm },
   archivedTripCard: { width: spacing["2xl"] * 4.5, overflow: "hidden", borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  archivedThumb: { minHeight: spacing["2xl"] * 2, justifyContent: "flex-end", padding: spacing.md, backgroundColor: colors.accent },
-  archivedBody: { padding: spacing.md },
+  archivedThumb: { width: "100%", height: spacing["2xl"] * 2, backgroundColor: colors.tealSoft },
+  archivedBody: { padding: spacing.md, gap: spacing.xs },
+  pressedCard: { transform: [{ scale: 0.98 }] },
   memberRow: { minHeight: spacing["2xl"] + spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   memberAvatar: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
   memberInfo: { flex: 1, gap: spacing.xs },
