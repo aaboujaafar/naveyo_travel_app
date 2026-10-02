@@ -35,6 +35,8 @@ export interface TripItineraryScreenProps {
   stops: Stop[];
   items: ItineraryItem[];
   trackPoints: TrackPoint[];
+  /** Provider category of each planned place, keyed by place id, to label the activity. */
+  placeCategories?: Record<string, string>;
   offline: OfflineTripPackLoad | null;
   onDownloadOffline?: () => Promise<void>;
   loading: boolean;
@@ -56,6 +58,7 @@ export function TripItineraryScreen({
   items,
   trackPoints,
   offline,
+  placeCategories,
   onDownloadOffline,
   loading,
   error,
@@ -76,9 +79,9 @@ export function TripItineraryScreen({
   const visibleItems = useMemo(
     () =>
       activeDay
-        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter))
+        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter, placeCategories))
         : [],
-    [activeDay, selectedFilter],
+    [activeDay, placeCategories, selectedFilter],
   );
   const routeInput = useMemo(
     () => itineraryRouteCoordinates(activeDay?.items ?? [], activeDay?.stop),
@@ -254,6 +257,7 @@ export function TripItineraryScreen({
                 <TimelineItem
                   key={item.id}
                   item={item}
+                  placeCategory={item.place?.placeId ? placeCategories?.[item.place.placeId] : undefined}
                   expanded={expandedItemId === item.id}
                   onPress={() => {
                     setSelectedPointId(
@@ -335,15 +339,17 @@ export function TripItineraryScreen({
 }
 
 function TimelineItem({
+  placeCategory,
   item,
   expanded,
   onPress,
 }: {
+  placeCategory?: string;
   item: ItineraryItem;
   expanded: boolean;
   onPress: () => void;
 }) {
-  const category = itineraryCategory(item);
+  const category = itineraryCategory(item, placeCategory);
   return (
     <Pressable
       accessibilityRole="button"
@@ -353,7 +359,7 @@ function TimelineItem({
     >
       <View style={styles.timelineDot} />
       <AppText variant="caption" color="muted" style={styles.timelineTime}>
-        {item.time?.local ?? "Sans heure"}
+        {formatLocalTime(item.time?.local) ?? "Sans heure"}
       </AppText>
       <AppText variant="label" style={styles.timelineName}>{item.title}</AppText>
       <View style={styles.timelineMeta}>
@@ -367,7 +373,7 @@ function TimelineItem({
           </AppText>
           {item.time ? (
             <AppText variant="caption" color="muted">
-              Heure locale {item.time.local} · {item.time.timeZone}
+              Heure locale {formatLocalTime(item.time.local) ?? item.time.local} · {item.time.timeZone}
             </AppText>
           ) : null}
           {item.notes ? <AppText variant="caption" color="muted">{item.notes}</AppText> : null}
@@ -453,7 +459,18 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function itineraryCategory(item: ItineraryItem): "Resto" | "Transport" | "Visite" | "Hôtel" {
+function formatLocalTime(value?: string): string | null {
+  const match = value ? /(\d{2}):(\d{2})/.exec(value) : null;
+  return match ? `${match[1]}:${match[2]}` : null;
+}
+
+function itineraryCategory(item: ItineraryItem, placeCategory?: string): "Resto" | "Transport" | "Visite" | "Hôtel" {
+  // The provider category of the place is more reliable than words in the title.
+  if (placeCategory) {
+    if (/^catering/.test(placeCategory)) return "Resto";
+    if (/^accommodation/.test(placeCategory)) return "Hôtel";
+    if (/^(public_transport|airport|commercial\.port)/.test(placeCategory)) return "Transport";
+  }
   const category = item.place?.kind === "origin" || item.place?.kind === "destination"
     ? "transport"
     : item.title.toLocaleLowerCase("fr");
@@ -463,7 +480,7 @@ function itineraryCategory(item: ItineraryItem): "Resto" | "Transport" | "Visite
   return "Visite";
 }
 
-function matchesFilter(item: ItineraryItem, filter: MapFilter): boolean {
+function matchesFilter(item: ItineraryItem, filter: MapFilter, placeCategories?: Record<string, string>): boolean {
   if (filter === "Tous") return true;
   const expected: Record<Exclude<MapFilter, "Tous">, ReturnType<typeof itineraryCategory>> = {
     Restos: "Resto",
@@ -471,7 +488,7 @@ function matchesFilter(item: ItineraryItem, filter: MapFilter): boolean {
     Hôtels: "Hôtel",
     Transport: "Transport",
   };
-  return itineraryCategory(item) === expected[filter];
+  return itineraryCategory(item, item.place?.placeId ? placeCategories?.[item.place.placeId] : undefined) === expected[filter];
 }
 
 const styles = StyleSheet.create({

@@ -20,6 +20,7 @@ export default function ItineraryRoute() {
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [offline, setOffline] = useState<OfflineTripPackLoad | null>(null);
+  const [placeCategories, setPlaceCategories] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,15 @@ export default function ItineraryRoute() {
         setItems(nextItems);
         setTrackPoints(nextTrackPoints);
         setOffline(nextOffline);
+        // Place categories label each activity (restaurant, hotel…); the offline pack answers first.
+        const known = new Map((nextOffline.pack?.places ?? []).map((place) => [place.id as string, place.category]));
+        const placeIds = Array.from(new Set(nextItems.flatMap((item) => (item.place?.placeId ? [item.place.placeId] : []))));
+        void Promise.allSettled(
+          placeIds.map(async (placeId) => [placeId, known.get(placeId) ?? (await bootstrap.modules.places.getById(placeId, tripId))?.category] as const),
+        ).then((results) => {
+          if (!active) return;
+          setPlaceCategories(Object.fromEntries(results.flatMap((result) => (result.status === "fulfilled" && result.value[1] ? [[result.value[0], result.value[1]] as const] : []))));
+        });
       })
       .catch((cause: unknown) => {
         if (active) {
@@ -64,6 +74,7 @@ export default function ItineraryRoute() {
       items={items}
       trackPoints={trackPoints}
       offline={offline}
+      placeCategories={placeCategories}
       loading={loading}
       error={error}
       onDownloadOffline={async () => {
