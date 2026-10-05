@@ -31,11 +31,12 @@ export function parseReceiptText(text: string, options: { defaultCurrency: strin
   const totals: { minorUnits: number; currency?: string }[] = [];
   const others: { minorUnits: number; currency?: string }[] = [];
   lines.forEach((line, index) => {
-    const normalized = normalizedLines[index]!;
-    if (NOT_TOTAL_WORDS.test(normalized)) return;
-    // On many receipts the amount of the "TOTAL" line is printed on the next line.
-    const totalLine = TOTAL_WORDS.test(normalized) || (index > 0 && TOTAL_WORDS.test(normalizedLines[index - 1]!) && !MONEY_TEST.test(lines[index - 1]!));
-    for (const amount of amountsIn(line)) (totalLine ? totals : others).push(amount);
+    // OCR reads receipt columns separately: an amount alone on its line belongs to the label just above it.
+    const amountOnly = !/\p{L}{2,}/u.test(line.replace(/\b(EUR|GBP|USD|CHF)\b/gi, ""));
+    const labelAbove = index > 0 && !MONEY_TEST.test(lines[index - 1]!) ? normalizedLines[index - 1]! : "";
+    const label = amountOnly && labelAbove ? labelAbove : normalizedLines[index]!;
+    if (NOT_TOTAL_WORDS.test(label)) return;
+    for (const amount of amountsIn(line)) (TOTAL_WORDS.test(label) ? totals : others).push(amount);
   });
   const best = largest(totals) ?? largest(others);
   if (best) {

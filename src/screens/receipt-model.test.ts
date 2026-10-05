@@ -37,6 +37,26 @@ describe("receipt reading", () => {
     expect(parseReceiptText(text, { defaultCurrency: "GBP" })).toMatchObject({ amountMinorUnits: 125000, currency: "GBP", category: "accommodation" });
   });
 
+  it("reads real Vision output, where each amount lands on the line after its label", () => {
+    // Exact output of Vision (fast) on a printed pastelaria receipt.
+    const ocr = [
+      "PASTELARIA SAO ROQUE", "Rua da Misericordia 12, Lisboa", "NIF 501234567", "Fatura simplif icada FS 2026/1234", "17-11-2026 10: 42",
+      "2 Pastel de nata", "2,60", "l Galao", "1,80", "IVA 23%", "0,82", "TOTAL", "4,40 EUR", "Numerario", "10,00", "Troco", "5,60",
+      "Obrigado e volte sempre!",
+    ].join("\n");
+    expect(parseReceiptText(ocr, options)).toEqual({
+      amountMinorUnits: 440,
+      currency: "EUR",
+      occurredOn: "2026-11-17",
+      merchant: "Pastelaria Sao Roque",
+      category: "food",
+    });
+    // Without a readable TOTAL line, the cash handed over, the change and the tax are never taken:
+    // the largest remaining amount is proposed and the traveller corrects it.
+    const withoutTotal = ocr.replace("TOTAL\n4,40 EUR\n", "");
+    expect(parseReceiptText(withoutTotal, options).amountMinorUnits).toBe(260);
+  });
+
   it("returns an empty draft when nothing is readable", () => {
     expect(parseReceiptText("", options)).toEqual({});
     expect(formatAmountInput(440)).toBe("4,40");

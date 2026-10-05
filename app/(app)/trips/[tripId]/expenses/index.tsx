@@ -123,7 +123,12 @@ export default function ExpensesRoute() {
         const uri = picked.canceled ? undefined : picked.assets[0]?.uri;
         if (!uri) return null;
         // Vision reads the text on the iPhone; nothing leaves the device.
-        const text = await extractor.extract(uri).catch(() => "");
+        const text = await extractor.extract(uri).catch((cause: unknown) => {
+          const reason = cause instanceof Error ? cause.message : String(cause);
+          // "No text" is an ordinary unreadable photo; anything else is worth showing.
+          if (/no text could be extracted/i.test(reason)) return "";
+          throw new Error(`Le ticket n’a pas pu être lu sur l’iPhone (${reason}).`);
+        });
         return parseReceiptText(text, { defaultCurrency: trip?.referenceCurrency ?? fallbackCurrency });
       } : undefined}
       members={members}
