@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Trip } from "../modules/trips";
+import type { TravelParty } from "../modules/trip-profiles";
+import { TravelPartyCard } from "./TravelPartyCard";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import {
   AppText,
@@ -26,17 +28,16 @@ export interface TripSettingsScreenProps {
   onBack: () => void;
   onSave: (values: TripSettingsValues) => Promise<void>;
   onOpenInvitation: () => void;
+  /** Names shared by the members, keyed by account; the current account is flagged. */
+  memberNames?: Record<string, string>;
+  currentAccountId?: string | null;
+  party?: TravelParty | null;
+  partyStatus?: { saving: boolean; error: string | null; message: string | null };
+  onSaveParty?: (party: TravelParty) => Promise<void>;
 }
 
-export function TripSettingsScreen({
-  trip,
-  saving,
-  message,
-  error,
-  onBack,
-  onSave,
-  onOpenInvitation,
-}: TripSettingsScreenProps) {
+export function TripSettingsScreen(props: TripSettingsScreenProps) {
+  const { trip, saving, message, error, onBack, onSave, onOpenInvitation } = props;
   const insets = useSafeAreaInsets();
   const [attempted, setAttempted] = useState(false);
   const [values, setValues] = useState<TripSettingsValues>(() => ({
@@ -158,24 +159,44 @@ export function TripSettingsScreen({
             <Badge label={`${trip?.members.length ?? 0} compte(s)`} variant="teal" />
           </View>
           <View style={styles.formCard}>
-            {trip?.members.map((member, index) => (
+            {trip?.members.map((member, index) => {
+              const name = props.memberNames?.[member.accountId] ?? `Compte ${index + 1}`;
+              const isMe = props.currentAccountId === member.accountId;
+              return (
               <View key={member.accountId} style={styles.memberRow}>
                 <View style={styles.memberAvatar}>
-                  <AppText variant="label" color="accent">C{index + 1}</AppText>
+                  <AppText variant="label" color="accent">{name.slice(0, 1).toUpperCase()}</AppText>
                 </View>
                 <View style={styles.memberInfo}>
-                  <AppText variant="label">Compte {index + 1}</AppText>
+                  <AppText variant="label">{isMe ? `${name} (vous)` : name}</AppText>
                   <AppText variant="caption" color="muted">
                     {member.role === "owner" ? "Propriétaire" : "Éditeur"}
                   </AppText>
                 </View>
               </View>
-            ))}
+              );
+            })}
             <Button fullWidth variant="secondary" onPress={onOpenInvitation} disabled={!trip}>
               Inviter le second Compte
             </Button>
           </View>
         </View>
+
+        {props.onSaveParty ? (
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeader}>
+              <AppText variant="h3">Qui voyage ?</AppText>
+            </View>
+            <TravelPartyCard
+              key={props.party ? "loaded" : "empty"}
+              party={props.party ?? null}
+              saving={props.partyStatus?.saving ?? false}
+              error={props.partyStatus?.error}
+              message={props.partyStatus?.message}
+              onSave={props.onSaveParty}
+            />
+          </View>
+        ) : null}
 
         <ComingSoonSection title="Photo de couverture">
           <View style={styles.coverPreview}>

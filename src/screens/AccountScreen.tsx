@@ -15,6 +15,7 @@ import {
   Icon,
   IconButton,
   InlineMessage,
+  Input,
   ProgressBar,
   Skeleton,
 } from "../ui";
@@ -41,6 +42,9 @@ export interface AccountScreenProps {
   onOpenInvitation: (tripId: Trip["id"]) => void;
   onOpenExpenses: (tripId: Trip["id"]) => void;
   onOpenRecap?: (tripId: Trip["id"]) => void;
+  /** The name the other members see; falls back to the e-mail. */
+  displayName?: string;
+  onRename?: (displayName: string) => Promise<void>;
   onSignOut: () => Promise<void>;
 }
 
@@ -59,10 +63,30 @@ export function AccountScreen({
   onOpenInvitation,
   onOpenExpenses,
   onOpenRecap,
+  displayName,
+  onRename,
   onSignOut,
 }: AccountScreenProps) {
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const shownName = displayName ?? accountDisplayName(account);
+  const rename = async () => {
+    if (!onRename) return;
+    setRenaming(true);
+    setRenameError(null);
+    try {
+      await onRename(nameDraft);
+      setRenameVisible(false);
+    } catch (cause) {
+      setRenameError(cause instanceof Error ? cause.message : "Modification impossible.");
+    } finally {
+      setRenaming(false);
+    }
+  };
   const currentTrip = currentTripForAccount(trips);
   const finishedTrips = pastTrips(trips);
   const timing = currentTrip ? tripTiming(currentTrip, localToday()) : null;
@@ -107,7 +131,7 @@ export function AccountScreen({
           <View style={styles.profileAvatar}>
             <AppText variant="h1" color="onAccent">{accountInitials(account)}</AppText>
           </View>
-          <AppText variant="h2" align="center">{accountDisplayName(account)}</AppText>
+          <AppText variant="h2" align="center">{shownName}</AppText>
           <AppText variant="bodySmall" color="muted" align="center">
             {account?.email ?? "Adresse e-mail indisponible"}
           </AppText>
@@ -115,11 +139,11 @@ export function AccountScreen({
             <ProfileStat value={`${trips.length}`} label="voyages" />
             <ProfileStat value={`${countryCount}`} label="pays" />
           </View>
-          <ComingSoonFrame label="Modification du profil">
-            <Button variant="secondary" icon={<Icon name="settings" size={16} />} disabled onPress={() => undefined}>
-              Modifier le profil
+          {onRename ? (
+            <Button variant="secondary" icon={<Icon name="edit" size={16} />} onPress={() => { setNameDraft(shownName); setRenameError(null); setRenameVisible(true); }}>
+              Modifier mon prénom
             </Button>
-          </ComingSoonFrame>
+          ) : null}
         </View>
 
         {loading ? (
@@ -289,6 +313,13 @@ export function AccountScreen({
         <BottomNavItem icon="file-text" label="Journal" comingSoon />
         <BottomNavItem icon="layers" label="Récap" comingSoon />
       </View>
+
+      <BottomSheet visible={renameVisible} onClose={() => setRenameVisible(false)} title="Mon prénom">
+        <AppText variant="bodySmall" color="muted">C’est le nom que voient les autres Membres de vos Voyages, par exemple dans « Qui paie quoi ».</AppText>
+        <Input label="Prénom" value={nameDraft} onChangeText={setNameDraft} maxLength={120} autoCapitalize="words" returnKeyType="done" onSubmitEditing={() => void rename()} />
+        {renameError ? <InlineMessage variant="error" title="Modification impossible" message={renameError} /> : null}
+        <Button fullWidth loading={renaming} disabled={!nameDraft.trim()} onPress={() => void rename()}>Enregistrer</Button>
+      </BottomSheet>
 
       <BottomSheet visible={logoutVisible} onClose={() => setLogoutVisible(false)} title="Déconnexion">
         <AppText variant="bodySmall" color="muted" align="center">

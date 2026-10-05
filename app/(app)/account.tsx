@@ -19,6 +19,7 @@ export default function AccountRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [displayName, setDisplayName] = useState<string | undefined>();
 
   useEffect(() => {
     if (!tripsModule || !bootstrap) return;
@@ -53,6 +54,9 @@ export default function AccountRoute() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    void bootstrap.modules.tripProfiles?.myProfile().then((profile) => {
+      if (active) setDisplayName(profile?.displayName);
+    }, () => undefined);
     return () => {
       active = false;
     };
@@ -92,6 +96,11 @@ export default function AccountRoute() {
       onOpenRecap={(tripId) =>
         router.push(`/(app)/trips/${tripId}/recap`)
       }
+      displayName={displayName}
+      onRename={bootstrap?.modules.tripProfiles ? async (name) => {
+        await bootstrap.modules.tripProfiles?.updateMyDisplayName(name);
+        setDisplayName(name.trim());
+      } : undefined}
       onSignOut={changeAccount}
     />
   );

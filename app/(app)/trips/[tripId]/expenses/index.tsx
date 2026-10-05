@@ -8,6 +8,7 @@ import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screens/TripBudgetScreen";
 import { budgetAlerts, computeSharing } from "../../../../../src/screens/budget-sharing-model";
 import { parseReceiptText } from "../../../../../src/screens/receipt-model";
+import { memberLabels, type MemberProfile } from "../../../../../src/modules/trip-profiles";
 import { localToday } from "../../../../../src/screens/trips-list-model";
 
 const fallbackCurrency = "EUR" as ISO4217;
@@ -25,6 +26,7 @@ export default function ExpensesRoute() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<UUID | null>(null);
+  const [memberProfiles, setMemberProfiles] = useState<MemberProfile[] | null>(null);
 
   const load = useCallback(async () => {
     if (!tripId || !trips) {
@@ -34,12 +36,14 @@ export default function ExpensesRoute() {
     }
     setError(null);
     try {
-      const [nextTrip, account] = await Promise.all([
+      const [nextTrip, account, profiles] = await Promise.all([
         trips.get(tripId),
         bootstrap?.modules.identity.currentAccount().catch(() => null) ?? Promise.resolve(null),
+        bootstrap?.modules.tripProfiles?.listMembers(tripId).catch(() => null) ?? Promise.resolve(null),
       ]);
       setTrip(nextTrip);
       setAccountId(account?.id ?? null);
+      setMemberProfiles(profiles);
       if (!bootstrap) {
         setError("Le Module Dépenses n'est pas encore exposé par la composition de l'application.");
         return;
@@ -98,11 +102,11 @@ export default function ExpensesRoute() {
   }
 
   // Members have no display name yet: "Vous" for this account, then the same numbering as the settings.
-  const members = useMemo(() => {
-    const ids = trip?.members.map((member) => member.accountId) ?? [];
-    const labelled = ids.map((id, index) => ({ id, label: id === accountId ? "Vous" : `Compte ${index + 1}` }));
-    return [...labelled.filter((member) => member.id === accountId), ...labelled.filter((member) => member.id !== accountId)];
-  }, [accountId, trip]);
+  // Names come from the members' profiles; without them, the numbering of the settings is kept.
+  const members = useMemo(
+    () => memberLabels(memberProfiles ?? trip?.members.map((member) => ({ accountId: member.accountId, role: member.role })) ?? [], accountId),
+    [accountId, memberProfiles, trip],
+  );
   const sharing = useMemo(() => (members.length > 1 ? computeSharing(expenses, members.map((member) => member.id)) : null), [expenses, members]);
   const alerts = useMemo(
     () => budgetAlerts({ summary, startsOn: trip?.startsOn, endsOn: trip?.endsOn, today: localToday() }),

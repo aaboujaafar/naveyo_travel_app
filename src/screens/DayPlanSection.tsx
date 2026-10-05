@@ -269,6 +269,8 @@ export function summarizeDayPlanPreferences(value: DayPlanPreferences): string {
     preferenceLabels.budget[value.budget],
     preferenceLabels.pace[value.pace],
     value.constraints?.indoorOutdoor === "indoor" ? "Intérieur" : value.constraints?.indoorOutdoor === "outdoor" ? "Extérieur" : null,
+    value.constraints?.children ? "Avec enfants" : null,
+    value.constraints?.accessibility ? "Accessible" : null,
   ].filter(Boolean).join(" · ");
 }
 

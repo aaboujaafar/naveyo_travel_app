@@ -72,6 +72,28 @@ export default function TripAssistantRoute() {
     setDayPlanPreferences((current) => updateDayPlanPreferences(current, { constraints: { indoorOutdoor: "indoor" } }));
   }
 
+  // The travelling party set in the Voyage settings presets the day planner (children, step-free access).
+  useEffect(() => {
+    const profiles = bootstrap?.modules.tripProfiles;
+    if (!profiles || !tripId) return;
+    let active = true;
+    void profiles.getParty(tripId as UUID).then((party) => {
+      if (!active || !party) return;
+      const children = party.childrenAges.length > 0;
+      const accessibility = party.stroller || party.reducedMobility;
+      if (!children && !accessibility) return;
+      setDayPlanPreferences((current) => updateDayPlanPreferences(current, {
+        constraints: {
+          ...(current.constraints?.children === undefined ? { children } : {}),
+          ...(current.constraints?.accessibility === undefined ? { accessibility } : {}),
+        },
+      }));
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, tripId]);
+
   const displayedPlannedItems = plannedItems.filter((item) => item.stopId === stop?.id);
 
   const handleDayPlanPreferencesChange = (preferences: DayPlanPreferences) => {
