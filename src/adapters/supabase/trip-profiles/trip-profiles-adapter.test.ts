@@ -41,8 +41,18 @@ describe("Supabase trip profiles adapter", () => {
     ]);
   });
 
+  it("still lists the members, unnamed, when names cannot be read yet", async () => {
+    const { client, calls } = fakeClient((call) => call.columns?.includes("accounts")
+      ? { data: null, error: { message: "permission denied for table accounts", code: "42501" } }
+      : { data: [{ account_id: "a1", role: "owner" }], error: null });
+    expect(await createSupabaseTripProfilesModule(client).listMembers(tripId)).toEqual([{ accountId: "a1", role: "owner" }]);
+    expect(calls.map((call) => call.columns)).toEqual(["account_id,role,account:accounts(display_name)", "account_id,role"]);
+  });
+
   it("treats a database without the party columns as « no details »", async () => {
-    const { client } = fakeClient(() => ({ data: null, error: { message: "column trips.party_stroller does not exist", code: "42703" } }));
+    const { client } = fakeClient((call) => call.op === "update"
+      ? { data: null, error: { message: "Could not find the 'party_children_ages' column of 'trips' in the schema cache", code: "PGRST204" } }
+      : { data: null, error: { message: "column trips.party_stroller does not exist", code: "42703" } });
     const profiles = createSupabaseTripProfilesModule(client);
     expect(await profiles.getParty(tripId)).toBeNull();
     await expect(profiles.saveParty(tripId, { childrenAges: [3], stroller: true, reducedMobility: false })).rejects.toThrow("migration « trip_profiles »");

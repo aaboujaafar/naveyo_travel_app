@@ -2,6 +2,11 @@
 -- its travelling party so the day planner can adapt pace and access.
 
 -- Only the display name lives in public.accounts; e-mails stay in auth.users.
+-- Privileges are granted table by table in this project: without them even
+-- one's own account cannot be read. Only the display name can be changed.
+grant select on table public.accounts to authenticated;
+grant update (display_name) on table public.accounts to authenticated;
+
 drop policy if exists accounts_select_co_member on public.accounts;
 create policy accounts_select_co_member on public.accounts
 for select to authenticated

@@ -56,8 +56,21 @@ export function TravelPartyCard({ party, saving, error, message, onSave }: {
         </View>
       ) : null}
 
-      <Switch label="Poussette" value={draft.stroller} onChange={(stroller) => setDraft((current) => ({ ...current, stroller }))} />
-      <Switch label="Mobilité réduite" value={draft.reducedMobility} onChange={(reducedMobility) => setDraft((current) => ({ ...current, reducedMobility }))} />
+      {/* The Switch only labels itself for VoiceOver: the visible text sits beside it. */}
+      <View style={styles.toggleRow}>
+        <View style={styles.flexOne}>
+          <AppText variant="label">Poussette</AppText>
+          <AppText variant="caption" color="muted">Parcours sans marches quand c’est possible</AppText>
+        </View>
+        <Switch label="Poussette" value={draft.stroller} onChange={(stroller) => setDraft((current) => ({ ...current, stroller }))} />
+      </View>
+      <View style={styles.toggleRow}>
+        <View style={styles.flexOne}>
+          <AppText variant="label">Mobilité réduite</AppText>
+          <AppText variant="caption" color="muted">Lieux accessibles et trajets courts</AppText>
+        </View>
+        <Switch label="Mobilité réduite" value={draft.reducedMobility} onChange={(reducedMobility) => setDraft((current) => ({ ...current, reducedMobility }))} />
+      </View>
 
       {summary ? (
         <View style={styles.summary}>
@@ -80,5 +93,6 @@ const styles = StyleSheet.create({
   agePicker: { gap: spacing.xs },
   ages: { gap: spacing.sm },
   summary: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   flexOne: { flex: 1 },
 });

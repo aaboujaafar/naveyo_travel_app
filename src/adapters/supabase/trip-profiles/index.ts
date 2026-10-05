@@ -7,8 +7,11 @@ import {
 import type { SupabaseClientLike, SupabaseQuery } from "../identity/client";
 
 type Row = Record<string, unknown>;
-// Raised by Postgres when a column does not exist: the profiles migration is not applied yet.
-const UNDEFINED_COLUMN = "42703";
+// Raised before the profiles migration: a missing column (Postgres when reading, PostgREST
+// when writing), or no privilege on accounts.
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+const PERMISSION_DENIED = "42501";
+const MIGRATION_NEEDED = "La base de données doit être mise à jour (migration « trip_profiles »).";
 
 class ProfilesDatabaseError extends Error {
   constructor(message: string, readonly code?: string) {
@@ -33,7 +36,14 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
 
   return {
     async listMembers(tripId) {
-      const rows = await run(client.from("trip_members").select("account_id,role,account:accounts(display_name)").eq("trip_id", tripId));
+      // Without the migration, reading names is refused: the members are still listed, unnamed.
+      const rows = await run(client.from("trip_members").select("account_id,role,account:accounts(display_name)").eq("trip_id", tripId))
+        .catch((error: unknown) => {
+          if (error instanceof ProfilesDatabaseError && error.code === PERMISSION_DENIED) {
+            return run(client.from("trip_members").select("account_id,role").eq("trip_id", tripId));
+          }
+          throw error;
+        });
       return (Array.isArray(rows) ? rows : []).flatMap((value): MemberProfile[] => {
         const row = asRow(value);
         if (!row || typeof row.account_id !== "string" || (row.role !== "owner" && row.role !== "editor")) return [];
@@ -50,7 +60,7 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
         const ages = Array.isArray(row.party_children_ages) ? row.party_children_ages.filter((age): age is number => typeof age === "number") : [];
         return normalizeParty({ childrenAges: ages, stroller: row.party_stroller === true, reducedMobility: row.party_reduced_mobility === true });
       } catch (error) {
-        if (error instanceof ProfilesDatabaseError && error.code === UNDEFINED_COLUMN) return null;
+        if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) return null;
         throw error;
       }
     },
@@ -64,8 +74,8 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
           party_reduced_mobility: normalized.reducedMobility,
         }).eq("id", tripId));
       } catch (error) {
-        if (error instanceof ProfilesDatabaseError && error.code === UNDEFINED_COLUMN) {
-          throw new Error("La base de données doit être mise à jour (migration « trip_profiles ») avant d’enregistrer les voyageurs.");
+        if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) {
+          throw new Error(`${MIGRATION_NEEDED} Les voyageurs ne peuvent pas encore être enregistrés.`);
         }
         throw error;
       }
@@ -84,7 +94,14 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
       if (name.length < 1 || name.length > 120) throw new Error("Le prénom doit faire entre 1 et 120 caractères.");
       const accountId = await currentAccountId();
       if (!accountId) throw new Error("Session expirée : reconnectez-vous.");
-      await run(client.from("accounts").update({ display_name: name }).eq("id", accountId));
+      try {
+        await run(client.from("accounts").update({ display_name: name }).eq("id", accountId));
+      } catch (error) {
+        if (error instanceof ProfilesDatabaseError && error.code === PERMISSION_DENIED) {
+          throw new Error(`${MIGRATION_NEEDED} Le prénom ne peut pas encore être modifié.`);
+        }
+        throw error;
+      }
     },
   };
 };
