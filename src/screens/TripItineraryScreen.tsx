@@ -44,6 +44,8 @@ export interface TripItineraryScreenProps {
   onDownloadOffline?: () => Promise<void>;
   /** Writes the programme and reservations into an iPhone calendar; resolves to the number of events. */
   onExportCalendar?: () => Promise<{ count: number; calendarName: string }>;
+  /** Opens Apple Plans on the destination, where its map can be saved offline. */
+  onOpenAppleMaps?: () => void;
   /** Present when the itinerary can be edited (online, with an editor role). */
   onMoveItem?: (item: ItineraryItem, target: { stopId: Stop["id"]; date: string }) => Promise<void>;
   onRemoveItem?: (item: ItineraryItem) => Promise<void>;
@@ -74,6 +76,7 @@ export function TripItineraryScreen({
   placeDetails,
   onDownloadOffline,
   onExportCalendar,
+  onOpenAppleMaps,
   onMoveItem,
   onRemoveItem,
   loading,
@@ -337,7 +340,7 @@ export function TripItineraryScreen({
           </ComingSoonFrame>
         </View>
 
-        <OfflineCard offline={offline} onDownload={onDownloadOffline} />
+        <OfflineCard offline={offline} onDownload={onDownloadOffline} onOpenAppleMaps={onOpenAppleMaps} />
         {onExportCalendar ? <CalendarCard onExport={onExportCalendar} /> : null}
 
         <ComingSoonSection title="Famille en temps réel">
@@ -470,7 +473,7 @@ function TimelineItem({
   );
 }
 
-function OfflineCard({ offline, onDownload }: { offline: OfflineTripPackLoad | null; onDownload?: () => Promise<void> }) {
+function OfflineCard({ offline, onDownload, onOpenAppleMaps }: { offline: OfflineTripPackLoad | null; onDownload?: () => Promise<void>; onOpenAppleMaps?: () => void }) {
   const ready = offline?.state === "ready";
   const [downloading, setDownloading] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -503,6 +506,16 @@ function OfflineCard({ offline, onDownload }: { offline: OfflineTripPackLoad | n
       <AppText variant="caption" color="muted">
         Le fond de carte peut rester vide sans connexion ; les lieux et leurs adresses restent listés.
       </AppText>
+      {onOpenAppleMaps ? (
+        <Pressable accessibilityRole="button" onPress={onOpenAppleMaps} style={({ pressed }) => [styles.mapsTip, pressed && styles.pressed]}>
+          <Icon name="map" size={20} color={colors.tealStrong} />
+          <View style={styles.flexOne}>
+            <AppText variant="label" color="teal">Garder la carte dans Plans</AppText>
+            <AppText variant="caption" color="muted">Dans Plans : votre photo › Cartes hors ligne › Télécharger une carte, puis cadrez la destination.</AppText>
+          </View>
+          <Icon name="arrow-right" size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
       {failure ? <InlineMessage variant="error" title="Téléchargement impossible" message={failure} /> : null}
       {onDownload ? (
         <Button
@@ -640,6 +653,7 @@ const styles = StyleSheet.create({
   comingSoonBadge: { position: "absolute", top: spacing.sm, right: spacing.sm, zIndex: zIndex.sticky },
   addStopPreview: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md, marginLeft: spacing["2xl"], borderRadius: radius.full, borderWidth: 1, borderStyle: "dashed", borderColor: colors.accent, backgroundColor: colors.accentSoft },
   flexOne: { flex: 1 },
+  mapsTip: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
   itemActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   dayChoices: { gap: spacing.sm },
   offlineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, gap: spacing.sm, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },

@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useEffect, useState } from "react";
+import { Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type {
   ItineraryItem,
@@ -91,6 +92,12 @@ export default function ItineraryRoute() {
         await itinerary.remove?.(tripId, item.id);
         setItems(await itinerary.list(tripId));
       } : undefined}
+      onOpenAppleMaps={(() => {
+        const destination = stops.find((stop) => stop.coordinates);
+        if (!destination?.coordinates) return undefined;
+        const { latitude, longitude } = destination.coordinates;
+        return () => void Linking.openURL(`maps://?ll=${latitude},${longitude}&z=12&q=${encodeURIComponent(destination.name)}`);
+      })()}
       onExportCalendar={async () => {
         if (!bootstrap || !tripId) throw new Error("Le Voyage n’est pas chargé.");
         const { modules } = bootstrap;
