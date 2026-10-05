@@ -264,6 +264,7 @@ export default function TripDetailRoute() {
         const stop = stops.find((candidate) => candidate.startDate <= date && date <= candidate.endDate) ?? stops[0];
         if (stop) router.push(planBAssistantPath(routeTripId, stop.id, date) as Href);
       }}
+      onOpenQuestions={() => router.push(`/(app)/trips/${routeTripId}/ask`)}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)

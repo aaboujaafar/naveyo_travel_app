@@ -63,6 +63,8 @@ export interface TripDashboardScreenProps {
   travelToNextSeconds?: number | null;
   onOpenDirections?: (entry: TodayEntry) => void;
   summary?: DashboardSummary;
+  /** Answers questions from the Voyage's own data, offline included. */
+  onOpenQuestions?: () => void;
   /** Composes a rainy day with indoor places. */
   onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
@@ -227,6 +229,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             summary={props.summary}
             offlineReady={props.offlineReady}
             onPlanB={props.onPlanB}
+            onOpenQuestions={props.onOpenQuestions}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             stops={sortedStops}
             itineraryItemCount={props.itineraryItems.length}
@@ -285,6 +288,7 @@ function TodayPanel({
   summary,
   offlineReady,
   onPlanB,
+  onOpenQuestions,
   onComposeDay,
   stops,
   itineraryItemCount,
@@ -305,6 +309,7 @@ function TodayPanel({
   summary?: DashboardSummary;
   offlineReady?: boolean;
   onPlanB?: (date: string) => void;
+  onOpenQuestions?: () => void;
   onComposeDay: () => void;
   stops: Stop[];
   itineraryItemCount: number;
@@ -405,6 +410,19 @@ function TodayPanel({
           />
         </View>
       </Section>
+
+      {onOpenQuestions ? (
+        <Section>
+          <Pressable accessibilityRole="button" onPress={onOpenQuestions} style={({ pressed }) => [styles.bookingCard, pressed && styles.pressed]}>
+            <View style={[styles.bookingIcon, styles.questionIcon]}><Icon name="message-circle" size={20} color={colors.tealStrong} /></View>
+            <View style={styles.flexOne}>
+              <AppText variant="label">Une question sur le Voyage ?</AppText>
+              <AppText variant="caption" color="muted">Vol, hôtel, programme, budget… même sans réseau</AppText>
+            </View>
+            <Icon name="arrow-right" size={16} color={colors.fg} />
+          </Pressable>
+        </Section>
+      ) : null}
 
       <DashboardWeather weather={weather} hasStops={stops.length > 0} onPlanB={onPlanB} />
 
@@ -631,6 +649,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  questionIcon: { backgroundColor: colors.tealSoft },
   planBChip: { marginTop: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.tealSoft },
   climateCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
