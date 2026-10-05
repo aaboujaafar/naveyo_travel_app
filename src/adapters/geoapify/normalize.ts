@@ -81,6 +81,8 @@ export function normalizeGeoapifyResponse(
       ? mostSpecificCategory(properties.categories)
       : text(properties.category);
     const datasource = properties.datasource as Record<string, unknown> | undefined;
+    // OpenStreetMap hours ("Tu-Su 10:00-18:00"), kept as text and read by the places module.
+    const openingHoursText = text(properties.opening_hours) ?? text((datasource?.raw as Record<string, unknown> | undefined)?.opening_hours);
     const imageUrl = text(properties.image) ?? text(properties.photo) ?? text(datasource?.image);
     const imageCredit = (() => {
       const value = properties.image_credit;
@@ -99,6 +101,7 @@ export function normalizeGeoapifyResponse(
       ...(imageUrl ? { imageUrl } : {}),
       ...(imageCredit ? { imageCredit } : {}),
       category,
+      ...(openingHoursText ? { openingHours: { sourceText: openingHoursText } } : {}),
       address: text(properties.formatted),
       countryCode: text(properties.country_code)?.toUpperCase(),
       coordinates: parseCoordinates({ latitude, longitude }),

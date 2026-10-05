@@ -7,10 +7,12 @@ import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
   Coordinates,
   ItineraryItem,
+  OpeningHours,
   Stop,
   TrackPoint,
 } from "../modules/_shared/model";
 import { buildItineraryDays } from "../modules/itinerary";
+import { describeOpeningDay, openingIntervals, openingStatusOn, weekday } from "../modules/places/opening-hours";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import {
@@ -36,8 +38,8 @@ export interface TripItineraryScreenProps {
   stops: Stop[];
   items: ItineraryItem[];
   trackPoints: TrackPoint[];
-  /** Provider category of each planned place, keyed by place id, to label the activity. */
-  placeCategories?: Record<string, string>;
+  /** Provider facts of each planned place, keyed by place id: label and opening hours. */
+  placeDetails?: Record<string, PlaceDetails>;
   offline: OfflineTripPackLoad | null;
   onDownloadOffline?: () => Promise<void>;
   /** Present when the itinerary can be edited (online, with an editor role). */
@@ -53,6 +55,11 @@ export interface TripItineraryScreenProps {
   mapAdapter?: MapAdapter;
 }
 
+export interface PlaceDetails {
+  category?: string;
+  openingHours?: OpeningHours;
+}
+
 type MapFilter = "Tous" | "Restos" | "Visites" | "Hôtels" | "Transport";
 
 const filters: MapFilter[] = ["Tous", "Restos", "Visites", "Hôtels", "Transport"];
@@ -62,7 +69,7 @@ export function TripItineraryScreen({
   items,
   trackPoints,
   offline,
-  placeCategories,
+  placeDetails,
   onDownloadOffline,
   onMoveItem,
   onRemoveItem,
@@ -103,9 +110,9 @@ export function TripItineraryScreen({
   const visibleItems = useMemo(
     () =>
       activeDay
-        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter, placeCategories))
+        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter, placeDetails))
         : [],
-    [activeDay, placeCategories, selectedFilter],
+    [activeDay, placeDetails, selectedFilter],
   );
   const routeInput = useMemo(
     () => itineraryRouteCoordinates(activeDay?.items ?? [], activeDay?.stop),
@@ -284,7 +291,7 @@ export function TripItineraryScreen({
                 <TimelineItem
                   key={item.id}
                   item={item}
-                  placeCategory={item.place?.placeId ? placeCategories?.[item.place.placeId] : undefined}
+                  details={item.place?.placeId ? placeDetails?.[item.place.placeId] : undefined}
                   onMove={onMoveItem ? () => setMovingItem(item) : undefined}
                   onRemove={onRemoveItem ? () => confirmRemove(item) : undefined}
                   expanded={expandedItemId === item.id}
@@ -390,21 +397,25 @@ export function TripItineraryScreen({
 }
 
 function TimelineItem({
-  placeCategory,
+  details,
   onMove,
   onRemove,
   item,
   expanded,
   onPress,
 }: {
-  placeCategory?: string;
+  details?: PlaceDetails;
   onMove?: () => void;
   onRemove?: () => void;
   item: ItineraryItem;
   expanded: boolean;
   onPress: () => void;
 }) {
-  const category = itineraryCategory(item, placeCategory);
+  const category = itineraryCategory(item, details?.category);
+  const opening = openingStatusOn(details?.openingHours, item.date, formatLocalTime(item.time?.local) ?? undefined);
+  const dayIndex = weekday(item.date);
+  const intervals = openingIntervals(details?.openingHours);
+  const todayHours = intervals && dayIndex !== null ? describeOpeningDay(intervals, dayIndex) : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -419,7 +430,13 @@ function TimelineItem({
       <AppText variant="label" style={styles.timelineName}>{item.title}</AppText>
       <View style={styles.timelineMeta}>
         <Badge label={category} variant={category === "Resto" ? "accent" : "teal"} />
-        <Badge label="Prévu" variant="gold" />
+        {opening === "closed-day" ? (
+          <Badge label="Fermé ce jour-là" variant="danger" />
+        ) : opening === "closed-time" ? (
+          <Badge label="Fermé à cette heure" variant="danger" />
+        ) : (
+          <Badge label="Prévu" variant="gold" />
+        )}
       </View>
       {expanded ? (
         <View style={styles.timelineDetail}>
@@ -429,6 +446,11 @@ function TimelineItem({
           {item.time ? (
             <AppText variant="caption" color="muted">
               Heure locale {formatLocalTime(item.time.local) ?? item.time.local} · {item.time.timeZone}
+            </AppText>
+          ) : null}
+          {todayHours ? (
+            <AppText variant="caption" color={opening === "closed-day" || opening === "closed-time" ? "accent" : "muted"}>
+              {`Horaires ce jour-là : ${todayHours}`}
             </AppText>
           ) : null}
           {item.notes ? <AppText variant="caption" color="muted">{item.notes}</AppText> : null}
@@ -541,7 +563,7 @@ function itineraryCategory(item: ItineraryItem, placeCategory?: string): "Resto"
   return "Visite";
 }
 
-function matchesFilter(item: ItineraryItem, filter: MapFilter, placeCategories?: Record<string, string>): boolean {
+function matchesFilter(item: ItineraryItem, filter: MapFilter, placeDetails?: Record<string, PlaceDetails>): boolean {
   if (filter === "Tous") return true;
   const expected: Record<Exclude<MapFilter, "Tous">, ReturnType<typeof itineraryCategory>> = {
     Restos: "Resto",
@@ -549,7 +571,7 @@ function matchesFilter(item: ItineraryItem, filter: MapFilter, placeCategories?:
     Hôtels: "Hôtel",
     Transport: "Transport",
   };
-  return itineraryCategory(item, item.place?.placeId ? placeCategories?.[item.place.placeId] : undefined) === expected[filter];
+  return itineraryCategory(item, item.place?.placeId ? placeDetails?.[item.place.placeId]?.category : undefined) === expected[filter];
 }
 
 const styles = StyleSheet.create({

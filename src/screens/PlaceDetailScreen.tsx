@@ -39,7 +39,7 @@ import {
   formatPlaceSource,
   type PlaceScheduleDate,
 } from "./place-detail-model";
-import { placeAttribution } from "../modules/places";
+import { placeAttribution, weeklyOpeningHours } from "../modules/places";
 
 export interface PlaceDetailScreenProps {
   place: PlaceCandidate | null;
@@ -143,6 +143,7 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   const mapPresentation = buildPlaceMapPresentation(place);
   const category = formatPlaceCategory(place.category);
   const country = formatCountry(place.countryCode);
+  const weeklyHours = weeklyOpeningHours(place.openingHours);
   const summary = [category, place.distanceMeters != null ? `à ${formatDistance(place.distanceMeters)}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -306,18 +307,19 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
           />
         </Section>
 
-        <ComingSoonFrame label="Horaires détaillés">
-          <Section title="Horaires détaillés">
-            <View style={styles.infoRow}>
-              <Icon name="clock" size={20} color={colors.muted} />
-              <View style={styles.flexOne}>
-                <AppText variant="caption" color="muted">{"Aujourd'hui"}</AppText>
-                <AppText variant="label">Horaires non fournis</AppText>
-              </View>
-              <Icon name="chevron-down" size={20} color={colors.muted} />
+        {weeklyHours ? (
+          <Section title="Horaires">
+            <View style={styles.hoursCard}>
+              {weeklyHours.map((day) => (
+                <View key={day.label} style={styles.hoursRow}>
+                  <AppText variant="bodySmall" color="muted">{day.label}</AppText>
+                  <AppText variant="label" color={day.hours === "Fermé" ? "accent" : "fg"}>{day.hours}</AppText>
+                </View>
+              ))}
+              <AppText variant="caption" color="muted">Horaires OpenStreetMap, à confirmer sur place.</AppText>
             </View>
           </Section>
-        </ComingSoonFrame>
+        ) : null}
 
         <ComingSoonFrame label="Menu et spécialités">
           <Section title="Menu / Spécialités">
@@ -566,6 +568,8 @@ const styles = StyleSheet.create({
   hero: { height: HERO_HEIGHT, position: "relative" },
   heroMedia: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   heroImage: { width: "100%", height: "100%" },
+  hoursCard: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, borderRadius: radius.sm },
+  hoursRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   sourceFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   heroOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   heroNav: { position: "absolute", left: spacing.md, right: spacing.md, flexDirection: "row", justifyContent: "space-between", zIndex: zIndex.sticky },

@@ -9,7 +9,7 @@ import type {
   UUID,
 } from "../../../../../../src/modules/_shared/model";
 import { downloadTripPack, type OfflineTripPackLoad } from "../../../../../../src/modules/offline-trip-pack";
-import { TripItineraryScreen } from "../../../../../../src/screens/TripItineraryScreen";
+import { TripItineraryScreen, type PlaceDetails } from "../../../../../../src/screens/TripItineraryScreen";
 
 export default function ItineraryRoute() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function ItineraryRoute() {
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
   const [offline, setOffline] = useState<OfflineTripPackLoad | null>(null);
-  const [placeCategories, setPlaceCategories] = useState<Record<string, string>>({});
+  const [placeDetails, setPlaceDetails] = useState<Record<string, PlaceDetails>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,14 +41,16 @@ export default function ItineraryRoute() {
         setItems(nextItems);
         setTrackPoints(nextTrackPoints);
         setOffline(nextOffline);
-        // Place categories label each activity (restaurant, hotel…); the offline pack answers first.
-        const known = new Map((nextOffline.pack?.places ?? []).map((place) => [place.id as string, place.category]));
+        // Category and opening hours of each planned place: fresh from the provider, else from the offline pack.
+        const known = new Map((nextOffline.pack?.places ?? []).map((place) => [place.id as string, place]));
         const placeIds = Array.from(new Set(nextItems.flatMap((item) => (item.place?.placeId ? [item.place.placeId] : []))));
-        void Promise.allSettled(
-          placeIds.map(async (placeId) => [placeId, known.get(placeId) ?? (await bootstrap.modules.places.getById(placeId, tripId))?.category] as const),
-        ).then((results) => {
-          if (!active) return;
-          setPlaceCategories(Object.fromEntries(results.flatMap((result) => (result.status === "fulfilled" && result.value[1] ? [[result.value[0], result.value[1]] as const] : []))));
+        void Promise.all(
+          placeIds.map(async (placeId) => {
+            const place = (await bootstrap.modules.places.getById(placeId, tripId).catch(() => null)) ?? known.get(placeId);
+            return [placeId, { category: place?.category, openingHours: place?.openingHours }] as const;
+          }),
+        ).then((entries) => {
+          if (active) setPlaceDetails(Object.fromEntries(entries));
         });
       })
       .catch((cause: unknown) => {
@@ -74,7 +76,7 @@ export default function ItineraryRoute() {
       items={items}
       trackPoints={trackPoints}
       offline={offline}
-      placeCategories={placeCategories}
+      placeDetails={placeDetails}
       loading={loading}
       error={error}
       onMoveItem={bootstrap?.modules.itinerary.move && tripId ? async (item, target) => {
