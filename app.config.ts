@@ -21,7 +21,15 @@ const config: ExpoConfig = {
     'expo-dev-client',
     './plugins/withNaveyoTracking',
     './plugins/withNaveyoDocuments',
-    './plugins/withNaveyoSceneLifecycle'
+    './plugins/withNaveyoSceneLifecycle',
+    [
+      'expo-media-library',
+      {
+        photosPermission: 'Naveyo propose les photos prises pendant le Voyage pour créer vos stories. Elles restent sur l’iPhone.',
+        savePhotosPermission: 'Naveyo enregistre les stories créées dans votre photothèque.',
+        isAccessMediaLocationEnabled: true
+      }
+    ]
   ],
   experiments: {
     typedRoutes: true

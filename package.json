@@ -23,6 +23,7 @@
     "expo-linking": "~57.0.5",
     "expo-location": "~57.0.9",
     "expo-maps": "~57.0.1",
+    "expo-media-library": "~57.0.5",
     "expo-router": "~57.0.12",
     "expo-secure-store": "^57.0.1",
     "expo-status-bar": "~57.0.1",
@@ -34,6 +35,7 @@
     "react-native-screens": "~4.26.0",
     "react-native-svg": "~15.15.4",
     "react-native-url-polyfill": "^4.0.0",
+    "react-native-view-shot": "5.1.0",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {

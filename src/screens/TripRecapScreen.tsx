@@ -16,6 +16,7 @@ export interface TripRecapScreenProps {
   error: string | null;
   onBack: () => void;
   onShare: () => void;
+  onCreateStories?: () => void;
 }
 
 export function TripRecapScreen(props: TripRecapScreenProps) {
@@ -97,7 +98,10 @@ export function TripRecapScreen(props: TripRecapScreenProps) {
         ) : null}
 
         <View style={styles.shareWrap}>
-          <Button fullWidth onPress={props.onShare} icon={<Icon name="arrow-right" size={20} color={colors.white} />}>Partager le récap</Button>
+          {props.onCreateStories ? (
+            <Button fullWidth onPress={props.onCreateStories} icon={<Icon name="image" size={20} color={colors.white} />}>Créer des stories Instagram</Button>
+          ) : null}
+          <Button fullWidth variant={props.onCreateStories ? "secondary" : "primary"} onPress={props.onShare} icon={<Icon name="arrow-right" size={20} color={props.onCreateStories ? colors.fg : colors.white} />}>Partager le récap en texte</Button>
         </View>
       </ScrollView>
     </View>
@@ -123,7 +127,7 @@ const styles = StyleSheet.create({
   map: { height: spacing["2xl"] * 5, borderRadius: radius.md, overflow: "hidden" },
   highlight: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   highlightDate: { width: spacing["2xl"] * 2 },
-  shareWrap: { paddingHorizontal: spacing.lg },
+  shareWrap: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   flexOne: { flex: 1 },
   pressed: { transform: [{ scale: 0.97 }] },
 });
