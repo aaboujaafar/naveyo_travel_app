@@ -42,6 +42,8 @@ export interface TripItineraryScreenProps {
   placeDetails?: Record<string, PlaceDetails>;
   offline: OfflineTripPackLoad | null;
   onDownloadOffline?: () => Promise<void>;
+  /** Writes the programme and reservations into an iPhone calendar; resolves to the number of events. */
+  onExportCalendar?: () => Promise<{ count: number; calendarName: string }>;
   /** Present when the itinerary can be edited (online, with an editor role). */
   onMoveItem?: (item: ItineraryItem, target: { stopId: Stop["id"]; date: string }) => Promise<void>;
   onRemoveItem?: (item: ItineraryItem) => Promise<void>;
@@ -71,6 +73,7 @@ export function TripItineraryScreen({
   offline,
   placeDetails,
   onDownloadOffline,
+  onExportCalendar,
   onMoveItem,
   onRemoveItem,
   loading,
@@ -335,6 +338,7 @@ export function TripItineraryScreen({
         </View>
 
         <OfflineCard offline={offline} onDownload={onDownloadOffline} />
+        {onExportCalendar ? <CalendarCard onExport={onExportCalendar} /> : null}
 
         <ComingSoonSection title="Famille en temps réel">
           <View style={styles.familyRow}>
@@ -511,6 +515,38 @@ function OfflineCard({ offline, onDownload }: { offline: OfflineTripPackLoad | n
           {ready ? "Mettre à jour" : "Télécharger pour le hors-ligne"}
         </Button>
       ) : null}
+    </View>
+  );
+}
+
+function CalendarCard({ onExport }: { onExport: () => Promise<{ count: number; calendarName: string }> }) {
+  const [exporting, setExporting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const exportNow = async () => {
+    setExporting(true);
+    setResult(null);
+    try {
+      const { count, calendarName } = await onExport();
+      setResult({ ok: true, message: `${count} événement${count > 1 ? "s" : ""} dans le calendrier « ${calendarName} », avec rappels.` });
+    } catch (cause) {
+      setResult({ ok: false, message: cause instanceof Error ? cause.message : "Export impossible." });
+    } finally {
+      setExporting(false);
+    }
+  };
+  return (
+    <View style={styles.offlineCard}>
+      <View style={styles.offlineHeader}>
+        <Icon name="calendar" size={20} color={colors.accentStrong} />
+        <AppText variant="label" style={styles.flexOne}>Calendrier de l’iPhone</AppText>
+      </View>
+      <AppText variant="caption" color="muted">
+        Le programme et les réservations dans un calendrier dédié, avec un rappel 30 min avant chaque activité et 1 h avant un vol, un train ou un ferry.
+      </AppText>
+      {result ? <InlineMessage variant={result.ok ? "success" : "error"} title={result.ok ? "Calendrier à jour" : "Export impossible"} message={result.message} /> : null}
+      <Button variant="secondary" fullWidth loading={exporting} onPress={() => void exportNow()} icon={<Icon name="calendar" size={20} color={colors.fg} />}>
+        {result?.ok ? "Mettre à jour le Calendrier" : "Ajouter au Calendrier"}
+      </Button>
     </View>
   );
 }

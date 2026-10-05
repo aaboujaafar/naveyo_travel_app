@@ -29,6 +29,20 @@ const config: ExpoConfig = {
         savePhotosPermission: 'Naveyo enregistre les stories créées dans votre photothèque.',
         isAccessMediaLocationEnabled: true
       }
+    ],
+    [
+      'expo-calendar',
+      {
+        calendarPermission: 'Naveyo ajoute le programme et les réservations du Voyage à un calendrier dédié, avec des rappels.'
+      }
+    ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Naveyo propose les photos prises pendant le Voyage pour créer vos stories. Elles restent sur l’iPhone.',
+        cameraPermission: 'Naveyo photographie vos tickets de caisse pour remplir les dépenses. L’image est lue sur l’iPhone.',
+        microphonePermission: false
+      }
     ]
   ],
   experiments: {

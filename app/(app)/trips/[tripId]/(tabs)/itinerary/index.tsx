@@ -10,6 +10,8 @@ import type {
 } from "../../../../../../src/modules/_shared/model";
 import { downloadTripPack, type OfflineTripPackLoad } from "../../../../../../src/modules/offline-trip-pack";
 import { TripItineraryScreen, type PlaceDetails } from "../../../../../../src/screens/TripItineraryScreen";
+import { exportTripCalendar } from "../../../../../../src/adapters/expo-calendar";
+import { buildCalendarEvents } from "../../../../../../src/screens/calendar-export-model";
 
 export default function ItineraryRoute() {
   const router = useRouter();
@@ -89,6 +91,18 @@ export default function ItineraryRoute() {
         await itinerary.remove?.(tripId, item.id);
         setItems(await itinerary.list(tripId));
       } : undefined}
+      onExportCalendar={async () => {
+        if (!bootstrap || !tripId) throw new Error("Le Voyage n’est pas chargé.");
+        const { modules } = bootstrap;
+        const [trip, reservations, latestItems] = await Promise.all([
+          modules.trips.get(tripId),
+          modules.reservations.list(tripId).catch(() => []),
+          modules.itinerary.list(tripId).catch(() => items),
+        ]);
+        const tripName = trip?.name ?? "Voyage";
+        const count = await exportTripCalendar(tripName, buildCalendarEvents({ items: latestItems, reservations, stops }));
+        return { count, calendarName: `Naveyo · ${tripName}` };
+      }}
       onDownloadOffline={async () => {
         if (!bootstrap || !tripId) return;
         const { modules } = bootstrap;
