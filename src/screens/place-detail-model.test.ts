@@ -50,7 +50,9 @@ describe("place detail model", () => {
   });
 
   it("formats only values supplied by the place provider", () => {
-    expect(formatPlaceCategory("local_cafe")).toBe("Local cafe");
+    expect(formatPlaceCategory("local_cafe")).toBeNull();
+    expect(formatPlaceCategory("tourism.sights.memorial")).toBe("Monument");
+    expect(formatPlaceCategory("building.historic")).toBe("Site historique");
     expect(formatPlaceCategory(undefined)).toBeNull();
     expect(formatCountry("pt")).toBe("🇵🇹 Portugal");
     expect(formatCountry("ZZ")).toBe("🇿🇿 ZZ");

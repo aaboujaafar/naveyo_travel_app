@@ -22,10 +22,18 @@ const text = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
-/** Keeps the deepest category of the first family, e.g. `catering.restaurant.portuguese`. */
+// Families that say what a place is, most telling first. Geoapify also lists
+// attributes ("fee", "wheelchair", "no_dogs"…) that must never become the label.
+const PLACE_FAMILIES = [
+  "catering", "accommodation", "entertainment", "tourism", "heritage", "religion", "leisure", "natural", "beach",
+  "activity", "sport", "commercial", "public_transport", "airport", "rental", "healthcare", "education", "service",
+  "camping", "ski", "parking", "office", "populated_place", "building",
+];
+
+/** The deepest category of the most telling family, e.g. `catering.restaurant.portuguese`. */
 function mostSpecificCategory(values: unknown[]): string | undefined {
   const categories = values.map(text).filter((value): value is string => value !== undefined);
-  const family = categories[0]?.split(".")[0];
+  const family = PLACE_FAMILIES.find((candidate) => categories.some((value) => value === candidate || value.startsWith(`${candidate}.`)));
   if (!family) return undefined;
   return categories
     .filter((value) => value === family || value.startsWith(`${family}.`))

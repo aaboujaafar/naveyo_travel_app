@@ -15,6 +15,15 @@ describe("Geoapify normalization", () => {
     expect(place?.category).toBe("catering.restaurant.portuguese");
   });
 
+  it("prefers what the place is over attributes such as an entrance fee", () => {
+    const [monument] = normalizeGeoapifyResponse({
+      features: [feature({ categories: ["building", "building.historic", "fee", "heritage", "tourism", "tourism.sights", "tourism.sights.memorial"] })],
+    });
+    expect(monument?.category).toBe("tourism.sights.memorial");
+    const [unknown] = normalizeGeoapifyResponse({ features: [feature({ categories: ["fee", "wheelchair.yes"] })] });
+    expect(unknown?.category).toBeUndefined();
+  });
+
   it("keeps OpenStreetMap opening hours as text", () => {
     const [withHours] = normalizeGeoapifyResponse({ features: [feature({ opening_hours: "Tu-Su 10:00-18:00" })] });
     expect(withHours?.openingHours).toEqual({ sourceText: "Tu-Su 10:00-18:00" });

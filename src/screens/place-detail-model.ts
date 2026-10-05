@@ -50,6 +50,16 @@ const categoryLabels: Record<string, string> = {
   "accommodation.apartment": "Appartement",
   "accommodation.motel": "Motel",
   accommodation: "Hébergement",
+  "tourism.sights.memorial": "Monument",
+  "tourism.sights.castle": "Château",
+  "tourism.sights.fort": "Fort",
+  "tourism.sights.viewpoint": "Point de vue",
+  "tourism.sights.place_of_worship": "Lieu de culte",
+  "tourism.sights.monastery": "Monastère",
+  "tourism.sights.tower": "Tour",
+  "tourism.sights.bridge": "Pont",
+  "tourism.sights.archaeological_site": "Site archéologique",
+  "tourism.sights.square": "Place",
   "tourism.sights": "À voir",
   "tourism.attraction": "Attraction",
   "tourism.information": "Office de tourisme",
@@ -77,6 +87,8 @@ const categoryLabels: Record<string, string> = {
   "public_transport": "Transport",
   "commercial.port": "Port",
   "populated_place": "Ville",
+  "building.historic": "Site historique",
+  "building.tourism": "À voir",
 };
 
 /** French label for a provider category such as `catering.restaurant.portuguese`. */
@@ -88,10 +100,8 @@ export function formatPlaceCategory(category?: string): string | null {
     const label = categoryLabels[parts.slice(0, length).join(".")];
     if (label) return label;
   }
-  const words = parts[parts.length - 1]!.split(/[\s_-]+/).filter(Boolean);
-  if (words.length === 0) return null;
-  const label = words.join(" ");
-  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+  // An unknown provider key would show an English word in a French app: better say nothing.
+  return null;
 }
 
 const countryNames: Record<string, string> = {
