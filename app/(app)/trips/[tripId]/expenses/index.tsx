@@ -1,4 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useMemo, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { BudgetSummary, Expense } from "../../../../../src/modules/expenses";
@@ -6,6 +7,7 @@ import type { ISO4217, Trip, UUID } from "../../../../../src/modules/_shared/mod
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screens/TripBudgetScreen";
 import { budgetAlerts, computeSharing } from "../../../../../src/screens/budget-sharing-model";
+import { parseReceiptText } from "../../../../../src/screens/receipt-model";
 import { localToday } from "../../../../../src/screens/trips-list-model";
 
 const fallbackCurrency = "EUR" as ISO4217;
@@ -109,6 +111,21 @@ export default function ExpensesRoute() {
 
   return (
     <TripBudgetScreen
+      onScanReceipt={bootstrap?.modules.reservationTextExtractor ? async (source) => {
+        const extractor = bootstrap.modules.reservationTextExtractor;
+        if (!extractor) return null;
+        if (source === "camera") {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) throw new Error("Autorisez l’appareil photo dans Réglages › Naveyo pour scanner un ticket.");
+        }
+        const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.9 };
+        const picked = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+        const uri = picked.canceled ? undefined : picked.assets[0]?.uri;
+        if (!uri) return null;
+        // Vision reads the text on the iPhone; nothing leaves the device.
+        const text = await extractor.extract(uri).catch(() => "");
+        return parseReceiptText(text, { defaultCurrency: trip?.referenceCurrency ?? fallbackCurrency });
+      } : undefined}
       members={members}
       sharing={sharing}
       alerts={alerts}

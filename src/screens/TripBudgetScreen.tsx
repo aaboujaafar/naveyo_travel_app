@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BudgetSummary, Expense, ExpenseCategory } from "../modules/expenses";
 import type { ISO4217, UUID } from "../modules/_shared/model";
 import type { BudgetAlert, SharingSummary } from "./budget-sharing-model";
+import { formatAmountInput, type ReceiptDraft } from "./receipt-model";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import { AppText, BottomSheet, Button, DatePickerField, Icon, InlineMessage, Input, ProgressBar, SectionTitle, Skeleton } from "../ui";
 import { expenseCategories, expenseCategoryLabels, formatExpenseDate, formatMoney, parseMoneyInput, summarizeExpenseCategories } from "./trip-budget-model";
@@ -33,6 +34,8 @@ export interface TripBudgetScreenProps {
   members?: { id: UUID; label: string }[];
   sharing?: SharingSummary | null;
   alerts?: BudgetAlert[];
+  /** Reads a receipt photo on the iPhone; null when the traveller cancels. */
+  onScanReceipt?: (source: "camera" | "library") => Promise<ReceiptDraft | null>;
 }
 
 export function TripBudgetScreen(props: TripBudgetScreenProps) {
@@ -48,6 +51,31 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
   const [paidBy, setPaidBy] = useState<UUID | undefined>(props.members?.[0]?.id);
   const payer = paidBy ?? props.members?.[0]?.id;
   const memberLabel = (id: UUID) => props.members?.find((member) => member.id === id)?.label ?? "Membre";
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function scanReceipt(source: "camera" | "library") {
+    if (!props.onScanReceipt) return;
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const draft = await props.onScanReceipt(source);
+      if (!draft) return;
+      if (draft.merchant) setLabel(draft.merchant);
+      if (draft.amountMinorUnits) setAmount(formatAmountInput(draft.amountMinorUnits));
+      if (draft.currency) setCurrency(draft.currency);
+      if (draft.category) setCategory(draft.category);
+      if (draft.occurredOn) setDate(draft.occurredOn);
+      const found = [draft.amountMinorUnits ? "montant" : null, draft.occurredOn ? "date" : null, draft.merchant ? "commerçant" : null].filter(Boolean);
+      setScanNote(found.length > 0
+        ? { ok: true, message: `Pré-rempli depuis le ticket (${found.join(", ")}). Vérifiez avant d’ajouter.` }
+        : { ok: false, message: "Le ticket n’a pas pu être lu. Saisissez la dépense à la main." });
+    } catch (cause) {
+      setScanNote({ ok: false, message: cause instanceof Error ? cause.message : "Lecture du ticket impossible." });
+    } finally {
+      setScanning(false);
+    }
+  }
   const categories = useMemo(() => summarizeExpenseCategories(props.expenses), [props.expenses]);
   const visibleExpenses = filter === "all" ? props.expenses : props.expenses.filter((expense) => expense.category === filter);
 
@@ -74,6 +102,7 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
     });
     setLabel("");
     setAmount("");
+    setScanNote(null);
     setModalVisible(false);
   }
 
@@ -165,6 +194,13 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
       <Pressable accessibilityRole="button" accessibilityLabel="Ajouter une Dépense" onPress={() => setModalVisible(true)} style={({ pressed }) => [styles.fab, shadows.lg, pressed && styles.pressed]}><Icon name="plus" size={24} color={colors.white} /></Pressable>
 
       <BottomSheet visible={modalVisible} onClose={() => setModalVisible(false)} title="Nouvelle Dépense" maxHeight={720}>
+        {props.onScanReceipt ? (
+          <View style={styles.scanRow}>
+            <Button size="sm" variant="secondary" style={styles.flexOne} loading={scanning} onPress={() => void scanReceipt("camera")} icon={<Icon name="image" size={16} color={colors.fg} />}>Photographier un ticket</Button>
+            <Button size="sm" variant="ghost" disabled={scanning} onPress={() => void scanReceipt("library")}>Depuis Photos</Button>
+          </View>
+        ) : null}
+        {scanNote ? <InlineMessage variant={scanNote.ok ? "info" : "error"} title={scanNote.ok ? "Ticket lu sur l’iPhone" : "Lecture incomplète"} message={scanNote.message} /> : null}
         <Input label="Titre" value={label} onChangeText={setLabel} placeholder="Dîner au restaurant" />
         <Input label="Montant" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="25,00" />
         <Input label="Devise" value={currency} onChangeText={setCurrency} autoCapitalize="characters" maxLength={3} hint="Code à 3 lettres : EUR, USD, GBP…" />
@@ -197,7 +233,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg }, scrollContent: { width: "100%", maxWidth: layout.maxMobileWidth, alignSelf: "center", paddingBottom: spacing["2xl"] * 3 },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg }, iconButton: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   horizontal: { paddingHorizontal: spacing.lg, gap: spacing.sm }, overview: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, gap: spacing.md }, moneyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: spacing.sm }, stats: { flexDirection: "row", gap: spacing.sm }, stat: { flex: 1, padding: spacing.sm, backgroundColor: colors.bg, borderRadius: radius.sm, gap: spacing.xs },
-  section: { marginHorizontal: spacing.lg, marginTop: spacing.lg }, categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm }, categoryInfo: { width: "30%" }, categoryProgress: { flex: 1 }, futureCard: { padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, gap: spacing.xs }, alertList: { gap: spacing.sm }, balanceRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs }, settlements: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  section: { marginHorizontal: spacing.lg, marginTop: spacing.lg }, categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm }, categoryInfo: { width: "30%" }, categoryProgress: { flex: 1 }, futureCard: { padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, gap: spacing.xs }, alertList: { gap: spacing.sm }, scanRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, balanceRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs }, settlements: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   filters: { gap: spacing.sm, paddingBottom: spacing.sm }, chip: { minHeight: spacing["2xl"] - spacing.xs, paddingHorizontal: spacing.md - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, chipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft }, expenseList: { gap: spacing.sm, marginTop: spacing.md }, expenseRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md }, expenseIcon: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.sm, backgroundColor: colors.tealSoft, alignItems: "center", justifyContent: "center" }, amount: { alignItems: "flex-end" },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, width: spacing["2xl"] + spacing.sm, height: spacing["2xl"] + spacing.sm, borderRadius: radius.full, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center", zIndex: zIndex.fab }, categoryPicker: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, receiptButton: { minHeight: spacing["2xl"], borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   futureWrap: { position: "relative" }, futureContent: { opacity: 0.5 }, futureBadge: { position: "absolute", top: spacing.xs, right: spacing.lg, zIndex: zIndex.sticky }, flexOne: { flex: 1 }, pressed: { transform: [{ scale: 0.97 }] }, loading: { flex: 1, padding: spacing.lg, gap: spacing.md, backgroundColor: colors.bg },
