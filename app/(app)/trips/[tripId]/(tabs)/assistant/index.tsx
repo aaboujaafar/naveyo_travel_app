@@ -21,6 +21,7 @@ import { useTripsModule } from "../../../../../../src/modules/trips";
 import { TripAssistantScreen } from "../../../../../../src/screens/TripAssistantScreen";
 import { DayPlanSection } from "../../../../../../src/screens/DayPlanSection";
 import { stopDates } from "../../../../../../src/screens/day-plan-model";
+import { updateDayPlanPreferences } from "../../../../../../src/screens/day-plan-preferences-model";
 import {
   assistantCategoryPlaceType,
   buildAssistantPreferences,
@@ -29,10 +30,14 @@ import {
 
 export default function TripAssistantRoute() {
   const router = useRouter();
-  const { tripId, stopId: requestedStopId, mode: requestedMode } = useTripTabParams<{
+  const { tripId, stopId: requestedStopId, mode: requestedMode, date: requestedDate, indoor } = useTripTabParams<{
     tripId: string;
     stopId?: string;
     mode?: string;
+    /** "YYYY-MM-DD": the day to compose, e.g. from a weather Plan B. */
+    date?: string;
+    /** "1" restricts the composed day to indoor places. */
+    indoor?: string;
   }>();
   const assistant = useTripAssistant();
   const bootstrap = useNaveyoBootstrap();
@@ -59,6 +64,14 @@ export default function TripAssistantRoute() {
     pace: "balanced",
   });
 
+  // A Plan B link asks for indoor places once; the traveller can change it afterwards (adjusted during render).
+  const planBKey = indoor === "1" ? requestedDate ?? "today" : undefined;
+  const [appliedPlanB, setAppliedPlanB] = useState<string | undefined>();
+  if (planBKey !== undefined && planBKey !== appliedPlanB) {
+    setAppliedPlanB(planBKey);
+    setDayPlanPreferences((current) => updateDayPlanPreferences(current, { constraints: { indoorOutdoor: "indoor" } }));
+  }
+
   const displayedPlannedItems = plannedItems.filter((item) => item.stopId === stop?.id);
 
   const handleDayPlanPreferencesChange = (preferences: DayPlanPreferences) => {
@@ -78,7 +91,9 @@ export default function TripAssistantRoute() {
           const selected = stops.find((candidate) => candidate.id === requestedStopId) ?? stops[0] ?? null;
           setStop(selected);
           if (selected) {
-            setSelectedDayPlanDate(selected.startDate);
+            setSelectedDayPlanDate(
+              requestedDate && selected.startDate <= requestedDate && requestedDate <= selected.endDate ? requestedDate : selected.startDate,
+            );
             setDayPlan(null);
             setDayPlanError(null);
           }
@@ -109,7 +124,7 @@ export default function TripAssistantRoute() {
     return () => {
       active = false;
     };
-  }, [bootstrap, requestedStopId, tripId, trips]);
+  }, [bootstrap, requestedDate, requestedStopId, tripId, trips]);
 
   const discover = async (values: AssistantSearchValues) => {
     if (!tripId || !stopId) {

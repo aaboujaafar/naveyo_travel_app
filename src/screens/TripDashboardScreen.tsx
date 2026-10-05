@@ -30,6 +30,7 @@ import {
 } from "./trip-dashboard-model";
 import { formatDuration, type TodayEntry, type TodayPlan } from "./today-model";
 import { localToday, tripTiming } from "./trips-list-model";
+import { isRainyDay } from "./weather-plan-b";
 import type { ClimateSummary } from "../modules/weather";
 
 
@@ -62,6 +63,8 @@ export interface TripDashboardScreenProps {
   travelToNextSeconds?: number | null;
   onOpenDirections?: (entry: TodayEntry) => void;
   summary?: DashboardSummary;
+  /** Composes a rainy day with indoor places. */
+  onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
   onOpenRecap?: () => void;
   /** True when the screen shows the last offline download because the network failed. */
@@ -223,6 +226,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onOpenDirections={props.onOpenDirections}
             summary={props.summary}
             offlineReady={props.offlineReady}
+            onPlanB={props.onPlanB}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             stops={sortedStops}
             itineraryItemCount={props.itineraryItems.length}
@@ -243,7 +247,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
   );
 }
 
-function DashboardWeather({ weather, hasStops }: { weather?: DashboardWeatherState; hasStops: boolean }) {
+function DashboardWeather({ weather, hasStops, onPlanB }: { weather?: DashboardWeatherState; hasStops: boolean; onPlanB?: (date: string) => void }) {
   if (!hasStops) return null;
   if (weather?.status === "loading") return <Section title="Météo"><Skeleton height={spacing.xl * 2} borderRadius={radius.md} /></Section>;
   const days = weather?.status === "ready" ? weather.days ?? [] : [];
@@ -264,7 +268,7 @@ function DashboardWeather({ weather, hasStops }: { weather?: DashboardWeatherSta
     const message = weather?.status === "error" ? "Météo momentanément indisponible." : "La météo s’affichera 16 jours avant le départ.";
     return <View style={styles.weatherNote}><Icon name="info" size={16} color={colors.muted} /><AppText variant="caption" color="muted" style={styles.flexOne}>{message}</AppText></View>;
   }
-  return <Section title="Météo"><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherStrip}>{days.slice(0, 7).map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="h3">{day.icon}</AppText><AppText variant="label">{Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}°</AppText>{day.precipitationProbabilityMax !== undefined ? <AppText variant="badge" color="muted">Pluie {Math.round(day.precipitationProbabilityMax)}%</AppText> : null}</View>)}</ScrollView></Section>;
+  return <Section title="Météo"><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weatherStrip}>{days.slice(0, 7).map((day) => <View key={day.date} style={styles.weatherDay}><AppText variant="badge" color="muted">{day.label}</AppText><AppText variant="h3">{day.icon}</AppText><AppText variant="label">{Math.round(day.temperatureMax)}°</AppText><AppText variant="caption" color="muted">Min {Math.round(day.temperatureMin)}°</AppText>{day.precipitationProbabilityMax !== undefined ? <AppText variant="badge" color="muted">Pluie {Math.round(day.precipitationProbabilityMax)}%</AppText> : null}{onPlanB && isRainyDay(day) ? <Pressable accessibilityRole="button" accessibilityLabel={`Plan B à l’abri pour ${day.label}`} onPress={() => onPlanB(day.date)} style={({ pressed }) => [styles.planBChip, pressed && styles.pressed]}><AppText variant="badge" color="teal">☔ Plan B</AppText></Pressable> : null}</View>)}</ScrollView></Section>;
 }
 
 function StepWeatherPreview({ weather }: { weather?: DashboardWeatherState }) {
@@ -280,6 +284,7 @@ function TodayPanel({
   onOpenDirections,
   summary,
   offlineReady,
+  onPlanB,
   onComposeDay,
   stops,
   itineraryItemCount,
@@ -299,6 +304,7 @@ function TodayPanel({
   onOpenDirections?: (entry: TodayEntry) => void;
   summary?: DashboardSummary;
   offlineReady?: boolean;
+  onPlanB?: (date: string) => void;
   onComposeDay: () => void;
   stops: Stop[];
   itineraryItemCount: number;
@@ -322,6 +328,8 @@ function TodayPanel({
       {today ? (
         <TodaySection
           today={today}
+          rainExpected={Boolean(today.stop && weatherByStopId?.[today.stop.id]?.days?.some((day) => day.date === today.date && isRainyDay(day)))}
+          onPlanB={onPlanB ? () => onPlanB(today.date) : undefined}
           travelToNextSeconds={travelToNextSeconds}
           onOpenDirections={onOpenDirections}
           onComposeDay={onComposeDay}
@@ -398,7 +406,7 @@ function TodayPanel({
         </View>
       </Section>
 
-      <DashboardWeather weather={weather} hasStops={stops.length > 0} />
+      <DashboardWeather weather={weather} hasStops={stops.length > 0} onPlanB={onPlanB} />
 
       <Section title="Étapes du Voyage">
         {stops.length === 0 ? (
@@ -493,8 +501,10 @@ function SummaryCard({ icon, label, value, detail, progress, onPress }: { icon: 
   );
 }
 
-function TodaySection({ today, travelToNextSeconds, onOpenDirections, onComposeDay, onOpenItinerary }: {
+function TodaySection({ today, rainExpected, onPlanB, travelToNextSeconds, onOpenDirections, onComposeDay, onOpenItinerary }: {
   today: TodayPlan;
+  rainExpected: boolean;
+  onPlanB?: () => void;
   travelToNextSeconds: number | null;
   onOpenDirections?: (entry: TodayEntry) => void;
   onComposeDay: () => void;
@@ -503,6 +513,16 @@ function TodaySection({ today, travelToNextSeconds, onOpenDirections, onComposeD
   const next = today.next;
   return (
     <Section title={`Aujourd’hui · jour ${today.dayNumber} sur ${today.dayCount}`}>
+      {rainExpected && onPlanB ? (
+        <Pressable accessibilityRole="button" onPress={onPlanB} style={({ pressed }) => [styles.bookingCard, pressed && styles.pressed]}>
+          <View style={styles.bookingIcon}><AppText variant="h3">☔</AppText></View>
+          <View style={styles.flexOne}>
+            <AppText variant="label">Pluie prévue aujourd’hui</AppText>
+            <AppText variant="caption" color="muted">Composer un plan B avec des lieux couverts</AppText>
+          </View>
+          <Icon name="arrow-right" size={16} color={colors.fg} />
+        </Pressable>
+      ) : null}
       {next ? (
         <View style={styles.nextCard}>
           <AppText variant="badge" color="onAccent">{`À ${next.time}`}</AppText>
@@ -611,6 +631,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  planBChip: { marginTop: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.tealSoft },
   climateCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   summaryTrack: { height: 4, borderRadius: radius.full, backgroundColor: colors.border, overflow: "hidden", marginTop: spacing.xs },

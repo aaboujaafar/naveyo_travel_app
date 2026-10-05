@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripDashboardScreen } from "../../../../../src/screens/TripDashboardScreen";
 import type { DashboardSummary, DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
 import { buildTodayPlan, localNow } from "../../../../../src/screens/today-model";
+import { planBAssistantPath } from "../../../../../src/screens/weather-plan-b";
 import { dashboardRouteCoordinates } from "../../../../../src/screens/trip-dashboard-model";
 
 export default function TripDetailRoute() {
@@ -259,6 +260,10 @@ export default function TripDetailRoute() {
       onOpenDocuments={() =>
         router.push(`/trips/${routeTripId}/documents`)
       }
+      onPlanB={(date) => {
+        const stop = stops.find((candidate) => candidate.startDate <= date && date <= candidate.endDate) ?? stops[0];
+        if (stop) router.push(planBAssistantPath(routeTripId, stop.id, date) as Href);
+      }}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
