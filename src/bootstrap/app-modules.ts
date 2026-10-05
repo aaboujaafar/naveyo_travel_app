@@ -18,6 +18,7 @@ import { Expenses } from "../modules/expenses/module";
 import { InMemoryTripPackFileStore } from "../adapters/sqlite/in-memory-file-store";
 import { fileTripPackStore } from "../adapters/file-system/trip-pack-store";
 import { createSupabaseTripProfilesModule } from "../adapters/supabase/trip-profiles";
+import { createSupabaseWishlistModule } from "../adapters/supabase/wishlist";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
@@ -46,6 +47,7 @@ export function createAppModules() {
   const trips = createSupabaseTripsModule(client, () => true);
   const packingList = createSupabasePackingListModule(client);
   const tripProfiles = createSupabaseTripProfilesModule(client);
+  const wishlist = createSupabaseWishlistModule(client);
   const weather = new Weather(createOpenMeteoWeatherProvider());
   const tripAssistant = createSupabaseTripAssistant(client);
   const dayPlanner = createSupabaseDayPlanner(client);
@@ -114,6 +116,7 @@ export function createAppModules() {
     routing,
     packingList,
     tripProfiles,
+    wishlist,
   };
 }
 

@@ -1,6 +1,7 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { rankWishes, type Wish } from "../../../../../../src/modules/wishlist";
 import { describePlacesError } from "../../../../../../src/screens/places-error";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../../src/modules/_shared/model";
@@ -93,6 +94,32 @@ export default function TripAssistantRoute() {
       active = false;
     };
   }, [bootstrap, tripId]);
+
+  const [wishes, setWishes] = useState<Wish[] | null>(null);
+  const [wishesError, setWishesError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<UUID | null>(null);
+  const rankedWishes = useMemo(() => (wishes ? rankWishes(wishes, accountId) : null), [accountId, wishes]);
+  const loadWishes = useCallback(async () => {
+    const wishlist = bootstrap?.modules.wishlist;
+    if (!wishlist || !tripId) return;
+    try {
+      const [next, account] = await Promise.all([
+        wishlist.list(tripId as UUID),
+        bootstrap.modules.identity.currentAccount().catch(() => null),
+      ]);
+      setWishes(next);
+      setAccountId(account?.id ?? null);
+      setWishesError(null);
+    } catch (cause) {
+      setWishesError(cause instanceof Error ? cause.message : "Envies indisponibles.");
+    }
+  }, [bootstrap, tripId]);
+
+  // A link straight to the « Envies » tab, or coming back from a place just wished: refresh the list.
+  const wishesLoaded = wishes !== null;
+  useFocusEffect(useCallback(() => {
+    if (requestedMode === "wishes" || wishesLoaded) void loadWishes();
+  }, [loadWishes, requestedMode, wishesLoaded]));
 
   const displayedPlannedItems = plannedItems.filter((item) => item.stopId === stop?.id);
 
@@ -256,7 +283,23 @@ export default function TripAssistantRoute() {
   return (
     <TripAssistantScreen
       stopName={stop?.name}
-      requestedMode={requestedMode === "day" || requestedMode === "places" ? requestedMode : undefined}
+      requestedMode={requestedMode === "day" || requestedMode === "places" || requestedMode === "wishes" ? requestedMode : undefined}
+      wishes={bootstrap?.modules.wishlist ? rankedWishes : undefined}
+      wishesError={wishesError}
+      onOpenWishes={() => void loadWishes()}
+      onVoteWish={async (wishId, vote) => {
+        try {
+          await bootstrap?.modules.wishlist?.vote(wishId, vote);
+          await loadWishes();
+        } catch (cause) {
+          setWishesError(cause instanceof Error ? cause.message : "Vote impossible.");
+        }
+      }}
+      onOpenWish={(wish) => {
+        // The detail screen reads places from the module: hand it the saved snapshot first.
+        bootstrap?.modules.places.remember?.([wish.place]);
+        router.push(`/(app)/trips/${tripId}/places/${wish.place.id}`);
+      }}
       drafts={drafts}
       nearbyCandidates={nearbyCandidates}
       loading={loading}

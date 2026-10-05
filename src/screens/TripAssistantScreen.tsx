@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PlaceCandidate } from "../modules/_shared/model";
 import { DEFAULT_GEOAPIFY_ATTRIBUTION, placeAttribution } from "../modules/places";
 import { formatPlaceCategory } from "./place-detail-model";
+import type { RankedWish } from "../modules/wishlist";
 import type { SuggestionDraft, SuggestionWeatherContext } from "../modules/trip-assistant";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import {
@@ -50,7 +51,13 @@ export interface TripAssistantScreenProps {
   planningContext?: { weather: SuggestionWeatherContext[]; plannedCount: number };
   dayPlanSection?: React.ReactNode;
   /** Mode asked for by a link (e.g. the dashboard's AI day card). */
-  requestedMode?: "places" | "day";
+  requestedMode?: "places" | "day" | "wishes";
+  /** Shared wish list, ranked by votes; undefined hides the « Envies » tab. */
+  wishes?: RankedWish[] | null;
+  wishesError?: string | null;
+  onOpenWishes?: () => void;
+  onVoteWish?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
+  onOpenWish?: (wish: RankedWish) => void;
 }
 
 const categories: AssistantCategory[] = [
@@ -60,7 +67,7 @@ const categories: AssistantCategory[] = [
   "Activités",
 ];
 
-type ExploreMode = "places" | "day";
+type ExploreMode = "places" | "day" | "wishes";
 type ResultsView = "list" | "map";
 
 export function TripAssistantScreen({
@@ -76,6 +83,11 @@ export function TripAssistantScreen({
   planningContext,
   dayPlanSection,
   requestedMode,
+  wishes,
+  wishesError,
+  onOpenWishes,
+  onVoteWish,
+  onOpenWish,
 }: TripAssistantScreenProps) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
@@ -118,6 +130,7 @@ export function TripAssistantScreen({
   const openMode = (next: ExploreMode) => {
     setMode(next);
     if (next === "places" && !searched) void discover();
+    if (next === "wishes") onOpenWishes?.();
   };
 
   return (
@@ -146,6 +159,7 @@ export function TripAssistantScreen({
         <View style={styles.segmented} accessibilityRole="tablist">
           <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => openMode("day")} />
           <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => openMode("places")} />
+          {wishes !== undefined ? <SegmentButton label="Envies" icon="users" active={mode === "wishes"} onPress={() => openMode("wishes")} /> : null}
         </View>
 
         {mode === "day" ? (
@@ -165,6 +179,8 @@ export function TripAssistantScreen({
               </View>
             )}
           </>
+        ) : mode === "wishes" ? (
+          <WishesPanel wishes={wishes ?? null} error={wishesError ?? null} onVote={onVoteWish} onOpen={onOpenWish} />
         ) : (
           <>
             <View style={styles.searchBar}>
@@ -267,7 +283,54 @@ export function TripAssistantScreen({
   );
 }
 
-function SegmentButton({ label, icon, active, onPress }: { label: string; icon: "search" | "sparkles"; active: boolean; onPress: () => void }) {
+function WishesPanel({ wishes, error, onVote, onOpen }: {
+  wishes: RankedWish[] | null;
+  error: string | null;
+  onVote?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
+  onOpen?: (wish: RankedWish) => void;
+}) {
+  if (error) return <View style={styles.horizontalSection}><InlineMessage title="Envies indisponibles" message={error} /></View>;
+  if (wishes === null) return <LoadingResults />;
+  if (wishes.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}><AppText variant="h3">♡</AppText></View>
+        <AppText variant="label" align="center">Aucune envie pour l’instant</AppText>
+        <AppText variant="bodySmall" color="muted" align="center">Touchez ♡ sur la fiche d’un lieu : les autres Membres votent ici, et les favoris remontent en tête.</AppText>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.resultsList}>
+      {wishes.map((wish) => (
+        <View key={wish.id} style={styles.resultCard}>
+          <Pressable accessibilityRole="button" onPress={onOpen ? () => onOpen(wish) : undefined} style={styles.resultBody}>
+            <AppText variant="label" numberOfLines={1}>{wish.place.name}</AppText>
+            <AppText variant="caption" color="muted" numberOfLines={1}>
+              {[formatPlaceCategory(wish.place.category), wish.score > 0 ? `${wish.likes} pour` : null, wish.dislikes > 0 ? `${wish.dislikes} contre` : null].filter(Boolean).join(" · ") || "Pas encore de vote"}
+            </AppText>
+          </Pressable>
+          {onVote ? (
+            <View style={styles.voteRow}>
+              <VoteChip label="👍" active={wish.myVote === 1} onPress={() => void onVote(wish.id, wish.myVote === 1 ? 0 : 1)} />
+              <VoteChip label="👎" active={wish.myVote === -1} onPress={() => void onVote(wish.id, wish.myVote === -1 ? 0 : -1)} />
+            </View>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function VoteChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={label === "👍" ? "Pour" : "Contre"} onPress={onPress} style={({ pressed }) => [styles.voteChip, active && styles.voteChipActive, pressed && styles.pressed]}>
+      <AppText variant="label">{label}</AppText>
+    </Pressable>
+  );
+}
+
+function SegmentButton({ label, icon, active, onPress }: { label: string; icon: "search" | "sparkles" | "users"; active: boolean; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.segment, active && styles.segmentActive]}>
       <Icon name={icon} size={16} color={active ? colors.fg : colors.muted} />
@@ -411,6 +474,9 @@ const styles = StyleSheet.create({
   resultCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   resultImage: { width: 72, height: 72, borderRadius: radius.sm, backgroundColor: colors.border },
   resultPlaceholder: { alignItems: "center", justifyContent: "center" },
+  voteRow: { flexDirection: "row", gap: spacing.xs },
+  voteChip: { width: 40, height: 40, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  voteChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   resultBody: { flex: 1, gap: 2 },
   credit: { fontSize: 11 },
   mapPreview: { height: 360, marginHorizontal: spacing.lg, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.tealSoft },

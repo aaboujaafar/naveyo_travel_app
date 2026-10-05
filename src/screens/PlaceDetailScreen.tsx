@@ -54,6 +54,9 @@ export interface PlaceDetailScreenProps {
   onOpenWaze?: () => void;
   onOpenPhotoCredit?: () => void;
   onAddToItinerary: (selection: PlaceScheduleDate) => Promise<void>;
+  /** Undefined while the wish list is unavailable: the heart is then hidden. */
+  wished?: boolean;
+  onToggleWish?: () => Promise<void>;
 }
 
 export interface PlaceMapPresentation {
@@ -112,6 +115,25 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   );
   const [toast, setToast] = useState<ToastData | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [wishing, setWishing] = useState(false);
+  async function toggleWish() {
+    if (!props.onToggleWish) return;
+    setWishing(true);
+    const wasWished = props.wished;
+    try {
+      await props.onToggleWish();
+      setToast({
+        id: `wish-${Date.now()}`,
+        title: wasWished ? "Retiré des envies" : "Ajouté aux envies",
+        message: wasWished ? "Le lieu n’est plus proposé au vote." : "Les autres Membres peuvent voter dans Explorer › Envies.",
+        variant: "success",
+      });
+    } catch (cause) {
+      setToast({ id: `wish-error-${Date.now()}`, title: "Envies indisponibles", message: cause instanceof Error ? cause.message : "Réessayez plus tard.", variant: "danger" });
+    } finally {
+      setWishing(false);
+    }
+  }
   const photoSources = getPhotoSources(props.place?.imageUrl, props.place?.category);
   const heroNavStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
@@ -446,6 +468,18 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
       </Animated.ScrollView>
 
       <View style={[styles.footer, footerStyle]}>
+        {props.onToggleWish && props.wished !== undefined ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={props.wished ? "Retirer des envies" : "Ajouter aux envies"}
+            accessibilityState={{ selected: props.wished }}
+            disabled={wishing}
+            onPress={() => void toggleWish()}
+            style={({ pressed }) => [styles.wishButton, props.wished && styles.wishButtonOn, pressed && styles.pressed]}
+          >
+            <AppText variant="h3" color={props.wished ? "onAccent" : "accent"}>{props.wished ? "♥" : "♡"}</AppText>
+          </Pressable>
+        ) : null}
         <Button
           fullWidth
           style={styles.footerPrimary}
@@ -613,6 +647,8 @@ const styles = StyleSheet.create({
   disabledAction: { opacity: 0.6 },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, maxWidth: layout.maxMobileWidth, alignSelf: "center", flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: componentMetrics.placeDetail.thinBorderWidth, borderTopColor: colors.border, zIndex: zIndex.sticky },
   footerPrimary: { flex: 1 },
+  wishButton: { width: layout.minimumTouchTarget + spacing.sm, height: layout.minimumTouchTarget + spacing.sm, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.accent, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  wishButtonOn: { backgroundColor: colors.accentStrong, borderColor: colors.accentStrong },
   futureReserve: { position: "relative" },
   reserveBadge: { position: "absolute", top: -spacing.sm, right: -spacing.sm, transform: [{ scale: 0.72 }] },
   dateGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
