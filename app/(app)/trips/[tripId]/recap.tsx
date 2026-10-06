@@ -80,6 +80,7 @@ export default function TripRecapRoute() {
       loading={loading}
       error={error}
       onBack={() => router.back()}
+      onCreateAlbum={rawTripId ? () => router.push(`/(app)/trips/${rawTripId}/album`) : undefined}
       onCreateStories={rawTripId ? () => router.push(`/(app)/trips/${rawTripId}/stories`) : undefined}
       onShare={() => {
         if (recap) void Share.share({ message: recap.shareText });

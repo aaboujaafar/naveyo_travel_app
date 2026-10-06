@@ -17,6 +17,7 @@ export interface TripRecapScreenProps {
   onBack: () => void;
   onShare: () => void;
   onCreateStories?: () => void;
+  onCreateAlbum?: () => void;
 }
 
 export function TripRecapScreen(props: TripRecapScreenProps) {
@@ -98,6 +99,9 @@ export function TripRecapScreen(props: TripRecapScreenProps) {
         ) : null}
 
         <View style={styles.shareWrap}>
+          {props.onCreateAlbum ? (
+            <Button fullWidth onPress={props.onCreateAlbum} icon={<Icon name="layers" size={20} color={colors.white} />}>Préparer l’album photo</Button>
+          ) : null}
           {props.onCreateStories ? (
             <Button fullWidth onPress={props.onCreateStories} icon={<Icon name="image" size={20} color={colors.white} />}>Créer des stories Instagram</Button>
           ) : null}

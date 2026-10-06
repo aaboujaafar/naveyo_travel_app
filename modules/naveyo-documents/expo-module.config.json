@@ -1,6 +1,6 @@
 {
   "platforms": ["apple"],
   "apple": {
-    "modules": ["NaveyoDocumentsModule"]
+    "modules": ["NaveyoDocumentsModule", "NaveyoPhotoAnalysisModule"]
   }
 }
