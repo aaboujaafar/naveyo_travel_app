@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import type { UUID } from "../modules/_shared/model";
 import type { CityRef } from "../modules/trip-profiles";
 import { CityPickerSheet } from "./CityPickerSheet";
+import { CountryPickerSheet } from "./CountryPickerSheet";
+import { formatCountry } from "./place-detail-model";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Account } from "../modules/identity";
@@ -53,6 +55,9 @@ export interface AccountScreenProps {
   onSaveHomeCity?: (city: CityRef | null) => Promise<void>;
   /** A Voyage of the account, needed to search cities. */
   searchTripId?: UUID;
+  /** Decides the entry formalities of each country. */
+  nationality?: string;
+  onSaveNationality?: (countryCode: string | null) => Promise<void>;
   onSignOut: () => Promise<void>;
 }
 
@@ -76,9 +81,12 @@ export function AccountScreen({
   homeCity,
   onSaveHomeCity,
   searchTripId,
+  nationality,
+  onSaveNationality,
   onSignOut,
 }: AccountScreenProps) {
   const [homePicker, setHomePicker] = useState(false);
+  const [nationalityPicker, setNationalityPicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [renameVisible, setRenameVisible] = useState(false);
@@ -154,6 +162,11 @@ export function AccountScreen({
           {onRename ? (
             <Button variant="secondary" icon={<Icon name="edit" size={16} />} onPress={() => { setNameDraft(shownName); setRenameError(null); setRenameVisible(true); }}>
               Modifier mon prénom
+            </Button>
+          ) : null}
+          {onSaveNationality ? (
+            <Button variant="secondary" icon={<Icon name="users" size={16} />} onPress={() => setNationalityPicker(true)}>
+              {nationality ? `Nationalité : ${formatCountry(nationality) ?? nationality}` : "Indiquer ma nationalité"}
             </Button>
           ) : null}
           {onSaveHomeCity && searchTripId ? (
@@ -331,6 +344,16 @@ export function AccountScreen({
         <BottomNavItem icon="layers" label="Récap" comingSoon />
       </View>
 
+      {onSaveNationality ? (
+        <CountryPickerSheet
+          visible={nationalityPicker}
+          title="Ma nationalité"
+          hint="Elle sert à indiquer les formalités d’entrée (visa, autorisation électronique) de chaque pays du Voyage."
+          onPick={(code) => onSaveNationality(code)}
+          onClear={nationality ? () => onSaveNationality(null) : undefined}
+          onClose={() => setNationalityPicker(false)}
+        />
+      ) : null}
       {onSaveHomeCity && searchTripId ? (
         <CityPickerSheet
           visible={homePicker}

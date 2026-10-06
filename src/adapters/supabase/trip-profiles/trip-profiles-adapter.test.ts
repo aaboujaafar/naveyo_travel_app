@@ -63,7 +63,12 @@ describe("Supabase trip profiles adapter", () => {
       ? { data: null, error: { message: "Could not find the 'party_adults' column", code: "PGRST204" } }
       : { data: null, error: null });
     await createSupabaseTripProfilesModule(client).saveParty(tripId, { adults: 2, childrenAges: [], stroller: false, reducedMobility: false });
-    expect(calls.map((call) => Object.keys(call.values as object).includes("party_adults"))).toEqual([true, false]);
+    // Newest columns first, then without nationalities, then without adults.
+    expect(calls.map((call) => Object.keys(call.values as object).filter((key) => key === "party_adults" || key === "party_nationalities"))).toEqual([
+      ["party_adults", "party_nationalities"],
+      ["party_adults"],
+      [],
+    ]);
   });
 
   it("stores the home city of the current account", async () => {
@@ -78,7 +83,7 @@ describe("Supabase trip profiles adapter", () => {
     await profiles.saveParty(tripId, { childrenAges: [5, 30], stroller: false, reducedMobility: true });
     await profiles.updateMyDisplayName("  Ayoub ");
     expect(calls).toEqual([
-      { table: "trips", op: "update", values: { party_children_ages: [5], party_stroller: false, party_reduced_mobility: true, party_adults: null }, filters: [["id", tripId]] },
+      { table: "trips", op: "update", values: { party_children_ages: [5], party_stroller: false, party_reduced_mobility: true, party_adults: null, party_nationalities: [] }, filters: [["id", tripId]] },
       { table: "accounts", op: "update", values: { display_name: "Ayoub" }, filters: [["id", "a1"]] },
     ]);
   });

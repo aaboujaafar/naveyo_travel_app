@@ -3,6 +3,8 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { EMPTY_PARTY, describeParty, type TravelParty } from "../modules/trip-profiles";
 import { colors, radius, spacing } from "../theme";
 import { AppText, Button, Chip, Icon, InlineMessage, Switch } from "../ui";
+import { CountryPickerSheet } from "./CountryPickerSheet";
+import { formatCountry } from "./place-detail-model";
 
 const AGES = Array.from({ length: 18 }, (_, age) => age);
 
@@ -20,6 +22,7 @@ export function TravelPartyCard({ party, defaultAdults = 1, saving, error, messa
   // Saving keeps the number shown, even if it was only the default.
   const save = () => onSave({ ...draft, adults: draft.adults ?? defaultAdults });
   const [pickingAge, setPickingAge] = useState(false);
+  const [nationalityPicker, setNationalityPicker] = useState(false);
   const summary = describeParty(draft);
 
   return (
@@ -75,6 +78,21 @@ export function TravelPartyCard({ party, defaultAdults = 1, saving, error, messa
           </ScrollView>
         </View>
       ) : null}
+
+      <AppText variant="label">Autres nationalités du groupe</AppText>
+      <AppText variant="caption" color="muted">Celle de chaque Membre vient de son compte. Ajoutez par exemple un enfant binational ou un proche sans compte.</AppText>
+      <View style={styles.wrap}>
+        {(draft.nationalities ?? []).map((code) => (
+          <Chip key={code} label={`${formatCountry(code) ?? code}  ✕`} active onPress={() => setDraft((current) => ({ ...current, nationalities: (current.nationalities ?? []).filter((item) => item !== code) }))} />
+        ))}
+        {(draft.nationalities ?? []).length < 6 ? <Chip label="+ Ajouter une nationalité" onPress={() => setNationalityPicker(true)} /> : null}
+      </View>
+      <CountryPickerSheet
+        visible={nationalityPicker}
+        title="Nationalité d’un voyageur"
+        onPick={(code) => setDraft((current) => ({ ...current, nationalities: [...new Set([...(current.nationalities ?? []), code])] }))}
+        onClose={() => setNationalityPicker(false)}
+      />
 
       {/* The Switch only labels itself for VoiceOver: the visible text sits beside it. */}
       <View style={styles.toggleRow}>

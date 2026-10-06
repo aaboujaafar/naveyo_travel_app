@@ -24,6 +24,7 @@ describe("trip profiles", () => {
     expect(party.childrenAges).toEqual([4, 0]);
     expect(describeParty(party)).toBe("2 adultes · 2 enfants (4 ans, moins d’1 an) · poussette");
     expect(normalizeParty({ adults: 40, childrenAges: [], stroller: false, reducedMobility: false }).adults).toBe(20);
+    expect(normalizeParty({ childrenAges: [], stroller: false, reducedMobility: false, nationalities: ["ca", "CA", "x1", "ma"] }).nationalities).toEqual(["CA", "MA"]);
     expect(describeParty({ childrenAges: [], stroller: false, reducedMobility: false })).toBeNull();
   });
 });

@@ -29,22 +29,25 @@ const run = async <T>(request: SupabaseQuery<T>): Promise<T | null> => {
 const asRow = (value: unknown): Row | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : null;
 
-/** Runs the full query, or the older one when the database lacks the newer columns. */
-async function withMissingColumnFallback<T>(full: () => Promise<T>, older: () => Promise<T>): Promise<T> {
-  try {
-    return await full();
-  } catch (error) {
-    if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) return older();
-    throw error;
+/** Tries the newest query first, then older ones while the database lacks the newer columns. */
+async function firstWorking<T>(attempts: readonly (() => Promise<T>)[]): Promise<T> {
+  for (const [index, attempt] of attempts.entries()) {
+    try {
+      return await attempt();
+    } catch (error) {
+      const missing = error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "");
+      if (!missing || index === attempts.length - 1) throw error;
+    }
   }
+  throw new Error("Aucune requête à essayer.");
 }
 
-async function migrationAware<T>(request: Promise<T>, detail: string): Promise<T> {
+async function migrationAware<T>(request: Promise<T>, detail: string, migration = "trip_departure"): Promise<T> {
   try {
     return await request;
   } catch (error) {
     if (error instanceof ProfilesDatabaseError && (MISSING_COLUMN_CODES.has(error.code ?? "") || error.code === PERMISSION_DENIED)) {
-      throw new Error(`La base de données doit être mise à jour (migration « trip_departure »). ${detail}`);
+      throw new Error(`La base de données doit être mise à jour (migration « ${migration} »). ${detail}`);
     }
     throw error;
   }
@@ -100,15 +103,17 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
     async getParty(tripId) {
       try {
         const columns = "party_children_ages,party_stroller,party_reduced_mobility";
-        // The adults count arrives with a later migration: without it, the rest of the party still loads.
-        const row = asRow(await withMissingColumnFallback(
+        // Adults and nationalities arrive with later migrations: without them, the rest of the party still loads.
+        const row = asRow(await firstWorking([
+          () => run(client.from("trips").select(`${columns},party_adults,party_nationalities`).eq("id", tripId).single()),
           () => run(client.from("trips").select(`${columns},party_adults`).eq("id", tripId).single()),
           () => run(client.from("trips").select(columns).eq("id", tripId).single()),
-        ));
+        ]));
         if (!row) return null;
         const ages = Array.isArray(row.party_children_ages) ? row.party_children_ages.filter((age): age is number => typeof age === "number") : [];
         return normalizeParty({
           ...(typeof row.party_adults === "number" ? { adults: row.party_adults } : {}),
+          ...(Array.isArray(row.party_nationalities) ? { nationalities: row.party_nationalities.filter((code): code is string => typeof code === "string") } : {}),
           childrenAges: ages,
           stroller: row.party_stroller === true,
           reducedMobility: row.party_reduced_mobility === true,
@@ -127,10 +132,11 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
           party_stroller: normalized.stroller,
           party_reduced_mobility: normalized.reducedMobility,
         };
-        await withMissingColumnFallback(
+        await firstWorking([
+          () => run(client.from("trips").update({ ...values, party_adults: normalized.adults ?? null, party_nationalities: normalized.nationalities ?? [] }).eq("id", tripId)),
           () => run(client.from("trips").update({ ...values, party_adults: normalized.adults ?? null }).eq("id", tripId)),
           () => run(client.from("trips").update(values).eq("id", tripId)),
-        );
+        ]);
       } catch (error) {
         if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) {
           throw new Error(`${MIGRATION_NEEDED} Les voyageurs ne peuvent pas encore être enregistrés.`);
@@ -142,13 +148,29 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
     async myProfile() {
       const accountId = await currentAccountId();
       if (!accountId) return null;
-      const row = asRow(await withMissingColumnFallback(
-        () => run(client.from("accounts").select("display_name,home_city,home_country,home_latitude,home_longitude").eq("id", accountId).single()),
+      const home = "display_name,home_city,home_country,home_latitude,home_longitude";
+      const row = asRow(await firstWorking([
+        () => run(client.from("accounts").select(`${home},nationality`).eq("id", accountId).single()),
+        () => run(client.from("accounts").select(home).eq("id", accountId).single()),
         () => run(client.from("accounts").select("display_name").eq("id", accountId).single()),
-      ).catch(() => null));
+      ]).catch(() => null));
       const name = row?.display_name;
       const homeCity = row ? cityFrom(row, "home") : null;
-      return { accountId, ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}), ...(homeCity ? { homeCity } : {}) };
+      const nationality = typeof row?.nationality === "string" ? row.nationality.trim().toUpperCase() : undefined;
+      return {
+        accountId,
+        ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}),
+        ...(homeCity ? { homeCity } : {}),
+        ...(nationality ? { nationality } : {}),
+      };
+    },
+
+    async updateMyNationality(countryCode) {
+      const accountId = await currentAccountId();
+      if (!accountId) throw new Error("Session expirée : reconnectez-vous.");
+      const code = countryCode?.trim().toUpperCase() ?? null;
+      if (code !== null && !/^[A-Z]{2}$/.test(code)) throw new Error("Nationalité invalide.");
+      await migrationAware(run(client.from("accounts").update({ nationality: code }).eq("id", accountId)), "La nationalité ne peut pas encore être enregistrée.", "nationalities");
     },
 
     async updateMyHomeCity(city) {

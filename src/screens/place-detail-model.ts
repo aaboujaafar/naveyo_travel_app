@@ -1,4 +1,5 @@
 import type { PlaceCandidate, Stop, UUID } from "../modules/_shared/model";
+import { countryFlag, countryName } from "../modules/countries";
 
 export interface PlaceScheduleDate {
   stopId: UUID;
@@ -115,8 +116,7 @@ const countryNames: Record<string, string> = {
 export function formatCountry(countryCode?: string): string | null {
   const code = countryCode?.trim().toUpperCase();
   if (!code || !/^[A-Z]{2}$/.test(code)) return null;
-  const flag = String.fromCodePoint(...[...code].map((letter) => 0x1f1e6 + letter.charCodeAt(0) - 65));
-  return `${flag} ${countryNames[code] ?? code}`;
+  return `${countryFlag(code)} ${countryNames[code] ?? countryName(code) ?? code}`;
 }
 
 export function formatPlaceSource(provider: PlaceCandidate["provider"]): string {

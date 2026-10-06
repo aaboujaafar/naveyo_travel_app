@@ -18,6 +18,8 @@ export interface CityRef {
 export interface TravelParty {
   /** Undefined until set: searches then count the members of the Voyage. */
   adults?: number;
+  /** Nationalities travelling besides the members' own (a dual-national child, a partner…), ISO codes. */
+  nationalities?: string[];
   childrenAges: number[];
   stroller: boolean;
   reducedMobility: boolean;
@@ -28,7 +30,8 @@ export interface TripProfilesModule {
   /** Null when the Voyage has no party details yet, or the database cannot store them. */
   getParty(tripId: UUID): Promise<TravelParty | null>;
   saveParty(tripId: UUID, party: TravelParty): Promise<void>;
-  myProfile(): Promise<{ accountId: UUID; displayName?: string; homeCity?: CityRef } | null>;
+  myProfile(): Promise<{ accountId: UUID; displayName?: string; homeCity?: CityRef; nationality?: string } | null>;
+  updateMyNationality(countryCode: string | null): Promise<void>;
   updateMyDisplayName(displayName: string): Promise<void>;
   updateMyHomeCity(city: CityRef | null): Promise<void>;
   /** The Voyage's own departure city, when set. */
@@ -59,6 +62,7 @@ export function memberLabels(members: readonly MemberProfile[], currentAccountId
 export function normalizeParty(party: TravelParty): TravelParty {
   return {
     ...(party.adults !== undefined && Number.isInteger(party.adults) ? { adults: Math.min(20, Math.max(1, party.adults)) } : {}),
+    ...(party.nationalities ? { nationalities: [...new Set(party.nationalities.map((code) => code.trim().toUpperCase()).filter((code) => /^[A-Z]{2}$/.test(code)))].slice(0, 6) } : {}),
     childrenAges: party.childrenAges.filter((age) => Number.isInteger(age) && age >= 0 && age <= 17).slice(0, 8),
     stroller: party.stroller,
     reducedMobility: party.reducedMobility,

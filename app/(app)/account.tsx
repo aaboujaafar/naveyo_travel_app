@@ -22,6 +22,7 @@ export default function AccountRoute() {
   const [signingOut, setSigningOut] = useState(false);
   const [displayName, setDisplayName] = useState<string | undefined>();
   const [homeCity, setHomeCity] = useState<CityRef | null>(null);
+  const [nationality, setNationality] = useState<string | undefined>();
 
   useEffect(() => {
     if (!tripsModule || !bootstrap) return;
@@ -60,6 +61,7 @@ export default function AccountRoute() {
       if (!active) return;
       setDisplayName(profile?.displayName);
       setHomeCity(profile?.homeCity ?? null);
+      setNationality(profile?.nationality);
     }, () => undefined);
     return () => {
       active = false;
@@ -106,6 +108,11 @@ export default function AccountRoute() {
         setDisplayName(name.trim());
       } : undefined}
       homeCity={homeCity}
+      nationality={nationality}
+      onSaveNationality={bootstrap?.modules.tripProfiles ? async (code) => {
+        await bootstrap.modules.tripProfiles?.updateMyNationality(code);
+        setNationality(code ?? undefined);
+      } : undefined}
       searchTripId={(currentTripForAccount(trips) ?? trips[0])?.id}
       onSaveHomeCity={bootstrap?.modules.tripProfiles ? async (city) => {
         await bootstrap.modules.tripProfiles?.updateMyHomeCity(city);
