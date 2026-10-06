@@ -3,6 +3,8 @@ import type { LogisticsGap, StoredWaiver } from "../../../../../src/modules/logi
 import { findCityCode } from "../../../../../src/adapters/travelpayouts/city-codes";
 import { PartnerSearchSheet, type PartnerSearchGroup } from "../../../../../src/screens/PartnerSearchSheet";
 import { journeyGroups, stayGroups } from "../../../../../src/screens/partner-search-model";
+import type { JourneyEstimate } from "../../../../../src/modules/partners";
+import { AppText, BottomSheet, Button } from "../../../../../src/ui";
 import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
 import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
 import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
@@ -10,7 +12,7 @@ import { effectiveDeparture, type CityRef } from "../../../../../src/modules/tri
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking } from "react-native";
+import { AppState, Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type {
   Coordinates,
@@ -46,21 +48,34 @@ export default function TripDetailRoute() {
   );
   // The stays and transport questions: opened at a gap, or after creating the Voyage or an Étape.
   const [tunnelStart, setTunnelStart] = useState<string | null>(null);
-  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null } | null>(null);
+  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null; estimates?: JourneyEstimate[]; gap: LogisticsGap } | null>(null);
+  // Back from a partner site: offer to import what was just booked (tracked on the phone only).
+  const [openedPartner, setOpenedPartner] = useState<{ label: string; at: number } | null>(null);
+  const [askBooked, setAskBooked] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openedPartner) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && Date.now() - openedPartner.at > 15_000) {
+        setAskBooked(openedPartner.label);
+        setOpenedPartner(null);
+      }
+    });
+    return () => subscription.remove();
+  }, [openedPartner]);
   const openSearch = async (gap: LogisticsGap) => {
     setTunnelStart(null);
     const party = await bootstrap?.modules.tripProfiles?.getParty(tripId as UUID).catch(() => null);
     const people = { adults: party?.adults ?? Math.max(1, trip?.members.length ?? 1), childrenAges: party?.childrenAges ?? [] };
     if (gap.kind === "stay") {
       const { summary, groups } = stayGroups(gap, people, itineraryItems);
-      setSearch({ title: "Chercher un hébergement", summary, groups });
+      setSearch({ title: "Chercher un hébergement", summary, groups, gap });
       return;
     }
-    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null });
+    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null, gap });
     // Flight searches need the cities' IATA codes; ground searches do not.
     const [from, to] = await Promise.all([findCityCode(gap.from), findCityCode(gap.to)]);
-    const { summary, groups } = journeyGroups(gap, people, { ...(from ? { from } : {}), ...(to ? { to } : {}) });
-    setSearch({ title: "Chercher un billet", summary, groups });
+    const { summary, groups, estimates } = journeyGroups(gap, people, { ...(from ? { from } : {}), ...(to ? { to } : {}) });
+    setSearch({ title: "Chercher un billet", summary, groups, estimates, gap });
   };
   const [tunnelRequested, setTunnelRequested] = useState(false);
   if (tunnelRequested && logistics) {
@@ -355,10 +370,19 @@ export default function TripDetailRoute() {
       title={search?.title ?? ""}
       summary={search?.summary ?? ""}
       groups={search?.groups ?? null}
+      estimates={search?.estimates}
       loading={search !== null && search.groups === null}
-      onOpened={() => undefined}
+      onOpened={(link) => {
+        setSearch(null);
+        setOpenedPartner({ label: link.label, at: Date.now() });
+      }}
       onClose={() => setSearch(null)}
     />
+    <BottomSheet visible={askBooked !== null} onClose={() => setAskBooked(null)} title="Avez-vous réservé ?">
+      <AppText variant="bodySmall" color="muted">{`Si vous avez réservé sur ${askBooked ?? "le site partenaire"}, importez la confirmation : « Préparation » se met à jour et tout reste disponible sans réseau.`}</AppText>
+      <Button fullWidth onPress={() => { setAskBooked(null); router.push(`/(app)/trips/${routeTripId}/reservations`); }}>Oui, importer la confirmation</Button>
+      <Button fullWidth variant="secondary" onPress={() => setAskBooked(null)}>Pas encore</Button>
+    </BottomSheet>
     </>
   );
 }

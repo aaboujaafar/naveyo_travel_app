@@ -124,3 +124,34 @@ export function centreOfPlaces(points: readonly Coordinates[]): Coordinates | nu
     longitude: valid.reduce((sum, point) => sum + point.longitude, 0) / valid.length,
   };
 }
+
+export interface JourneyEstimate {
+  mode: "train" | "bus" | "flight";
+  label: string;
+  /** Door-to-door estimate in minutes, rounded to the quarter hour. */
+  minutes: number;
+}
+
+/**
+ * Rough door-to-door durations from the distance as the crow flies: roads
+ * and rails are about a fifth longer, a flight adds the trips to and from
+ * the airports and the checks. Shown as « environ », never as a timetable.
+ */
+export function estimateJourneys(distanceKm: number): JourneyEstimate[] {
+  const quarter = (minutes: number) => Math.max(15, Math.round(minutes / 15) * 15);
+  const estimates: JourneyEstimate[] = [];
+  if (distanceKm <= 1500) {
+    // Calibrated on Lisbon → Porto (274 km): about 3 h by train, 3 h 30–4 h by coach.
+    estimates.push({ mode: "train", label: "Train", minutes: quarter(((distanceKm * 1.2) / 120) * 60 + 20) });
+    estimates.push({ mode: "bus", label: "Bus", minutes: quarter(((distanceKm * 1.2) / 90) * 60 + 20) });
+  }
+  if (distanceKm >= 300) estimates.push({ mode: "flight", label: "Avion", minutes: quarter((distanceKm / 700) * 60 + 30 + 150) });
+  return estimates.sort((left, right) => left.minutes - right.minutes);
+}
+
+export function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${String(rest).padStart(2, "0")}`;
+}

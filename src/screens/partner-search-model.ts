@@ -1,6 +1,6 @@
 import type { ItineraryItem } from "../modules/_shared/model";
 import { distance as km, type LegGap, type StayGap } from "../modules/logistics";
-import { centreOfPlaces, journeyLinks, journeySummary, stayLinks, type JourneySearch } from "../modules/partners";
+import { centreOfPlaces, estimateJourneys, journeyLinks, journeySummary, stayLinks, type JourneyEstimate, type JourneySearch } from "../modules/partners";
 import type { PartnerSearchGroup } from "./PartnerSearchSheet";
 import { shortDate } from "./logistics-model";
 
@@ -41,7 +41,7 @@ export function sensibleModes(distanceKm: number | undefined): ("flight" | "grou
   return ["ground", "flight"];
 }
 
-export function journeyGroups(gap: LegGap, party: Party, codes: { from?: string; to?: string }): { summary: string; groups: PartnerSearchGroup[] } {
+export function journeyGroups(gap: LegGap, party: Party, codes: { from?: string; to?: string }): { summary: string; groups: PartnerSearchGroup[]; estimates: JourneyEstimate[] } {
   const search: JourneySearch = {
     from: { name: gap.from.name, countryCode: gap.from.countryCode, ...(codes.from ? { iata: codes.from } : {}) },
     to: { name: gap.to.name, countryCode: gap.to.countryCode, ...(codes.to ? { iata: codes.to } : {}) },
@@ -51,6 +51,7 @@ export function journeyGroups(gap: LegGap, party: Party, codes: { from?: string;
   };
   const links = journeyLinks(search, sensibleModes(gap.distanceKm));
   return {
+    estimates: gap.distanceKm !== undefined ? estimateJourneys(gap.distanceKm) : [],
     summary: journeySummary(search, shortDate),
     groups: [{ title: gap.distanceKm ? `${gap.distanceKm.toLocaleString("fr-FR")} km à vol d’oiseau` : "Trajet", links }],
   };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { affiliate, bookingUrl, centreOfPlaces, journeyLinks, journeySummary } from ".";
+import { affiliate, bookingUrl, centreOfPlaces, estimateJourneys, formatDuration, journeyLinks, journeySummary } from ".";
 
 describe("partner links", () => {
   it("fills Booking with destination, dates and the party", () => {
@@ -35,5 +35,13 @@ describe("partner links", () => {
   it("finds the centre of the planned places", () => {
     expect(centreOfPlaces([{ latitude: 38.71, longitude: -9.13 }, { latitude: 38.73, longitude: -9.15 }])).toEqual({ latitude: 38.72, longitude: -9.14 });
     expect(centreOfPlaces([{ latitude: 38.71, longitude: -9.13 }])).toBeNull();
+  });
+
+  it("estimates door-to-door durations by mode", () => {
+    // Lisbon → Porto, 274 km: no flight, the train is quicker than the bus.
+    expect(estimateJourneys(274).map((item) => `${item.label} ${formatDuration(item.minutes)}`)).toEqual(["Train 3 h", "Bus 4 h"]);
+    // Paris → Lisbon, 1,453 km: the flight wins once the airports are counted.
+    expect(estimateJourneys(1453).map((item) => item.mode)).toEqual(["flight", "train", "bus"]);
+    expect(estimateJourneys(2500).map((item) => item.mode)).toEqual(["flight"]);
   });
 });
