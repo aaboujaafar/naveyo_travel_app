@@ -26,6 +26,15 @@ describe("budget sharing", () => {
     expect(result.balances.reduce((sum, item) => sum + item.balanceMinorUnits, 0)).toBe(0);
     expect(result.unassignedCount).toBe(1);
   });
+
+  it("counts repayments already made", () => {
+    const expenses = [expense(9000, alice), expense(3000, bob)];
+    const partly = computeSharing(expenses, [alice, bob, carol], [{ from: carol, to: alice, minorUnits: 4000 }]);
+    expect(partly.balances.map((item) => item.balanceMinorUnits)).toEqual([1000, -1000, 0]);
+    expect(partly.settlements).toEqual([{ from: bob, to: alice, minorUnits: 1000 }]);
+    const settled = computeSharing(expenses, [alice, bob, carol], [{ from: carol, to: alice, minorUnits: 4000 }, { from: bob, to: alice, minorUnits: 1000 }]);
+    expect(settled.settlements).toEqual([]);
+  });
 });
 
 describe("budget alerts", () => {

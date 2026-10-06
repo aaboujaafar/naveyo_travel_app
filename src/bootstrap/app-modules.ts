@@ -20,6 +20,7 @@ import { fileTripPackStore } from "../adapters/file-system/trip-pack-store";
 import { createSupabaseTripProfilesModule } from "../adapters/supabase/trip-profiles";
 import { createSupabaseWishlistModule } from "../adapters/supabase/wishlist";
 import { createWikimediaTransitMapsModule } from "../adapters/wikimedia/transit-maps";
+import { createSupabaseRepaymentsModule } from "../adapters/supabase/repayments";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
@@ -50,6 +51,7 @@ export function createAppModules() {
   const tripProfiles = createSupabaseTripProfilesModule(client);
   const wishlist = createSupabaseWishlistModule(client);
   const transitMaps = createWikimediaTransitMapsModule();
+  const repayments = createSupabaseRepaymentsModule(client);
   const weather = new Weather(createOpenMeteoWeatherProvider());
   const tripAssistant = createSupabaseTripAssistant(client);
   const dayPlanner = createSupabaseDayPlanner(client);
@@ -120,6 +122,7 @@ export function createAppModules() {
     tripProfiles,
     wishlist,
     transitMaps,
+    repayments,
   };
 }
 

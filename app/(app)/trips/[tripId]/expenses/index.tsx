@@ -9,6 +9,7 @@ import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screen
 import { budgetAlerts, computeSharing } from "../../../../../src/screens/budget-sharing-model";
 import { parseReceiptText } from "../../../../../src/screens/receipt-model";
 import { memberLabels, type MemberProfile } from "../../../../../src/modules/trip-profiles";
+import type { RecordedRepayment } from "../../../../../src/modules/repayments";
 import { localToday } from "../../../../../src/screens/trips-list-model";
 
 const fallbackCurrency = "EUR" as ISO4217;
@@ -22,6 +23,19 @@ export default function ExpensesRoute() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [repayments, setRepayments] = useState<RecordedRepayment[] | null>(null);
+  const [repaymentError, setRepaymentError] = useState<string | null>(null);
+  // Optional: before its migration the « Réglé » buttons stay hidden.
+  const loadRepayments = useCallback(async () => {
+    const module = bootstrap?.modules.repayments;
+    if (!module || !tripId) return;
+    try {
+      setRepayments(await module.list(tripId));
+      setRepaymentError(null);
+    } catch {
+      setRepayments(null);
+    }
+  }, [bootstrap, tripId]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,12 +68,13 @@ export default function ExpensesRoute() {
       ]);
       setSummary(nextSummary);
       setExpenses(nextExpenses);
+      await loadRepayments();
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Impossible de charger le Budget global.");
     } finally {
       setLoading(false);
     }
-  }, [bootstrap, tripId, trips]);
+  }, [bootstrap, loadRepayments, tripId, trips]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -107,7 +122,10 @@ export default function ExpensesRoute() {
     () => memberLabels(memberProfiles ?? trip?.members.map((member) => ({ accountId: member.accountId, role: member.role })) ?? [], accountId),
     [accountId, memberProfiles, trip],
   );
-  const sharing = useMemo(() => (members.length > 1 ? computeSharing(expenses, members.map((member) => member.id)) : null), [expenses, members]);
+  const sharing = useMemo(
+    () => (members.length > 1 ? computeSharing(expenses, members.map((member) => member.id), repayments?.map((item) => ({ from: item.from, to: item.to, minorUnits: item.amount.minorUnits })) ?? []) : null),
+    [expenses, members, repayments],
+  );
   const alerts = useMemo(
     () => budgetAlerts({ summary, startsOn: trip?.startsOn, endsOn: trip?.endsOn, today: localToday() }),
     [summary, trip],
@@ -137,6 +155,24 @@ export default function ExpensesRoute() {
       } : undefined}
       members={members}
       sharing={sharing}
+      repayments={repayments?.map((item) => ({ id: item.id, from: item.from, to: item.to, minorUnits: item.amount.minorUnits }))}
+      repaymentError={repaymentError}
+      onSettle={repayments && bootstrap?.modules.repayments && tripId ? async (settlement) => {
+        try {
+          await bootstrap.modules.repayments?.record({ tripId, from: settlement.from, to: settlement.to, amount: { minorUnits: settlement.minorUnits, currency: trip?.referenceCurrency ?? fallbackCurrency } });
+          await loadRepayments();
+        } catch (cause) {
+          setRepaymentError(cause instanceof Error ? cause.message : "Enregistrement impossible.");
+        }
+      } : undefined}
+      onCancelRepayment={repayments && bootstrap?.modules.repayments && tripId ? async (repaymentId) => {
+        try {
+          await bootstrap.modules.repayments?.remove(tripId, repaymentId);
+          await loadRepayments();
+        } catch (cause) {
+          setRepaymentError(cause instanceof Error ? cause.message : "Annulation impossible.");
+        }
+      } : undefined}
       alerts={alerts}
       tripName={trip?.name ?? "Voyage"}
       referenceCurrency={trip?.referenceCurrency ?? fallbackCurrency}

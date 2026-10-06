@@ -15,6 +15,13 @@ export interface Settlement {
   minorUnits: number;
 }
 
+/** Money a member already handed to another to settle the Voyage. */
+export interface Repayment {
+  from: UUID;
+  to: UUID;
+  minorUnits: number;
+}
+
 export interface SharingSummary {
   balances: MemberBalance[];
   settlements: Settlement[];
@@ -24,9 +31,10 @@ export interface SharingSummary {
 
 /**
  * Splits every expense with a known payer equally between the members, in the
- * reference currency, then proposes the fewest transfers that settle everyone.
+ * reference currency, takes the repayments already made into account, then
+ * proposes the fewest transfers that settle everyone.
  */
-export function computeSharing(expenses: readonly Expense[], memberIds: readonly UUID[]): SharingSummary {
+export function computeSharing(expenses: readonly Expense[], memberIds: readonly UUID[], repayments: readonly Repayment[] = []): SharingSummary {
   const members = Array.from(new Set(memberIds));
   const paid = new Map(members.map((id) => [id, 0]));
   const share = new Map(members.map((id) => [id, 0]));
@@ -45,10 +53,18 @@ export function computeSharing(expenses: readonly Expense[], memberIds: readonly
     members.forEach((id, index) => share.set(id, (share.get(id) ?? 0) + base + (index < remainder ? 1 : 0)));
   }
 
+  // Handing money over settles part of a debt: the payer's balance rises, the receiver's falls.
+  const repaid = new Map(members.map((id) => [id, 0]));
+  for (const repayment of repayments) {
+    if (!repaid.has(repayment.from) || !repaid.has(repayment.to) || repayment.minorUnits <= 0) continue;
+    repaid.set(repayment.from, (repaid.get(repayment.from) ?? 0) + repayment.minorUnits);
+    repaid.set(repayment.to, (repaid.get(repayment.to) ?? 0) - repayment.minorUnits);
+  }
+
   const balances = members.map((accountId) => {
     const paidMinorUnits = paid.get(accountId) ?? 0;
     const shareMinorUnits = share.get(accountId) ?? 0;
-    return { accountId, paidMinorUnits, shareMinorUnits, balanceMinorUnits: paidMinorUnits - shareMinorUnits };
+    return { accountId, paidMinorUnits, shareMinorUnits, balanceMinorUnits: paidMinorUnits - shareMinorUnits + (repaid.get(accountId) ?? 0) };
   });
 
   const creditors = balances.filter((item) => item.balanceMinorUnits > 0).map((item) => ({ id: item.accountId, left: item.balanceMinorUnits }));

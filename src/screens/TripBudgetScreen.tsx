@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BudgetSummary, Expense, ExpenseCategory } from "../modules/expenses";
 import type { ISO4217, UUID } from "../modules/_shared/model";
-import type { BudgetAlert, SharingSummary } from "./budget-sharing-model";
+import type { BudgetAlert, Settlement, SharingSummary } from "./budget-sharing-model";
 import { formatAmountInput, type ReceiptDraft } from "./receipt-model";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import { AppText, BottomSheet, Button, DatePickerField, Icon, InlineMessage, Input, ProgressBar, SectionTitle, Skeleton } from "../ui";
@@ -33,6 +33,11 @@ export interface TripBudgetScreenProps {
   /** Members who can pay; the current account comes first and is labelled "Vous". */
   members?: { id: UUID; label: string }[];
   sharing?: SharingSummary | null;
+  /** Transfers already made; undefined hides the « Réglé » buttons (no repayments module). */
+  repayments?: { id: UUID; from: UUID; to: UUID; minorUnits: number }[];
+  repaymentError?: string | null;
+  onSettle?: (settlement: Settlement) => Promise<void>;
+  onCancelRepayment?: (repaymentId: UUID) => Promise<void>;
   alerts?: BudgetAlert[];
   /** Reads a receipt photo on the iPhone; null when the traveller cancels. */
   onScanReceipt?: (source: "camera" | "library") => Promise<ReceiptDraft | null>;
@@ -51,6 +56,16 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
   const [paidBy, setPaidBy] = useState<UUID | undefined>(props.members?.[0]?.id);
   const payer = paidBy ?? props.members?.[0]?.id;
   const memberLabel = (id: UUID) => props.members?.find((member) => member.id === id)?.label ?? "Membre";
+  const [settling, setSettling] = useState<string | null>(null);
+  const settle = async (settlement: Settlement) => {
+    if (!props.onSettle) return;
+    setSettling(`${settlement.from}-${settlement.to}`);
+    try {
+      await props.onSettle(settlement);
+    } finally {
+      setSettling(null);
+    }
+  };
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -167,9 +182,34 @@ export function TripBudgetScreen(props: TripBudgetScreenProps) {
                 <View style={styles.settlements}>
                   <AppText variant="caption" color="muted">Pour équilibrer</AppText>
                   {props.sharing.settlements.map((settlement) => (
-                    <AppText key={`${settlement.from}-${settlement.to}`} variant="bodySmall">
-                      {`${memberLabel(settlement.from)} → ${memberLabel(settlement.to)} : ${formatMoney({ minorUnits: settlement.minorUnits, currency: props.referenceCurrency })}`}
-                    </AppText>
+                    <View key={`${settlement.from}-${settlement.to}`} style={styles.balanceRow}>
+                      <AppText variant="bodySmall" style={styles.flexOne}>
+                        {`${memberLabel(settlement.from)} → ${memberLabel(settlement.to)} : ${formatMoney({ minorUnits: settlement.minorUnits, currency: props.referenceCurrency })}`}
+                      </AppText>
+                      {props.onSettle ? (
+                        <Button size="sm" variant="secondary" loading={settling === `${settlement.from}-${settlement.to}`} onPress={() => void settle(settlement)} icon={<Icon name="check" size={14} />}>Réglé</Button>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : props.repayments && props.repayments.length > 0 ? (
+                <AppText variant="bodySmall" color="success">Tout est réglé entre vous.</AppText>
+              ) : null}
+              {props.repaymentError ? <InlineMessage variant="error" title="Remboursement impossible" message={props.repaymentError} /> : null}
+              {props.repayments && props.repayments.length > 0 ? (
+                <View style={styles.settlements}>
+                  <AppText variant="caption" color="muted">Déjà remboursé</AppText>
+                  {props.repayments.map((repayment) => (
+                    <View key={repayment.id} style={styles.balanceRow}>
+                      <AppText variant="caption" color="muted" style={styles.flexOne}>
+                        {`${memberLabel(repayment.from)} → ${memberLabel(repayment.to)} : ${formatMoney({ minorUnits: repayment.minorUnits, currency: props.referenceCurrency })}`}
+                      </AppText>
+                      {props.onCancelRepayment ? (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Annuler ce remboursement" onPress={() => void props.onCancelRepayment?.(repayment.id)} hitSlop={8}>
+                          <AppText variant="caption" color="teal">Annuler</AppText>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   ))}
                 </View>
               ) : null}
