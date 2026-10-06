@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
-import type { TravelParty } from "../../../../../src/modules/trip-profiles";
+import { effectiveDeparture, type CityRef, type TravelParty } from "../../../../../src/modules/trip-profiles";
 import type { Trip } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripSettingsScreen } from "../../../../../src/screens/TripSettingsScreen";
@@ -18,6 +18,8 @@ export default function TripSettingsRoute() {
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [party, setParty] = useState<TravelParty | null>(null);
+  const [tripDeparture, setTripDeparture] = useState<CityRef | null>(null);
+  const [homeCity, setHomeCity] = useState<CityRef | null>(null);
   const [partyStatus, setPartyStatus] = useState({ saving: false, error: null as string | null, message: null as string | null });
   const [trip, setTrip] = useState<Trip | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,8 +49,12 @@ export default function TripSettingsRoute() {
         profiles.listMembers(tripId as Trip["id"]).catch(() => []),
         profiles.getParty(tripId as Trip["id"]).catch(() => null),
         bootstrap.modules.identity.currentAccount().catch(() => null),
-      ]).then(([members, loadedParty, account]) => {
+        profiles.getDeparture(tripId as Trip["id"]).catch(() => null),
+        profiles.myProfile().catch(() => null),
+      ]).then(([members, loadedParty, account, departure, profile]) => {
         if (!active) return;
+        setTripDeparture(departure);
+        setHomeCity(profile?.homeCity ?? null);
         setMemberNames(Object.fromEntries(members.flatMap((member) => (member.displayName ? [[member.accountId, member.displayName]] : []))));
         setParty(loadedParty);
         setCurrentAccountId(account?.id ?? null);
@@ -107,6 +113,12 @@ export default function TripSettingsRoute() {
         } catch (cause) {
           setPartyStatus({ saving: false, error: cause instanceof Error ? cause.message : "Enregistrement impossible.", message: null });
         }
+      } : undefined}
+      departure={effectiveDeparture(tripDeparture, homeCity)}
+      departureIsDefault={!tripDeparture && Boolean(homeCity)}
+      onSaveDeparture={bootstrap?.modules.tripProfiles && tripId ? async (city) => {
+        await bootstrap.modules.tripProfiles?.saveDeparture(tripId as Trip["id"], city);
+        setTripDeparture(city);
       } : undefined}
       onOpenInvitation={() => {
         if (tripId) router.push(`/(app)/trips/${tripId}/invite`);

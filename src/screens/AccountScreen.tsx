@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import type { UUID } from "../modules/_shared/model";
+import type { CityRef } from "../modules/trip-profiles";
+import { CityPickerSheet } from "./CityPickerSheet";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Account } from "../modules/identity";
@@ -45,6 +48,11 @@ export interface AccountScreenProps {
   /** The name the other members see; falls back to the e-mail. */
   displayName?: string;
   onRename?: (displayName: string) => Promise<void>;
+  /** The city the traveller usually leaves from, offered by default for each Voyage. */
+  homeCity?: CityRef | null;
+  onSaveHomeCity?: (city: CityRef | null) => Promise<void>;
+  /** A Voyage of the account, needed to search cities. */
+  searchTripId?: UUID;
   onSignOut: () => Promise<void>;
 }
 
@@ -65,8 +73,12 @@ export function AccountScreen({
   onOpenRecap,
   displayName,
   onRename,
+  homeCity,
+  onSaveHomeCity,
+  searchTripId,
   onSignOut,
 }: AccountScreenProps) {
+  const [homePicker, setHomePicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [renameVisible, setRenameVisible] = useState(false);
@@ -142,6 +154,11 @@ export function AccountScreen({
           {onRename ? (
             <Button variant="secondary" icon={<Icon name="edit" size={16} />} onPress={() => { setNameDraft(shownName); setRenameError(null); setRenameVisible(true); }}>
               Modifier mon prénom
+            </Button>
+          ) : null}
+          {onSaveHomeCity && searchTripId ? (
+            <Button variant="secondary" icon={<Icon name="map-pin" size={16} />} onPress={() => setHomePicker(true)}>
+              {homeCity ? `Ville de départ : ${homeCity.name}` : "Ajouter ma ville de départ"}
             </Button>
           ) : null}
         </View>
@@ -313,6 +330,18 @@ export function AccountScreen({
         <BottomNavItem icon="file-text" label="Journal" comingSoon />
         <BottomNavItem icon="layers" label="Récap" comingSoon />
       </View>
+
+      {onSaveHomeCity && searchTripId ? (
+        <CityPickerSheet
+          visible={homePicker}
+          tripId={searchTripId}
+          title="Ma ville de départ"
+          hint="Proposée par défaut pour l’aller et le retour de chaque Voyage, et modifiable Voyage par Voyage."
+          onPick={(city) => onSaveHomeCity(city)}
+          onClear={homeCity ? () => onSaveHomeCity(null) : undefined}
+          onClose={() => setHomePicker(false)}
+        />
+      ) : null}
 
       <BottomSheet visible={renameVisible} onClose={() => setRenameVisible(false)} title="Mon prénom">
         <AppText variant="bodySmall" color="muted">C’est le nom que voient les autres Membres de vos Voyages, par exemple dans « Qui paie quoi ».</AppText>

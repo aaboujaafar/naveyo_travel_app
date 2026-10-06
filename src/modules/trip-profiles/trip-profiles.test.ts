@@ -20,9 +20,10 @@ describe("trip profiles", () => {
   });
 
   it("keeps only plausible children ages and describes the party", () => {
-    const party = normalizeParty({ childrenAges: [4, 0, 19, 2.5], stroller: true, reducedMobility: false });
+    const party = normalizeParty({ adults: 2, childrenAges: [4, 0, 19, 2.5], stroller: true, reducedMobility: false });
     expect(party.childrenAges).toEqual([4, 0]);
-    expect(describeParty(party)).toBe("2 enfants (4 ans, moins d’1 an) · poussette");
+    expect(describeParty(party)).toBe("2 adultes · 2 enfants (4 ans, moins d’1 an) · poussette");
+    expect(normalizeParty({ adults: 40, childrenAges: [], stroller: false, reducedMobility: false }).adults).toBe(20);
     expect(describeParty({ childrenAges: [], stroller: false, reducedMobility: false })).toBeNull();
   });
 });

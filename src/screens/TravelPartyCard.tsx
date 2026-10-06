@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { EMPTY_PARTY, describeParty, type TravelParty } from "../modules/trip-profiles";
 import { colors, radius, spacing } from "../theme";
 import { AppText, Button, Chip, Icon, InlineMessage, Switch } from "../ui";
@@ -7,14 +7,18 @@ import { AppText, Button, Chip, Icon, InlineMessage, Switch } from "../ui";
 const AGES = Array.from({ length: 18 }, (_, age) => age);
 
 /** Who travels: children with their age, a stroller, reduced mobility. */
-export function TravelPartyCard({ party, saving, error, message, onSave }: {
+export function TravelPartyCard({ party, defaultAdults = 1, saving, error, message, onSave }: {
   party: TravelParty | null;
+  /** Shown until the adults are set: the number of members of the Voyage. */
+  defaultAdults?: number;
   saving: boolean;
   error?: string | null;
   message?: string | null;
   onSave: (party: TravelParty) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<TravelParty>(party ?? EMPTY_PARTY);
+  // Saving keeps the number shown, even if it was only the default.
+  const save = () => onSave({ ...draft, adults: draft.adults ?? defaultAdults });
   const [pickingAge, setPickingAge] = useState(false);
   const summary = describeParty(draft);
 
@@ -23,6 +27,22 @@ export function TravelPartyCard({ party, saving, error, message, onSave }: {
       <AppText variant="bodySmall" color="muted">
         L’IA adapte le rythme, les lieux et l’accessibilité des journées qu’elle compose.
       </AppText>
+
+      <View style={styles.toggleRow}>
+        <View style={styles.flexOne}>
+          <AppText variant="label">Adultes</AppText>
+          <AppText variant="caption" color="muted">Pour remplir les recherches d’hôtel et de billets</AppText>
+        </View>
+        <View style={styles.stepper}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Un adulte de moins" disabled={(draft.adults ?? 1) <= 1} onPress={() => setDraft((current) => ({ ...current, adults: Math.max(1, (current.adults ?? defaultAdults) - 1) }))} style={styles.stepButton}>
+            <AppText variant="h3">−</AppText>
+          </Pressable>
+          <AppText variant="label" style={styles.stepValue}>{draft.adults ?? defaultAdults}</AppText>
+          <Pressable accessibilityRole="button" accessibilityLabel="Un adulte de plus" disabled={(draft.adults ?? 1) >= 20} onPress={() => setDraft((current) => ({ ...current, adults: Math.min(20, (current.adults ?? defaultAdults) + 1) }))} style={styles.stepButton}>
+            <AppText variant="h3">+</AppText>
+          </Pressable>
+        </View>
+      </View>
 
       <AppText variant="label">Enfants</AppText>
       <View style={styles.wrap}>
@@ -80,7 +100,7 @@ export function TravelPartyCard({ party, saving, error, message, onSave }: {
       ) : null}
       {error ? <InlineMessage variant="error" title="Enregistrement impossible" message={error} /> : null}
       {message ? <InlineMessage variant="success" title="Voyageurs enregistrés" message={message} /> : null}
-      <Button fullWidth variant="secondary" loading={saving} onPress={() => void onSave(draft)}>
+      <Button fullWidth variant="secondary" loading={saving} onPress={() => void save()}>
         Enregistrer les voyageurs
       </Button>
     </View>
@@ -94,5 +114,8 @@ const styles = StyleSheet.create({
   ages: { gap: spacing.sm },
   summary: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  stepper: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  stepButton: { width: 36, height: 36, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  stepValue: { minWidth: 20, textAlign: "center" },
   flexOne: { flex: 1 },
 });

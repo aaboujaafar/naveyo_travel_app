@@ -58,13 +58,27 @@ describe("Supabase trip profiles adapter", () => {
     await expect(profiles.saveParty(tripId, { childrenAges: [3], stroller: true, reducedMobility: false })).rejects.toThrow("migration « trip_profiles »");
   });
 
+  it("keeps saving the party on a database without the adults column", async () => {
+    const { client, calls } = fakeClient((call) => (call.values as Record<string, unknown> | undefined)?.party_adults !== undefined
+      ? { data: null, error: { message: "Could not find the 'party_adults' column", code: "PGRST204" } }
+      : { data: null, error: null });
+    await createSupabaseTripProfilesModule(client).saveParty(tripId, { adults: 2, childrenAges: [], stroller: false, reducedMobility: false });
+    expect(calls.map((call) => Object.keys(call.values as object).includes("party_adults"))).toEqual([true, false]);
+  });
+
+  it("stores the home city of the current account", async () => {
+    const { client, calls } = fakeClient(() => ({ data: null, error: null }));
+    await createSupabaseTripProfilesModule(client).updateMyHomeCity({ name: "Paris", countryCode: "fr", coordinates: { latitude: 48.85, longitude: 2.35 } });
+    expect(calls[0]).toMatchObject({ table: "accounts", op: "update", values: { home_city: "Paris", home_country: "FR", home_latitude: 48.85, home_longitude: 2.35 }, filters: [["id", "a1"]] });
+  });
+
   it("saves a normalized party and renames only the current account", async () => {
     const { client, calls } = fakeClient(() => ({ data: null, error: null }));
     const profiles = createSupabaseTripProfilesModule(client);
     await profiles.saveParty(tripId, { childrenAges: [5, 30], stroller: false, reducedMobility: true });
     await profiles.updateMyDisplayName("  Ayoub ");
     expect(calls).toEqual([
-      { table: "trips", op: "update", values: { party_children_ages: [5], party_stroller: false, party_reduced_mobility: true }, filters: [["id", tripId]] },
+      { table: "trips", op: "update", values: { party_children_ages: [5], party_stroller: false, party_reduced_mobility: true, party_adults: null }, filters: [["id", tripId]] },
       { table: "accounts", op: "update", values: { display_name: "Ayoub" }, filters: [["id", "a1"]] },
     ]);
   });

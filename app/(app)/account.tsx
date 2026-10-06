@@ -5,6 +5,7 @@ import { useNaveyoBootstrap } from "../../src/bootstrap";
 import type { OfflineTripPackLoad } from "../../src/modules/offline-trip-pack";
 import { useTripsModule, type Trip } from "../../src/modules/trips";
 import { AccountScreen } from "../../src/screens/AccountScreen";
+import type { CityRef } from "../../src/modules/trip-profiles";
 import { useShellSession } from "../../src/ui";
 import { currentTripForAccount } from "../../src/screens/account-screen-model";
 
@@ -20,6 +21,7 @@ export default function AccountRoute() {
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [displayName, setDisplayName] = useState<string | undefined>();
+  const [homeCity, setHomeCity] = useState<CityRef | null>(null);
 
   useEffect(() => {
     if (!tripsModule || !bootstrap) return;
@@ -55,7 +57,9 @@ export default function AccountRoute() {
         if (active) setLoading(false);
       });
     void bootstrap.modules.tripProfiles?.myProfile().then((profile) => {
-      if (active) setDisplayName(profile?.displayName);
+      if (!active) return;
+      setDisplayName(profile?.displayName);
+      setHomeCity(profile?.homeCity ?? null);
     }, () => undefined);
     return () => {
       active = false;
@@ -100,6 +104,12 @@ export default function AccountRoute() {
       onRename={bootstrap?.modules.tripProfiles ? async (name) => {
         await bootstrap.modules.tripProfiles?.updateMyDisplayName(name);
         setDisplayName(name.trim());
+      } : undefined}
+      homeCity={homeCity}
+      searchTripId={(currentTripForAccount(trips) ?? trips[0])?.id}
+      onSaveHomeCity={bootstrap?.modules.tripProfiles ? async (city) => {
+        await bootstrap.modules.tripProfiles?.updateMyHomeCity(city);
+        setHomeCity(city);
       } : undefined}
       onSignOut={changeAccount}
     />

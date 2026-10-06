@@ -1,6 +1,7 @@
 import type { UUID } from "../../../modules/_shared/model";
 import {
   normalizeParty,
+  type CityRef,
   type MemberProfile,
   type TripProfilesModule,
 } from "../../../modules/trip-profiles";
@@ -27,6 +28,49 @@ const run = async <T>(request: SupabaseQuery<T>): Promise<T | null> => {
 
 const asRow = (value: unknown): Row | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : null;
+
+/** Runs the full query, or the older one when the database lacks the newer columns. */
+async function withMissingColumnFallback<T>(full: () => Promise<T>, older: () => Promise<T>): Promise<T> {
+  try {
+    return await full();
+  } catch (error) {
+    if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) return older();
+    throw error;
+  }
+}
+
+async function migrationAware<T>(request: Promise<T>, detail: string): Promise<T> {
+  try {
+    return await request;
+  } catch (error) {
+    if (error instanceof ProfilesDatabaseError && (MISSING_COLUMN_CODES.has(error.code ?? "") || error.code === PERMISSION_DENIED)) {
+      throw new Error(`La base de données doit être mise à jour (migration « trip_departure »). ${detail}`);
+    }
+    throw error;
+  }
+}
+
+function cityFrom(row: Row, prefix: "home" | "departure"): CityRef | null {
+  const name = row[`${prefix}_city`];
+  const country = row[`${prefix}_country`];
+  if (typeof name !== "string" || !name.trim() || typeof country !== "string") return null;
+  const latitude = row[`${prefix}_latitude`];
+  const longitude = row[`${prefix}_longitude`];
+  return {
+    name: name.trim(),
+    countryCode: country.trim().toUpperCase(),
+    ...(typeof latitude === "number" && typeof longitude === "number" ? { coordinates: { latitude, longitude } } : {}),
+  };
+}
+
+function cityColumns(prefix: "home" | "departure", city: CityRef | null): Row {
+  return {
+    [`${prefix}_city`]: city?.name.trim() ?? null,
+    [`${prefix}_country`]: city?.countryCode.toUpperCase() ?? null,
+    [`${prefix}_latitude`]: city?.coordinates?.latitude ?? null,
+    [`${prefix}_longitude`]: city?.coordinates?.longitude ?? null,
+  };
+}
 
 export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): TripProfilesModule => {
   const currentAccountId = async (): Promise<UUID | null> => {
@@ -55,10 +99,20 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
 
     async getParty(tripId) {
       try {
-        const row = asRow(await run(client.from("trips").select("party_children_ages,party_stroller,party_reduced_mobility").eq("id", tripId).single()));
+        const columns = "party_children_ages,party_stroller,party_reduced_mobility";
+        // The adults count arrives with a later migration: without it, the rest of the party still loads.
+        const row = asRow(await withMissingColumnFallback(
+          () => run(client.from("trips").select(`${columns},party_adults`).eq("id", tripId).single()),
+          () => run(client.from("trips").select(columns).eq("id", tripId).single()),
+        ));
         if (!row) return null;
         const ages = Array.isArray(row.party_children_ages) ? row.party_children_ages.filter((age): age is number => typeof age === "number") : [];
-        return normalizeParty({ childrenAges: ages, stroller: row.party_stroller === true, reducedMobility: row.party_reduced_mobility === true });
+        return normalizeParty({
+          ...(typeof row.party_adults === "number" ? { adults: row.party_adults } : {}),
+          childrenAges: ages,
+          stroller: row.party_stroller === true,
+          reducedMobility: row.party_reduced_mobility === true,
+        });
       } catch (error) {
         if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) return null;
         throw error;
@@ -68,11 +122,15 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
     async saveParty(tripId, party) {
       const normalized = normalizeParty(party);
       try {
-        await run(client.from("trips").update({
+        const values = {
           party_children_ages: normalized.childrenAges,
           party_stroller: normalized.stroller,
           party_reduced_mobility: normalized.reducedMobility,
-        }).eq("id", tripId));
+        };
+        await withMissingColumnFallback(
+          () => run(client.from("trips").update({ ...values, party_adults: normalized.adults ?? null }).eq("id", tripId)),
+          () => run(client.from("trips").update(values).eq("id", tripId)),
+        );
       } catch (error) {
         if (error instanceof ProfilesDatabaseError && MISSING_COLUMN_CODES.has(error.code ?? "")) {
           throw new Error(`${MIGRATION_NEEDED} Les voyageurs ne peuvent pas encore être enregistrés.`);
@@ -84,9 +142,28 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
     async myProfile() {
       const accountId = await currentAccountId();
       if (!accountId) return null;
-      const row = asRow(await run(client.from("accounts").select("display_name").eq("id", accountId).single()).catch(() => null));
+      const row = asRow(await withMissingColumnFallback(
+        () => run(client.from("accounts").select("display_name,home_city,home_country,home_latitude,home_longitude").eq("id", accountId).single()),
+        () => run(client.from("accounts").select("display_name").eq("id", accountId).single()),
+      ).catch(() => null));
       const name = row?.display_name;
-      return { accountId, ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}) };
+      const homeCity = row ? cityFrom(row, "home") : null;
+      return { accountId, ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}), ...(homeCity ? { homeCity } : {}) };
+    },
+
+    async updateMyHomeCity(city) {
+      const accountId = await currentAccountId();
+      if (!accountId) throw new Error("Session expirée : reconnectez-vous.");
+      await migrationAware(run(client.from("accounts").update(cityColumns("home", city)).eq("id", accountId)), "La ville de départ ne peut pas encore être enregistrée.");
+    },
+
+    async getDeparture(tripId) {
+      const row = asRow(await run(client.from("trips").select("departure_city,departure_country,departure_latitude,departure_longitude").eq("id", tripId).single()).catch(() => null));
+      return row ? cityFrom(row, "departure") : null;
+    },
+
+    async saveDeparture(tripId, city) {
+      await migrationAware(run(client.from("trips").update(cityColumns("departure", city)).eq("id", tripId)), "La ville de départ du Voyage ne peut pas encore être enregistrée.");
     },
 
     async updateMyDisplayName(displayName) {
