@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useEffect, useState } from "react";
+import { isTripOver, localToday } from "../../../../../../src/screens/trips-list-model";
 import { Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type {
@@ -26,6 +27,17 @@ export default function ItineraryRoute() {
   const [placeDetails, setPlaceDetails] = useState<Record<string, PlaceDetails>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tripOver, setTripOver] = useState(false);
+  useEffect(() => {
+    if (!bootstrap || !tripId) return;
+    let active = true;
+    void bootstrap.modules.trips.get(tripId).then((trip) => {
+      if (active) setTripOver(isTripOver(trip, localToday()));
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, tripId]);
 
   useEffect(() => {
     if (!bootstrap || !tripId) {
@@ -132,6 +144,7 @@ export default function ItineraryRoute() {
         );
         setOffline(await modules.offlineTripPack.load(tripId));
       }}
+      canComposeDay={!tripOver}
       onOpenAssistant={(stopId) => {
         if (tripId) {
           router.push(`/trips/${tripId}/assistant?stopId=${stopId}&mode=day`);

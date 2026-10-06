@@ -60,6 +60,8 @@ export interface TripAssistantScreenProps {
   onOpenWishes?: () => void;
   onVoteWish?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
   onOpenWish?: (wish: RankedWish) => void;
+  /** False once the Voyage is over: the « Journée IA » tab is hidden. */
+  canComposeDay?: boolean;
   /** Opens the place behind a Google Maps or Apple Plans link; resolves to an error message, or null. */
   onImportLink?: (link: string) => Promise<string | null>;
 }
@@ -93,6 +95,7 @@ export function TripAssistantScreen({
   onVoteWish,
   onOpenWish,
   onImportLink,
+  canComposeDay = true,
 }: TripAssistantScreenProps) {
   const [linkVisible, setLinkVisible] = useState(false);
   const [link, setLink] = useState("");
@@ -114,7 +117,8 @@ export function TripAssistantScreen({
     }
   };
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
+  const [chosenMode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
+  const mode: ExploreMode = chosenMode === "day" && !canComposeDay ? "places" : chosenMode;
   // A new link asking for a mode wins over the tab's last state (adjusted during render).
   const [lastRequestedMode, setLastRequestedMode] = useState(requestedMode);
   if (requestedMode !== lastRequestedMode) {
@@ -181,7 +185,7 @@ export function TripAssistantScreen({
         </View>
 
         <View style={styles.segmented} accessibilityRole="tablist">
-          <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => openMode("day")} />
+          {canComposeDay ? <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => openMode("day")} /> : null}
           <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => openMode("places")} />
           {wishes !== undefined ? <SegmentButton label="Envies" icon="users" active={mode === "wishes"} onPress={() => openMode("wishes")} /> : null}
         </View>

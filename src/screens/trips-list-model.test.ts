@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../modules/_shared/model";
-import { formatTripsListDateRange, tripMemberCount, tripTiming } from "./trips-list-model";
+import { formatTripsListDateRange, isTripOver, orderTrips, tripMemberCount, tripTiming } from "./trips-list-model";
 
 const trip = (overrides: Partial<Trip> = {}): Trip => ({
   id: "trip" as Trip["id"], name: "Portugal", referenceCurrency: "EUR" as Trip["referenceCurrency"],
@@ -25,5 +25,30 @@ describe("trips list model", () => {
     expect(tripTiming(dated, "2026-11-17")).toEqual({ phase: "ongoing", progress: 0.4, label: "En cours · jour 2 sur 5" });
     expect(tripTiming(dated, "2026-11-21").phase).toBe("past");
     expect(tripTiming({}, "2026-10-02").phase).toBe("undated");
+  });
+});
+
+describe("home list order", () => {
+  const dated = (name: string, startsOn?: string, endsOn?: string) => ({ name, ...(startsOn ? { startsOn } : {}), ...(endsOn ? { endsOn } : {}) });
+
+  it("pins the Voyage under way, then sorts from the most recent to the oldest", () => {
+    const trip = dated;
+    const { pinned, others } = orderTrips([
+      trip("Rome", "2025-04-10", "2025-04-14"),
+      trip("Sans dates"),
+      trip("Lisbonne", "2026-10-03", "2026-10-09"),
+      trip("Japon", "2027-03-01", "2027-03-15"),
+      trip("Porto", "2026-06-01", "2026-06-05"),
+    ], "2026-10-06");
+    expect(pinned.map((item) => item.name)).toEqual(["Lisbonne"]);
+    expect(others.map((item) => item.name)).toEqual(["Japon", "Porto", "Rome", "Sans dates"]);
+  });
+
+  it("knows when a Voyage is over", () => {
+    const trip = dated;
+    expect(isTripOver(trip("Porto", "2026-06-01", "2026-06-05"), "2026-10-06")).toBe(true);
+    expect(isTripOver(trip("Lisbonne", "2026-10-03", "2026-10-09"), "2026-10-06")).toBe(false);
+    expect(isTripOver(trip("Sans dates"), "2026-10-06")).toBe(false);
+    expect(isTripOver(null, "2026-10-06")).toBe(false);
   });
 });

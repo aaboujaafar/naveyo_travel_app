@@ -29,7 +29,7 @@ import {
   sortStopsByLocalDate,
 } from "./trip-dashboard-model";
 import { formatDuration, type TodayEntry, type TodayPlan } from "./today-model";
-import { localToday, tripTiming } from "./trips-list-model";
+import { isTripOver, localToday, tripTiming } from "./trips-list-model";
 import { isRainyDay } from "./weather-plan-b";
 import type { ClimateSummary } from "../modules/weather";
 
@@ -231,6 +231,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onPlanB={props.onPlanB}
             onOpenQuestions={props.onOpenQuestions}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
+            tripOver={isTripOver(trip, localToday())}
             stops={sortedStops}
             itineraryItemCount={props.itineraryItems.length}
             reservations={props.reservations}
@@ -290,6 +291,7 @@ function TodayPanel({
   onPlanB,
   onOpenQuestions,
   onComposeDay,
+  tripOver,
   stops,
   itineraryItemCount,
   reservations,
@@ -311,6 +313,8 @@ function TodayPanel({
   onPlanB?: (date: string) => void;
   onOpenQuestions?: () => void;
   onComposeDay: () => void;
+  /** A finished Voyage shows neither its preparation nor day composition. */
+  tripOver: boolean;
   stops: Stop[];
   itineraryItemCount: number;
   reservations: Reservation[];
@@ -342,7 +346,7 @@ function TodayPanel({
         />
       ) : null}
 
-      {!today && stops.length > 0 && itineraryItemCount === 0 ? (
+      {!today && !tripOver && stops.length > 0 && itineraryItemCount === 0 ? (
         <Section>
           <Pressable accessibilityRole="button" accessibilityLabel="Composer une journée avec l’IA" onPress={onComposeDay} style={({ pressed }) => [styles.aiDayCard, pressed && styles.pressed]}>
             <View style={styles.aiDayIcon}><Icon name="sparkles" size={22} color={colors.white} /></View>
@@ -358,7 +362,7 @@ function TodayPanel({
         </Section>
       ) : null}
 
-      {today ? null : <Section title="Préparation">
+      {today || tripOver ? null : <Section title="Préparation">
         <View style={styles.preparationCard}>
           <View style={styles.preparationHeader}>
             <AppText variant="h3">{doneCount === steps.length ? "Voyage prêt" : "Votre Voyage se prépare"}</AppText>

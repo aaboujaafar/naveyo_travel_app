@@ -54,6 +54,8 @@ export interface TripItineraryScreenProps {
   /** Absent when the screen is a tab: the tab bar is the way out. */
   onBack?: () => void;
   onOpenAssistant: (stopId: Stop["id"]) => void;
+  /** False once the Voyage is over: there is no day left to compose. */
+  canComposeDay?: boolean;
   onOpenTracking: () => void;
   onCalculateRoute?: (coordinates: Coordinates[]) => Promise<Coordinates[] | null>;
   mapAdapter?: MapAdapter;
@@ -83,6 +85,7 @@ export function TripItineraryScreen({
   error,
   onBack,
   onOpenAssistant,
+  canComposeDay = true,
   onOpenTracking,
   onCalculateRoute,
   mapAdapter,
@@ -319,9 +322,9 @@ export function TripItineraryScreen({
               <Icon name="calendar" size={24} color={colors.muted} />
               <AppText variant="label">Aucun élément prévu</AppText>
               <AppText variant="caption" color="muted" align="center">
-                Laissez l’IA composer cette journée, ou ajoutez un lieu depuis Explorer.
+                {canComposeDay ? "Laissez l’IA composer cette journée, ou ajoutez un lieu depuis Explorer." : "Rien n’a été prévu ce jour-là."}
               </AppText>
-              {activeDay ? (
+              {activeDay && canComposeDay ? (
                 <Button
                   onPress={() => onOpenAssistant(activeDay.stop.id)}
                   icon={<Icon name="sparkles" size={16} color={colors.white} />}

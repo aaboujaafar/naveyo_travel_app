@@ -47,3 +47,22 @@ function dayNumber(value: string | undefined): number | null {
   if (!match) return null;
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86_400_000;
 }
+
+/**
+ * Home list order: the Voyages under way are pinned on top, then the others
+ * from the most recent departure to the oldest; undated Voyages come last.
+ */
+export function orderTrips<T extends Pick<Trip, "startsOn" | "endsOn">>(trips: readonly T[], today: string): { pinned: T[]; others: T[] } {
+  const byStartDesc = (left: T, right: T) => (right.startsOn ?? "").localeCompare(left.startsOn ?? "") || (right.endsOn ?? "").localeCompare(left.endsOn ?? "");
+  const pinned = trips.filter((trip) => tripTiming(trip, today).phase === "ongoing").sort(byStartDesc);
+  const rest = trips.filter((trip) => !pinned.includes(trip));
+  return {
+    pinned,
+    others: [...rest.filter((trip) => trip.startsOn).sort(byStartDesc), ...rest.filter((trip) => !trip.startsOn)],
+  };
+}
+
+/** A finished Voyage no longer needs preparing nor days composed. */
+export function isTripOver(trip: Pick<Trip, "startsOn" | "endsOn"> | null | undefined, today: string): boolean {
+  return Boolean(trip) && tripTiming(trip!, today).phase === "past";
+}

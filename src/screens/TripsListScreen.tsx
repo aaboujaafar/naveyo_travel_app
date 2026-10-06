@@ -4,7 +4,7 @@ import type { Trip } from "../modules/_shared/model";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import { colors, radius, shadows, spacing } from "../theme";
 import { AppText, Badge, Button, EmptyState, Icon, IconButton, InlineMessage, ProgressBar, Skeleton, Screen, TopBar } from "../ui";
-import { formatTripsListDateRange, localToday, tripMemberCount, tripTiming } from "./trips-list-model";
+import { formatTripsListDateRange, localToday, orderTrips, tripMemberCount, tripTiming } from "./trips-list-model";
 import { DestinationImage } from "../ui/DestinationImage";
 
 export interface TripsListScreenProps {
@@ -21,7 +21,7 @@ export interface TripsListScreenProps {
 }
 
 export function TripsListScreen(props: TripsListScreenProps) {
-  const ordered = useMemo(() => [...props.items].sort((a, b) => (a.startsOn ?? "9999").localeCompare(b.startsOn ?? "9999")), [props.items]);
+  const { pinned, others } = useMemo(() => orderTrips(props.items, localToday()), [props.items]);
   return (
     <Screen scroll contentStyle={styles.content}>
       <TopBar title="Mes Voyages" actions={<View style={styles.headerActions}><IconButton size={40} onPress={props.onOpenAccount} accessibilityLabel="Ouvrir mon compte" icon={<Icon name="user" size={20} />} /><IconButton size={40} onPress={props.onCreate} accessibilityLabel="Créer un Voyage" icon={<Icon name="plus" size={20} color={colors.white} />} style={styles.createButton} /></View>} />
@@ -31,8 +31,17 @@ export function TripsListScreen(props: TripsListScreenProps) {
         <Shortcut icon="user-plus" label="Rejoindre" detail="Utiliser une invitation" onPress={props.onJoinTrip} />
       </View>
       {props.error ? <View style={styles.message}><InlineMessage variant="error" title="Impossible de charger les Voyages" message={props.error} /><Button variant="secondary" onPress={() => void props.onRetry()}>Réessayer</Button></View> : null}
-      {props.loading ? <LoadingList /> : ordered.length === 0 ? <EmptyState title="Aucun Voyage" message="Créez votre premier Voyage privé." actionLabel="Créer un Voyage" onAction={props.onCreate} /> : (
-        <View style={styles.list}>{ordered.map((trip) => <TripCard key={trip.id} trip={trip} pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />)}</View>
+      {props.loading ? <LoadingList /> : props.items.length === 0 ? <EmptyState title="Aucun Voyage" message="Créez votre premier Voyage privé." actionLabel="Créer un Voyage" onAction={props.onCreate} /> : (
+        <View style={styles.list}>
+          {pinned.length > 0 ? (
+            <>
+              <View style={styles.listHeading}><Icon name="map-pin" size={14} color={colors.accentStrong} /><AppText variant="label" color="accent">En ce moment</AppText></View>
+              {pinned.map((trip) => <TripCard key={trip.id} trip={trip} pinned pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />)}
+              {others.length > 0 ? <View style={styles.listHeading}><AppText variant="label" color="muted">Tous les Voyages</AppText></View> : null}
+            </>
+          ) : null}
+          {others.map((trip) => <TripCard key={trip.id} trip={trip} pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />)}
+        </View>
       )}
     </Screen>
   );
@@ -42,11 +51,11 @@ function Shortcut({ icon, label, detail, onPress }: { icon: "file-text" | "user-
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}><Icon name={icon} size={20} color={colors.teal} /><View style={styles.shortcutText}><AppText variant="label">{label}</AppText><AppText variant="caption" color="muted">{detail}</AppText></View><Icon name="arrow-right" size={16} color={colors.muted} /></Pressable>;
 }
 
-function TripCard({ trip, pack, onPress }: { trip: Trip; pack?: OfflineTripPackLoad; onPress: () => void }) {
+function TripCard({ trip, pack, pinned = false, onPress }: { trip: Trip; pack?: OfflineTripPackLoad; pinned?: boolean; onPress: () => void }) {
   const packReady = pack?.state === "ready";
   const memberCount = tripMemberCount(trip);
   const timing = tripTiming(trip, localToday());
-  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, shadows.sm, pressed && styles.pressed]}>
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, shadows.sm, pinned && styles.cardPinned, timing.phase === "past" && styles.cardPast, pressed && styles.pressed]}>
     <DestinationImage name={trip.name} imageUrl={trip.imageUrl} style={styles.cover} />
     <View style={styles.cardHeader}><View style={styles.titleWrap}><AppText variant="h3" numberOfLines={2}>{trip.name}</AppText><AppText variant="caption" color="muted">{formatTripsListDateRange(trip)}</AppText></View><Badge label={trip.referenceCurrency} variant="teal" /></View>
     <View style={styles.meta}><View style={styles.metaItem}><Icon name="users" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{memberCount} membre{memberCount > 1 ? "s" : ""}</AppText></View><View style={styles.metaItem}><Icon name="map-pin" size={16} color={colors.muted} /><AppText variant="caption" color="muted">{trip.stopIds.length} Étape{trip.stopIds.length > 1 ? "s" : ""}</AppText></View></View>
@@ -72,6 +81,9 @@ const styles = StyleSheet.create({
   shortcutText: { flex: 1, gap: spacing.xs },
   message: { paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
   list: { gap: spacing.md, paddingHorizontal: spacing.lg },
+  listHeading: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
+  cardPinned: { borderColor: colors.accent, borderWidth: 1.5 },
+  cardPast: { opacity: 0.85 },
   card: { overflow: "hidden", paddingBottom: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, gap: spacing.md },
   cover: { width: "100%", height: spacing["2xl"] * 4, backgroundColor: colors.tealSoft },
   cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingHorizontal: spacing.lg },

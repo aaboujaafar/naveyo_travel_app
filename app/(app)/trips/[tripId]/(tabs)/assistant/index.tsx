@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isTripOver, localToday } from "../../../../../../src/screens/trips-list-model";
 import { rankWishes, type Wish } from "../../../../../../src/modules/wishlist";
 import { bestNameMatch, isShortMapsLink, parseMapsLink } from "../../../../../../src/screens/maps-link-model";
 import { describePlacesError } from "../../../../../../src/screens/places-error";
@@ -95,6 +96,18 @@ export default function TripAssistantRoute() {
       active = false;
     };
   }, [bootstrap, tripId]);
+
+  const [tripOver, setTripOver] = useState(false);
+  useEffect(() => {
+    if (!trips || !tripId) return;
+    let active = true;
+    void trips.get(tripId as UUID).then((trip) => {
+      if (active) setTripOver(isTripOver(trip, localToday()));
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [trips, tripId]);
 
   const [wishes, setWishes] = useState<Wish[] | null>(null);
   const [wishesError, setWishesError] = useState<string | null>(null);
@@ -296,6 +309,7 @@ export default function TripAssistantRoute() {
           setWishesError(cause instanceof Error ? cause.message : "Vote impossible.");
         }
       }}
+      canComposeDay={!tripOver}
       onImportLink={async (link) => {
         const places = bootstrap?.modules.places;
         if (!places || !tripId) return "La recherche de lieux est indisponible.";
