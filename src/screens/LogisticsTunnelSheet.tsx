@@ -75,7 +75,7 @@ export function LogisticsTunnelSheet({ gaps, startKey, onImport, onSearch, onWai
   const isStay = gap.kind === "stay";
 
   return (
-    <BottomSheet visible onClose={onClose} title={isStay ? "Où dormez-vous ?" : "Comment y allez-vous ?"}>
+    <BottomSheet visible onClose={onClose} maxHeight={680} title={isStay ? "Où dormez-vous ?" : "Comment y allez-vous ?"}>
       <View style={styles.gapCard}>
         <Icon name={isStay ? "home" : "map"} size={20} color={colors.accentStrong} />
         <View style={styles.flexOne}>

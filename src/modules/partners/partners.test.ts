@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { affiliate, bookingUrl, centreOfPlaces, estimateJourneys, formatDuration, journeyLinks, journeySummary } from ".";
+import { affiliate, bookingUrl, centreOfPlaces, estimateJourneys, formatDuration, journeyLinks, journeySummary, suggestExtras } from ".";
 
 describe("partner links", () => {
   it("fills Booking with destination, dates and the party", () => {
@@ -43,5 +43,16 @@ describe("partner links", () => {
     // Paris → Lisbon, 1,453 km: the flight wins once the airports are counted.
     expect(estimateJourneys(1453).map((item) => item.mode)).toEqual(["flight", "train", "bus"]);
     expect(estimateJourneys(2500).map((item) => item.mode)).toEqual(["flight"]);
+  });
+
+  it("suggests a car where no station is near, and an eSIM outside EU roaming", () => {
+    const stops = [
+      { id: "s1", name: "Lisbonne", countryCode: "PT", startDate: "2026-11-16", endDate: "2026-11-18" },
+      { id: "s2", name: "Comporta", countryCode: "PT", startDate: "2026-11-18", endDate: "2026-11-20" },
+      { id: "s3", name: "Marrakech", countryCode: "ma", startDate: "2026-11-20", endDate: "2026-11-23" },
+      { id: "s4", name: "Essaouira", countryCode: "MA", startDate: "2026-11-23", endDate: "2026-11-25" },
+    ];
+    expect(suggestExtras(stops, { s1: true, s2: false, s3: undefined }).map((extra) => extra.key)).toEqual(["car:s2", "esim:MA"]);
+    expect(suggestExtras(stops, {}).find((extra) => extra.kind === "esim")).toMatchObject({ stopNames: ["Marrakech", "Essaouira"] });
   });
 });

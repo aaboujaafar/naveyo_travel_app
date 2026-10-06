@@ -155,3 +155,40 @@ export function formatDuration(minutes: number): string {
   if (hours === 0) return `${rest} min`;
   return rest === 0 ? `${hours} h` : `${hours} h ${String(rest).padStart(2, "0")}`;
 }
+
+/** EU roaming zone (« roam like at home »): the European Union plus Iceland, Liechtenstein and Norway. */
+const EU_ROAMING = new Set([
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT",
+  "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO",
+]);
+
+export type ExtraSuggestion =
+  | { kind: "car"; key: string; stopId: string; stopName: string; startDate: string; endDate: string }
+  | { kind: "esim"; key: string; countryCode: string; stopNames: string[] };
+
+/**
+ * Optional extras for the Voyage: a hire car at an Étape with no railway
+ * station nearby, and an eSIM in each country outside the EU roaming zone.
+ * `stationNearby` is undefined while unknown: no car is suggested then.
+ */
+export function suggestExtras(stops: readonly { id: string; name: string; countryCode: string; startDate: string; endDate: string }[], stationNearby: Readonly<Record<string, boolean | undefined>>): ExtraSuggestion[] {
+  const cars: ExtraSuggestion[] = stops
+    .filter((stop) => stationNearby[stop.id] === false)
+    .map((stop) => ({ kind: "car", key: `car:${stop.id}`, stopId: stop.id, stopName: stop.name, startDate: stop.startDate, endDate: stop.endDate }));
+  const countries = new Map<string, string[]>();
+  for (const stop of stops) {
+    const code = stop.countryCode.toUpperCase();
+    if (EU_ROAMING.has(code)) continue;
+    countries.set(code, [...(countries.get(code) ?? []), stop.name]);
+  }
+  const esims: ExtraSuggestion[] = [...countries].map(([countryCode, stopNames]) => ({ kind: "esim", key: `esim:${countryCode}`, countryCode, stopNames }));
+  return [...cars, ...esims];
+}
+
+export function carLinks(config?: AffiliateConfig): PartnerLink[] {
+  return [{ partner: "discovercars", label: "DiscoverCars (location de voiture)", category: "car", url: affiliate("discovercars", "https://www.discovercars.com/", config), prefilled: false }];
+}
+
+export function esimLinks(config?: AffiliateConfig): PartnerLink[] {
+  return [{ partner: "airalo", label: "Airalo (eSIM)", category: "esim", url: affiliate("airalo", "https://www.airalo.com/", config), prefilled: false }];
+}

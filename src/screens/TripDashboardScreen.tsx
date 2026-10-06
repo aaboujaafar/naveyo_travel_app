@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { formatCountry } from "./place-detail-model";
 import type { LogisticsGap, LogisticsReport } from "../modules/logistics";
+import type { ExtraSuggestion } from "../modules/partners";
 import { describeGap } from "./logistics-model";
 import {
   Pressable,
@@ -72,6 +74,9 @@ export interface TripDashboardScreenProps {
   /** Nights and journeys still to book. */
   logistics?: LogisticsReport | null;
   onOpenGap?: (gap: LogisticsGap) => void;
+  /** Optional extras: hire car, eSIM. */
+  extras?: ExtraSuggestion[];
+  onOpenExtra?: (extra: ExtraSuggestion) => void;
   /** Composes a rainy day with indoor places. */
   onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
@@ -240,6 +245,8 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onOpenEmergency={props.onOpenEmergency}
             logistics={props.logistics}
             onOpenGap={props.onOpenGap}
+            extras={props.extras}
+            onOpenExtra={props.onOpenExtra}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             tripOver={isTripOver(trip, localToday())}
             stops={sortedStops}
@@ -303,6 +310,8 @@ function TodayPanel({
   onOpenEmergency,
   logistics,
   onOpenGap,
+  extras,
+  onOpenExtra,
   onComposeDay,
   tripOver,
   stops,
@@ -328,6 +337,8 @@ function TodayPanel({
   onOpenEmergency?: () => void;
   logistics?: LogisticsReport | null;
   onOpenGap?: (gap: LogisticsGap) => void;
+  extras?: ExtraSuggestion[];
+  onOpenExtra?: (extra: ExtraSuggestion) => void;
   onComposeDay: () => void;
   /** A finished Voyage shows neither its preparation nor day composition. */
   tripOver: boolean;
@@ -406,6 +417,21 @@ function TodayPanel({
                 </Pressable>
               ))}
               {logistics.gaps.length > 4 ? <AppText variant="caption" color="muted">{`Et ${logistics.gaps.length - 4} autre${logistics.gaps.length > 5 ? "s" : ""} à prévoir`}</AppText> : null}
+            </View>
+          ) : null}
+          {extras && extras.length > 0 ? (
+            <View style={styles.logistics}>
+              <AppText variant="label">À prévoir aussi</AppText>
+              {extras.map((extra) => (
+                <Pressable key={extra.key} accessibilityRole="button" onPress={() => onOpenExtra?.(extra)} style={({ pressed }) => [styles.preparationStep, pressed && styles.pressed]}>
+                  <View style={[styles.preparationCheck, styles.gapIcon]}><Icon name={extra.kind === "car" ? "map-pin" : "message-circle"} size={14} color={colors.tealStrong} /></View>
+                  <View style={styles.flexOne}>
+                    <AppText variant="label">{extra.kind === "car" ? `Voiture à ${extra.stopName}` : `eSIM · ${formatCountry(extra.countryCode) ?? extra.countryCode}`}</AppText>
+                    <AppText variant="caption" color="muted">{extra.kind === "car" ? "Aucune gare à moins de 5 km" : "Hors de l’itinérance européenne : données à prix local"}</AppText>
+                  </View>
+                  <Icon name="arrow-right" size={16} color={colors.fg} />
+                </Pressable>
+              ))}
             </View>
           ) : null}
           {steps.map((step) => step.done ? (

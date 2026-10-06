@@ -3,7 +3,10 @@ import type { LogisticsGap, StoredWaiver } from "../../../../../src/modules/logi
 import { findCityCode } from "../../../../../src/adapters/travelpayouts/city-codes";
 import { PartnerSearchSheet, type PartnerSearchGroup } from "../../../../../src/screens/PartnerSearchSheet";
 import { journeyGroups, stayGroups } from "../../../../../src/screens/partner-search-model";
-import type { JourneyEstimate } from "../../../../../src/modules/partners";
+import { carLinks, esimLinks, suggestExtras, type JourneyEstimate } from "../../../../../src/modules/partners";
+import { shortDate } from "../../../../../src/screens/logistics-model";
+import { formatCountry } from "../../../../../src/screens/place-detail-model";
+import { isTripOver, localToday } from "../../../../../src/screens/trips-list-model";
 import { AppText, BottomSheet, Button } from "../../../../../src/ui";
 import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
 import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
@@ -11,7 +14,7 @@ import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
 import { effectiveDeparture, type CityRef } from "../../../../../src/modules/trip-profiles";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
 import * as Location from "expo-location";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type {
@@ -48,7 +51,23 @@ export default function TripDetailRoute() {
   );
   // The stays and transport questions: opened at a gap, or after creating the Voyage or an Étape.
   const [tunnelStart, setTunnelStart] = useState<string | null>(null);
-  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null; estimates?: JourneyEstimate[]; gap: LogisticsGap } | null>(null);
+  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null; estimates?: JourneyEstimate[] } | null>(null);
+  // A hire car is suggested where no railway station is within 5 km (looked up once per Étape).
+  const [stationNearby, setStationNearby] = useState<Record<string, boolean | undefined>>({});
+  const tripIsOver = isTripOver(trip, localToday());
+  const stationLookups = useRef(new Set<string>());
+  useEffect(() => {
+    const places = bootstrap?.modules.places;
+    if (!places || !tripId || tripIsOver) return;
+    for (const stop of stops) {
+      if (!stop.coordinates || stationLookups.current.has(stop.id)) continue;
+      stationLookups.current.add(stop.id);
+      void places.nearby({ coordinates: stop.coordinates, tripId: tripId as UUID, type: "station", radiusMeters: 5_000, limit: 1 })
+        .then((found) => setStationNearby((current) => ({ ...current, [stop.id]: found.length > 0 })), () => undefined);
+    }
+  }, [bootstrap, stops, tripId, tripIsOver]);
+  const extras = useMemo(() => (tripIsOver ? [] : suggestExtras(stops, stationNearby)), [stationNearby, stops, tripIsOver]);
+
   // Back from a partner site: offer to import what was just booked (tracked on the phone only).
   const [openedPartner, setOpenedPartner] = useState<{ label: string; at: number } | null>(null);
   const [askBooked, setAskBooked] = useState<string | null>(null);
@@ -68,14 +87,14 @@ export default function TripDetailRoute() {
     const people = { adults: party?.adults ?? Math.max(1, trip?.members.length ?? 1), childrenAges: party?.childrenAges ?? [] };
     if (gap.kind === "stay") {
       const { summary, groups } = stayGroups(gap, people, itineraryItems);
-      setSearch({ title: "Chercher un hébergement", summary, groups, gap });
+      setSearch({ title: "Chercher un hébergement", summary, groups });
       return;
     }
-    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null, gap });
+    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null });
     // Flight searches need the cities' IATA codes; ground searches do not.
     const [from, to] = await Promise.all([findCityCode(gap.from), findCityCode(gap.to)]);
     const { summary, groups, estimates } = journeyGroups(gap, people, { ...(from ? { from } : {}), ...(to ? { to } : {}) });
-    setSearch({ title: "Chercher un billet", summary, groups, estimates, gap });
+    setSearch({ title: "Chercher un billet", summary, groups, estimates });
   };
   const [tunnelRequested, setTunnelRequested] = useState(false);
   if (tunnelRequested && logistics) {
@@ -329,6 +348,10 @@ export default function TripDetailRoute() {
       onOpenEmergency={() => router.push(`/(app)/trips/${routeTripId}/emergency`)}
       logistics={logistics}
       onOpenGap={(gap) => setTunnelStart(gap.key)}
+      extras={extras}
+      onOpenExtra={(extra) => setSearch(extra.kind === "car"
+        ? { title: "Louer une voiture", summary: `${extra.stopName} · ${shortDate(extra.startDate)} → ${shortDate(extra.endDate)}`, groups: [{ title: "Location", links: carLinks() }] }
+        : { title: "eSIM pour le Voyage", summary: `${formatCountry(extra.countryCode) ?? extra.countryCode} · ${extra.stopNames.join(", ")}`, groups: [{ title: "Données mobiles", links: esimLinks() }] })}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
