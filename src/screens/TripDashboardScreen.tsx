@@ -65,6 +65,8 @@ export interface TripDashboardScreenProps {
   summary?: DashboardSummary;
   /** Answers questions from the Voyage's own data, offline included. */
   onOpenQuestions?: () => void;
+  /** Emergency numbers and stay addresses, offline included. */
+  onOpenEmergency?: () => void;
   /** Composes a rainy day with indoor places. */
   onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
@@ -230,6 +232,7 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             offlineReady={props.offlineReady}
             onPlanB={props.onPlanB}
             onOpenQuestions={props.onOpenQuestions}
+            onOpenEmergency={props.onOpenEmergency}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             tripOver={isTripOver(trip, localToday())}
             stops={sortedStops}
@@ -290,6 +293,7 @@ function TodayPanel({
   offlineReady,
   onPlanB,
   onOpenQuestions,
+  onOpenEmergency,
   onComposeDay,
   tripOver,
   stops,
@@ -312,6 +316,7 @@ function TodayPanel({
   offlineReady?: boolean;
   onPlanB?: (date: string) => void;
   onOpenQuestions?: () => void;
+  onOpenEmergency?: () => void;
   onComposeDay: () => void;
   /** A finished Voyage shows neither its preparation nor day composition. */
   tripOver: boolean;
@@ -422,6 +427,19 @@ function TodayPanel({
             <View style={styles.flexOne}>
               <AppText variant="label">Une question sur le Voyage ?</AppText>
               <AppText variant="caption" color="muted">Vol, hôtel, programme, budget… même sans réseau</AppText>
+            </View>
+            <Icon name="arrow-right" size={16} color={colors.fg} />
+          </Pressable>
+        </Section>
+      ) : null}
+
+      {onOpenEmergency && stops.length > 0 ? (
+        <Section>
+          <Pressable accessibilityRole="button" onPress={onOpenEmergency} style={({ pressed }) => [styles.bookingCard, pressed && styles.pressed]}>
+            <View style={[styles.bookingIcon, styles.emergencyIcon]}><Icon name="info" size={20} color={colors.danger} /></View>
+            <View style={styles.flexOne}>
+              <AppText variant="label">Urgence et adresse de l’hôtel</AppText>
+              <AppText variant="caption" color="muted">Numéros du pays, carte pour le chauffeur, même sans réseau</AppText>
             </View>
             <Icon name="arrow-right" size={16} color={colors.fg} />
           </Pressable>
@@ -654,6 +672,7 @@ const styles = StyleSheet.create({
   sectionTitle: { textTransform: "uppercase", marginBottom: spacing.md },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   questionIcon: { backgroundColor: colors.tealSoft },
+  emergencyIcon: { backgroundColor: colors.accentSoft },
   planBChip: { marginTop: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.tealSoft },
   climateCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },

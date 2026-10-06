@@ -265,6 +265,7 @@ export default function TripDetailRoute() {
         if (stop) router.push(planBAssistantPath(routeTripId, stop.id, date) as Href);
       }}
       onOpenQuestions={() => router.push(`/(app)/trips/${routeTripId}/ask`)}
+      onOpenEmergency={() => router.push(`/(app)/trips/${routeTripId}/emergency`)}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
