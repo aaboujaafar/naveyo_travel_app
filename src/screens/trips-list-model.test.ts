@@ -31,17 +31,19 @@ describe("trips list model", () => {
 describe("home list order", () => {
   const dated = (name: string, startsOn?: string, endsOn?: string) => ({ name, ...(startsOn ? { startsOn } : {}), ...(endsOn ? { endsOn } : {}) });
 
-  it("pins the Voyage under way, then sorts from the most recent to the oldest", () => {
+  it("pins the Voyage under way, then the nearest departures, then the latest finished", () => {
     const trip = dated;
-    const { pinned, others } = orderTrips([
+    const { pinned, upcoming, past } = orderTrips([
       trip("Rome", "2025-04-10", "2025-04-14"),
       trip("Sans dates"),
       trip("Lisbonne", "2026-10-03", "2026-10-09"),
       trip("Japon", "2027-03-01", "2027-03-15"),
       trip("Porto", "2026-06-01", "2026-06-05"),
+      trip("Londres", "2026-12-18", "2026-12-22"),
     ], "2026-10-06");
     expect(pinned.map((item) => item.name)).toEqual(["Lisbonne"]);
-    expect(others.map((item) => item.name)).toEqual(["Japon", "Porto", "Rome", "Sans dates"]);
+    expect(upcoming.map((item) => item.name)).toEqual(["Londres", "Japon", "Sans dates"]);
+    expect(past.map((item) => item.name)).toEqual(["Porto", "Rome"]);
   });
 
   it("knows when a Voyage is over", () => {

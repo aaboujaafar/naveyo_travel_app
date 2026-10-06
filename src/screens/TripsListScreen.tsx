@@ -21,7 +21,8 @@ export interface TripsListScreenProps {
 }
 
 export function TripsListScreen(props: TripsListScreenProps) {
-  const { pinned, others } = useMemo(() => orderTrips(props.items, localToday()), [props.items]);
+  const { pinned, upcoming, past } = useMemo(() => orderTrips(props.items, localToday()), [props.items]);
+  const card = (trip: Trip, isPinned = false) => <TripCard key={trip.id} trip={trip} pinned={isPinned} pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />;
   return (
     <Screen scroll contentStyle={styles.content}>
       <TopBar title="Mes Voyages" actions={<View style={styles.headerActions}><IconButton size={40} onPress={props.onOpenAccount} accessibilityLabel="Ouvrir mon compte" icon={<Icon name="user" size={20} />} /><IconButton size={40} onPress={props.onCreate} accessibilityLabel="Créer un Voyage" icon={<Icon name="plus" size={20} color={colors.white} />} style={styles.createButton} /></View>} />
@@ -33,14 +34,12 @@ export function TripsListScreen(props: TripsListScreenProps) {
       {props.error ? <View style={styles.message}><InlineMessage variant="error" title="Impossible de charger les Voyages" message={props.error} /><Button variant="secondary" onPress={() => void props.onRetry()}>Réessayer</Button></View> : null}
       {props.loading ? <LoadingList /> : props.items.length === 0 ? <EmptyState title="Aucun Voyage" message="Créez votre premier Voyage privé." actionLabel="Créer un Voyage" onAction={props.onCreate} /> : (
         <View style={styles.list}>
-          {pinned.length > 0 ? (
-            <>
-              <View style={styles.listHeading}><Icon name="map-pin" size={14} color={colors.accentStrong} /><AppText variant="label" color="accent">En ce moment</AppText></View>
-              {pinned.map((trip) => <TripCard key={trip.id} trip={trip} pinned pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />)}
-              {others.length > 0 ? <View style={styles.listHeading}><AppText variant="label" color="muted">Tous les Voyages</AppText></View> : null}
-            </>
-          ) : null}
-          {others.map((trip) => <TripCard key={trip.id} trip={trip} pack={props.packs[trip.id]} onPress={() => props.onOpenTrip(trip)} />)}
+          {pinned.length > 0 ? <View style={styles.listHeading}><Icon name="map-pin" size={14} color={colors.accentStrong} /><AppText variant="label" color="accent">En ce moment</AppText></View> : null}
+          {pinned.map((trip) => card(trip, true))}
+          {upcoming.length > 0 && (pinned.length > 0 || past.length > 0) ? <View style={styles.listHeading}><AppText variant="label" color="muted">À venir</AppText></View> : null}
+          {upcoming.map((trip) => card(trip))}
+          {past.length > 0 ? <View style={styles.listHeading}><AppText variant="label" color="muted">Terminés</AppText></View> : null}
+          {past.map((trip) => card(trip))}
         </View>
       )}
     </Screen>

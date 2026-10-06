@@ -49,16 +49,17 @@ function dayNumber(value: string | undefined): number | null {
 }
 
 /**
- * Home list order: the Voyages under way are pinned on top, then the others
- * from the most recent departure to the oldest; undated Voyages come last.
+ * Home list order: the Voyages under way are pinned on top, then the coming
+ * ones from the nearest departure, undated ones, and finally the finished
+ * ones from the most recently ended.
  */
-export function orderTrips<T extends Pick<Trip, "startsOn" | "endsOn">>(trips: readonly T[], today: string): { pinned: T[]; others: T[] } {
-  const byStartDesc = (left: T, right: T) => (right.startsOn ?? "").localeCompare(left.startsOn ?? "") || (right.endsOn ?? "").localeCompare(left.endsOn ?? "");
-  const pinned = trips.filter((trip) => tripTiming(trip, today).phase === "ongoing").sort(byStartDesc);
-  const rest = trips.filter((trip) => !pinned.includes(trip));
+export function orderTrips<T extends Pick<Trip, "startsOn" | "endsOn">>(trips: readonly T[], today: string): { pinned: T[]; upcoming: T[]; past: T[] } {
+  const phase = (trip: T) => tripTiming(trip, today).phase;
+  const byStart = (left: T, right: T) => (left.startsOn ?? "").localeCompare(right.startsOn ?? "");
   return {
-    pinned,
-    others: [...rest.filter((trip) => trip.startsOn).sort(byStartDesc), ...rest.filter((trip) => !trip.startsOn)],
+    pinned: trips.filter((trip) => phase(trip) === "ongoing").sort(byStart),
+    upcoming: [...trips.filter((trip) => phase(trip) === "upcoming").sort(byStart), ...trips.filter((trip) => phase(trip) === "undated")],
+    past: trips.filter((trip) => phase(trip) === "past").sort((left, right) => (right.endsOn ?? "").localeCompare(left.endsOn ?? "")),
   };
 }
 
