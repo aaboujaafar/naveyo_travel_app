@@ -1,9 +1,9 @@
 /**
  * Official sites only: government portals to apply for an authorisation or
  * an e-visa (never paid intermediaries), and the French government's travel
- * advice. Each URL was checked to answer on 2026-10-08.
+ * advice. Each URL was checked to answer on 2026-10-06.
  */
-export const PORTALS_CHECKED_ON = "2026-10-08";
+export const PORTALS_CHECKED_ON = "2026-10-06";
 
 export interface OfficialPortal {
   /** Name shown on the button: « ESTA », « eTA / AVE », « e-Visa »… */
