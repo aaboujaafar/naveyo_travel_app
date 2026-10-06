@@ -23,6 +23,8 @@ import {
 } from "../theme";
 import {
   AppText,
+  BottomSheet,
+  Button,
   Chip,
   Icon,
   IconButton,
@@ -58,6 +60,8 @@ export interface TripAssistantScreenProps {
   onOpenWishes?: () => void;
   onVoteWish?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
   onOpenWish?: (wish: RankedWish) => void;
+  /** Opens the place behind a Google Maps or Apple Plans link; resolves to an error message, or null. */
+  onImportLink?: (link: string) => Promise<string | null>;
 }
 
 const categories: AssistantCategory[] = [
@@ -88,7 +92,27 @@ export function TripAssistantScreen({
   onOpenWishes,
   onVoteWish,
   onOpenWish,
+  onImportLink,
 }: TripAssistantScreenProps) {
+  const [linkVisible, setLinkVisible] = useState(false);
+  const [link, setLink] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const importLink = async () => {
+    if (!onImportLink || !link.trim()) return;
+    setImporting(true);
+    setLinkError(null);
+    try {
+      const failure = await onImportLink(link.trim());
+      if (failure) setLinkError(failure);
+      else {
+        setLink("");
+        setLinkVisible(false);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
   // A new link asking for a mode wins over the tab's last state (adjusted during render).
@@ -203,6 +227,13 @@ export function TripAssistantScreen({
               />
             </View>
 
+            {onImportLink ? (
+              <Pressable accessibilityRole="button" onPress={() => { setLinkError(null); setLinkVisible(true); }} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+                <Icon name="copy" size={16} color={colors.tealStrong} />
+                <AppText variant="caption" color="teal">Importer un lien Google Maps ou Plans</AppText>
+              </Pressable>
+            ) : null}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {categories.map((category) => <Chip key={category} label={category} active={values.category === category} onPress={() => chooseCategory(category)} />)}
             </ScrollView>
@@ -279,6 +310,13 @@ export function TripAssistantScreen({
           </>
         )}
       </ScrollView>
+
+      <BottomSheet visible={linkVisible} onClose={() => setLinkVisible(false)} title="Importer un lien">
+        <AppText variant="bodySmall" color="muted">Collez le lien d’un lieu partagé depuis Google Maps ou Plans : Naveyo le retrouve et ouvre sa fiche.</AppText>
+        <Input value={link} onChangeText={setLink} placeholder="https://maps.app.goo.gl/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={() => void importLink()} />
+        {linkError ? <InlineMessage variant="error" title="Import impossible" message={linkError} /> : null}
+        <Button fullWidth loading={importing} disabled={!link.trim()} onPress={() => void importLink()}>Retrouver le lieu</Button>
+      </BottomSheet>
     </View>
   );
 }
@@ -475,6 +513,7 @@ const styles = StyleSheet.create({
   resultImage: { width: 72, height: 72, borderRadius: radius.sm, backgroundColor: colors.border },
   resultPlaceholder: { alignItems: "center", justifyContent: "center" },
   voteRow: { flexDirection: "row", gap: spacing.xs },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, alignSelf: "flex-start", marginHorizontal: spacing.lg, marginBottom: spacing.sm, paddingVertical: spacing.xs },
   voteChip: { width: 40, height: 40, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   voteChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   resultBody: { flex: 1, gap: 2 },

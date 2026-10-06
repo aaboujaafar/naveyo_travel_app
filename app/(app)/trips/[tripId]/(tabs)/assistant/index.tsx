@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { rankWishes, type Wish } from "../../../../../../src/modules/wishlist";
+import { bestNameMatch, isShortMapsLink, parseMapsLink } from "../../../../../../src/screens/maps-link-model";
 import { describePlacesError } from "../../../../../../src/screens/places-error";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../../src/modules/_shared/model";
@@ -293,6 +294,37 @@ export default function TripAssistantRoute() {
           await loadWishes();
         } catch (cause) {
           setWishesError(cause instanceof Error ? cause.message : "Vote impossible.");
+        }
+      }}
+      onImportLink={async (link) => {
+        const places = bootstrap?.modules.places;
+        if (!places || !tripId) return "La recherche de lieux est indisponible.";
+        let target = link;
+        if (isShortMapsLink(link)) {
+          // Short links only reveal the place once the redirection is followed.
+          try {
+            target = (await fetch(link, { method: "GET", redirect: "follow" })).url || link;
+          } catch {
+            return "Le lien court ne peut pas être ouvert sans réseau.";
+          }
+        }
+        const parsed = parseMapsLink(target);
+        if (!parsed) return "Ce lien n’est pas un lien de lieu Google Maps ou Plans.";
+        try {
+          const found = parsed.name
+            ? await places.search({ query: parsed.name, tripId: tripId as UUID, ...(parsed.coordinates ? { near: { ...parsed.coordinates, radiusMeters: 2_000 } } : { countryCode: stop?.countryCode }) })
+            : [];
+          let match = bestNameMatch(found, parsed.name);
+          if (!match && parsed.coordinates && places.nearby) {
+            const around = await places.nearby({ coordinates: parsed.coordinates, tripId: tripId as UUID, radiusMeters: 120, limit: 10 });
+            match = parsed.name ? bestNameMatch(around, parsed.name) ?? around[0] : around[0];
+          }
+          if (!match) return parsed.name ? `« ${parsed.name} » n’a pas été retrouvé. Cherchez-le par son nom.` : "Aucun lieu trouvé à ces coordonnées.";
+          places.remember?.([match]);
+          router.push(`/(app)/trips/${tripId}/places/${match.id}`);
+          return null;
+        } catch (cause) {
+          return cause instanceof Error ? cause.message : "Recherche impossible.";
         }
       }}
       onOpenWish={(wish) => {
