@@ -324,6 +324,9 @@ export function AccountScreen({
           <View style={styles.sectionHeader}><AppText variant="h3">À propos / Support</AppText></View>
           <View style={styles.sectionCard}>
             <PreferencePreview label="Version" value={`Naveyo ${version}`} />
+            <AppText variant="caption" color="muted">
+              Sources des données : formalités d’entrée indicatives d’après Passport Index data (imorte/passport-index-data, licence MIT) ; infos pratiques par pays et réseaux de transport d’après Wikidata (CC0) ; plans de transport de Wikimedia Commons (licence de chaque plan) ; lieux © OpenStreetMap et ses contributeurs.
+            </AppText>
             <ComingSoonFrame label="Centre d’aide et support">
               <PreferencePreview label="Centre d’aide" value="Ouvrir" />
               <PreferencePreview label="Nous contacter" value="Ouvrir" />

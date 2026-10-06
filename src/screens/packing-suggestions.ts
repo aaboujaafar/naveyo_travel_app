@@ -1,4 +1,7 @@
 import type { PackingCategory } from "../modules/packing-list";
+import { countryName } from "../modules/countries";
+import { adapterNeeded } from "../modules/country-info";
+import { COUNTRY_INFO } from "../modules/country-info/data";
 
 export interface PackingSuggestion {
   label: string;
@@ -8,7 +11,6 @@ export interface PackingSuggestion {
 }
 
 // Countries whose sockets do not take the European two-pin plug (types C/E/F).
-const otherPlugCountries = new Set(["GB", "IE", "MT", "CY", "US", "CA", "MX", "JP", "AU", "NZ", "CH", "ZA", "IN", "CN", "BR", "AR", "TH", "SG", "HK", "AE"]);
 const euCountries = new Set(["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"]);
 
 /**
@@ -20,6 +22,8 @@ export function suggestPackingItems(input: {
   endsOn?: string;
   countryCodes: readonly string[];
   existingLabels: readonly string[];
+  /** Where the travellers' devices come from; France by default. */
+  homeCountry?: string;
 }): PackingSuggestion[] {
   const nights = countNights(input.startsOn, input.endsOn);
   const days = Math.min(nights + 1, 7);
@@ -58,9 +62,8 @@ export function suggestPackingItems(input: {
     { label: "Brosse à dents et dentifrice", category: "toiletries", quantity: 1 },
     { label: "Trousse de toilette", category: "toiletries", quantity: 1 },
     { label: "Chargeur de téléphone", category: "electronics", quantity: 1 },
-    ...(countries.some((code) => otherPlugCountries.has(code))
-      ? [{ label: "Adaptateur de prise", category: "electronics" as const, quantity: 1, reason: "Prises différentes sur place" }]
-      : []),
+    // One adapter per plug type the home plugs do not fit (« Adaptateur type G »), from Wikidata.
+    ...adapterSuggestions(countries, input.homeCountry ?? "FR"),
     { label: "Batterie externe", category: "electronics", quantity: 1 },
     { label: "Médicaments personnels", category: "health", quantity: 1 },
     { label: "Trousse de premiers secours", category: "health", quantity: 1 },
@@ -78,4 +81,21 @@ function countNights(startsOn?: string, endsOn?: string): number {
 
 function normalize(value: string): string {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’']/g, " ").toLowerCase().trim();
+}
+
+function adapterSuggestions(countries: readonly string[], homeCountry: string): PackingSuggestion[] {
+  const home = COUNTRY_INFO[homeCountry.toUpperCase()];
+  const byType = new Map<string, string[]>();
+  for (const code of countries) {
+    const types = adapterNeeded(COUNTRY_INFO[code], home);
+    if (!types) continue;
+    const key = types.join("/");
+    byType.set(key, [...(byType.get(key) ?? []), countryName(code) ?? code]);
+  }
+  return [...byType].map(([types, names]) => ({
+    label: `Adaptateur de prise type ${types}`,
+    category: "electronics" as const,
+    quantity: 1,
+    reason: `Prises différentes : ${names.join(", ")}`,
+  }));
 }

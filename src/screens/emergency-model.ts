@@ -1,3 +1,5 @@
+import { practicalNotes, type PracticalNote } from "../modules/country-info";
+import { COUNTRY_INFO } from "../modules/country-info/data";
 import type { Reservation, Stop } from "../modules/_shared/model";
 
 export interface EmergencyNumbers {
@@ -90,6 +92,8 @@ export interface EmergencyCountry {
   stays: EmergencyStay[];
   /** In the local language, or English. */
   taxiPhrase: string;
+  /** Plugs, voltage, driving side, currency, calling code; notable when different from home. */
+  practical: PracticalNote[];
 }
 
 /** One section per country of the Voyage, in travel order. */
@@ -98,6 +102,7 @@ export function buildEmergencySheet(
   reservations: readonly Reservation[],
   /** Stays without a booking (« chez des proches », van…) that have an address. */
   otherStays: readonly { stopId: string; label: string; address: string }[] = [],
+  homeCountry = "FR",
 ): EmergencyCountry[] {
   const ordered = [...stops].sort((left, right) => left.startDate.localeCompare(right.startDate));
   const countries = [...new Set(ordered.map((stop) => stop.countryCode.toUpperCase()))];
@@ -126,6 +131,7 @@ export function buildEmergencySheet(
         }),
       ],
       taxiPhrase: TAXI_PHRASES[COUNTRY_LANGUAGES[countryCode] ?? "en"] ?? TAXI_PHRASES.en!,
+      practical: practicalNotes(COUNTRY_INFO[countryCode], COUNTRY_INFO[homeCountry.toUpperCase()]),
     };
   });
 }

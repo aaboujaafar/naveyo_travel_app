@@ -1,5 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   AddPackingItemInput,
   PackingItem,
@@ -58,6 +59,18 @@ export function PackingPanel({ tripId, onBack, onOpenDocuments, onOpenReservatio
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [items, setItems] = useState<PackingItem[]>([]);
+  // Adapters depend on where the devices come from: the departure city's country, else the nationality.
+  const [homeCountry, setHomeCountry] = useState<string | undefined>();
+  const profilesModule = useNaveyoBootstrap()?.modules.tripProfiles;
+  useEffect(() => {
+    let active = true;
+    void profilesModule?.myProfile().then((profile) => {
+      if (active) setHomeCountry(profile?.homeCity?.countryCode ?? profile?.nationality);
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [profilesModule]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,9 +142,10 @@ export function PackingPanel({ tripId, onBack, onOpenDocuments, onOpenReservatio
           endsOn: trip.endsOn,
           countryCodes: stops.map((stop) => stop.countryCode),
           existingLabels: items.map((item) => item.label),
+          ...(homeCountry ? { homeCountry } : {}),
         })
       : []),
-    [items, stops, trip],
+    [homeCountry, items, stops, trip],
   );
 
   const update = useCallback(async (itemId: UUID, changes: UpdatePackingItemInput) => {

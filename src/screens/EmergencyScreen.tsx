@@ -57,6 +57,18 @@ export function EmergencyScreen(props: EmergencyScreenProps) {
               <InlineMessage title="Numéro à vérifier" message="Ce pays n’est pas encore dans la fiche : renseignez-vous à l’arrivée. Le 112 fonctionne dans de nombreux pays depuis un portable." />
             )}
 
+            {country.practical.length > 0 ? (
+              <View style={styles.card}>
+                <AppText variant="label">Infos pratiques</AppText>
+                {country.practical.map((note) => (
+                  <View key={note.kind} style={styles.practicalRow}>
+                    <View style={[styles.dot, note.notable && styles.dotNotable]} />
+                    <AppText variant="bodySmall" color={note.notable ? "fg" : "muted"} style={styles.flexOne}>{note.text}</AppText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             {country.stays.length > 0 ? country.stays.map((stay) => (
               <View key={`${stay.name}-${stay.from ?? ""}`} style={styles.card}>
                 <View style={styles.row}>
@@ -130,5 +142,8 @@ const styles = StyleSheet.create({
   driverAddress: { fontSize: 34, lineHeight: 42 },
   close: { position: "absolute", top: spacing["2xl"], right: spacing.lg, padding: spacing.sm },
   pressed: { opacity: 0.8 },
+  practicalRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dotNotable: { backgroundColor: colors.accentStrong },
   flexOne: { flex: 1 },
 });

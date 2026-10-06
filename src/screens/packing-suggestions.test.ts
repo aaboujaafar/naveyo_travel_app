@@ -18,7 +18,7 @@ describe("packing suggestions", () => {
     expect(winterLisbon).not.toContain("Adaptateur de prise");
 
     const summerLondon = labels({ startsOn: "2026-07-01", endsOn: "2026-07-05", countryCodes: ["GB"], existingLabels: [] });
-    expect(summerLondon).toEqual(expect.arrayContaining(["Maillot de bain", "Adaptateur de prise", "Passeport (validité à vérifier)"]));
+    expect(summerLondon).toEqual(expect.arrayContaining(["Maillot de bain", "Adaptateur de prise type G", "Passeport (validité à vérifier)"]));
   });
 
   it("skips what is already on the list, ignoring case and accents", () => {
