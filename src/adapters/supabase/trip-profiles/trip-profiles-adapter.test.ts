@@ -46,7 +46,7 @@ describe("Supabase trip profiles adapter", () => {
       ? { data: null, error: { message: "permission denied for table accounts", code: "42501" } }
       : { data: [{ account_id: "a1", role: "owner" }], error: null });
     expect(await createSupabaseTripProfilesModule(client).listMembers(tripId)).toEqual([{ accountId: "a1", role: "owner" }]);
-    expect(calls.map((call) => call.columns)).toEqual(["account_id,role,account:accounts(display_name)", "account_id,role"]);
+    expect(calls.map((call) => call.columns)).toEqual(["account_id,role,account:accounts(display_name,nationality)", "account_id,role"]);
   });
 
   it("treats a database without the party columns as « no details »", async () => {

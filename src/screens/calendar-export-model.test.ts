@@ -46,4 +46,10 @@ describe("calendar export", () => {
     expect(event).toMatchObject({ allDay: true, title: "🛏️ Hôtel" });
     expect([event?.startDate.getDate(), event?.endDate.getDate()]).toEqual([16, 20]);
   });
+
+  it("adds formality deadlines as all-day reminders", () => {
+    const [event] = buildCalendarEvents({ items: [], reservations: [], stops: [lisbon], deadlines: [{ key: "formality:US:FR:eta", title: "Demander l’ESTA", date: "2026-11-24", url: "https://esta.cbp.dhs.gov/" }] });
+    expect(event).toMatchObject({ key: "formality:US:FR:eta", title: "📝 Demander l’ESTA", allDay: true, notes: "https://esta.cbp.dhs.gov/" });
+    expect(event?.startDate.getDate()).toBe(24);
+  });
 });

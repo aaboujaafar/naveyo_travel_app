@@ -7,6 +7,7 @@ import { carLinks, esimLinks, suggestExtras, type JourneyEstimate } from "../../
 import { shortDate } from "../../../../../src/screens/logistics-model";
 import { formatCountry } from "../../../../../src/screens/place-detail-model";
 import { isTripOver, localToday } from "../../../../../src/screens/trips-list-model";
+import { loadTripFormalities, type TripFormalities } from "../../../../../src/screens/formalities-loader";
 import { AppText, BottomSheet, Button } from "../../../../../src/ui";
 import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
 import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
@@ -65,6 +66,17 @@ export default function TripDetailRoute() {
       void places.nearby({ coordinates: stop.coordinates, tripId: tripId as UUID, type: "station", radiusMeters: 5_000, limit: 1 })
         .then((found) => setStationNearby((current) => ({ ...current, [stop.id]: found.length > 0 })), () => undefined);
     }
+  }, [bootstrap, stops, tripId, tripIsOver]);
+  const [formalities, setFormalities] = useState<TripFormalities | null>(null);
+  useEffect(() => {
+    if (!bootstrap || !tripId || stops.length === 0 || tripIsOver) return;
+    let active = true;
+    void loadTripFormalities(bootstrap.modules, tripId as UUID, stops).then((next) => {
+      if (active) setFormalities(next);
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
   }, [bootstrap, stops, tripId, tripIsOver]);
   const extras = useMemo(() => (tripIsOver ? [] : suggestExtras(stops, stationNearby)), [stationNearby, stops, tripIsOver]);
 
@@ -349,6 +361,23 @@ export default function TripDetailRoute() {
       logistics={logistics}
       onOpenGap={(gap) => setTunnelStart(gap.key)}
       extras={extras}
+      formalities={formalities}
+      onSetNationality={() => router.push("/(app)/account")}
+      onToggleFormality={formalities?.canCheck && bootstrap?.modules.tripChecks && tripId ? (key, done) => {
+        // Ticked at once on screen; reverted if the save fails.
+        setFormalities((current) => {
+          if (!current) return current;
+          const checked = new Set(current.checked);
+          if (done) checked.add(key); else checked.delete(key);
+          return { ...current, checked };
+        });
+        void bootstrap.modules.tripChecks?.set(tripId, key, done).catch(() => setFormalities((current) => {
+          if (!current) return current;
+          const checked = new Set(current.checked);
+          if (done) checked.delete(key); else checked.add(key);
+          return { ...current, checked };
+        }));
+      } : undefined}
       onOpenExtra={(extra) => setSearch(extra.kind === "car"
         ? { title: "Louer une voiture", summary: `${extra.stopName} · ${shortDate(extra.startDate)} → ${shortDate(extra.endDate)}`, groups: [{ title: "Location", links: carLinks() }] }
         : { title: "eSIM pour le Voyage", summary: `${formatCountry(extra.countryCode) ?? extra.countryCode} · ${extra.stopNames.join(", ")}`, groups: [{ title: "Données mobiles", links: esimLinks() }] })}

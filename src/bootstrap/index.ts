@@ -27,6 +27,7 @@ import type { WishlistModule } from '../modules/wishlist'
 import type { TransitMapsModule } from '../modules/transit-maps'
 import type { RepaymentsModule } from '../modules/repayments'
 import type { LogisticsWaiversModule } from '../modules/logistics'
+import type { TripChecksModule } from '../modules/trip-checks'
 
 /**
  * The application boundary consumed by routes and UI composition.
@@ -61,6 +62,7 @@ export interface NaveyoModules {
   transitMaps?: TransitMapsModule
   repayments?: RepaymentsModule
   logisticsWaivers?: LogisticsWaiversModule
+  tripChecks?: TripChecksModule
   /** Native analyzer is optional while OCR-001 is not available in a build. */
   reservationAnalyzer?: DocumentAnalyzer
 }

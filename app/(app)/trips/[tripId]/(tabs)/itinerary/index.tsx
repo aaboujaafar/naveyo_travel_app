@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
 import { useCallback, useEffect, useState } from "react";
 import { isTripOver, localToday } from "../../../../../../src/screens/trips-list-model";
+import { loadTripFormalities } from "../../../../../../src/screens/formalities-loader";
 import { Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type {
@@ -124,7 +125,12 @@ export default function ItineraryRoute() {
           modules.itinerary.list(tripId).catch(() => items),
         ]);
         const tripName = trip?.name ?? "Voyage";
-        const count = await exportTripCalendar(tripName, buildCalendarEvents({ items: latestItems, reservations, stops }));
+        // Formalities still to do (ESTA, e-visa…) appear on their deadline.
+        const formalities = await loadTripFormalities(modules, tripId, stops).catch(() => null);
+        const deadlines = (formalities?.formalities ?? [])
+          .filter((item) => item.deadline && !formalities?.checked.has(item.key))
+          .map((item) => ({ key: item.key, title: item.title, date: item.deadline!, url: item.link.url }));
+        const count = await exportTripCalendar(tripName, buildCalendarEvents({ items: latestItems, reservations, stops, deadlines }));
         return { count, calendarName: `Naveyo · ${tripName}` };
       }}
       onDownloadOffline={async () => {

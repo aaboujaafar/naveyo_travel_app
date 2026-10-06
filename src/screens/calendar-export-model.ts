@@ -35,6 +35,8 @@ export function buildCalendarEvents(input: {
   items: readonly ItineraryItem[];
   reservations: readonly Reservation[];
   stops: readonly Stop[];
+  /** Formalities to do before leaving (ESTA, e-visa…), shown on their deadline. */
+  deadlines?: readonly { key: string; title: string; date: string; url?: string }[];
 }): CalendarEventDraft[] {
   const stopZone = new Map(input.stops.map((stop) => [stop.id as string, stop.timeZone as string]));
   const fallbackZone = input.stops[0]?.timeZone ?? "UTC";
@@ -86,7 +88,15 @@ export function buildCalendarEvents(input: {
     }];
   });
 
-  return [...bookings, ...activities].sort((left, right) => left.startDate.getTime() - right.startDate.getTime());
+  const formalities = (input.deadlines ?? []).map((deadline): CalendarEventDraft => ({
+    key: deadline.key,
+    title: `📝 ${deadline.title}`,
+    ...allDay(deadline.date, deadline.date),
+    timeZone: fallbackZone,
+    ...(deadline.url ? { notes: deadline.url } : {}),
+  }));
+
+  return [...formalities, ...bookings, ...activities].sort((left, right) => left.startDate.getTime() - right.startDate.getTime());
 }
 
 /**

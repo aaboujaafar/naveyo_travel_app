@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { formatCountry } from "./place-detail-model";
 import type { LogisticsGap, LogisticsReport } from "../modules/logistics";
 import type { ExtraSuggestion } from "../modules/partners";
+import { FormalitiesBlock } from "./FormalitiesBlock";
+import type { TripFormalities } from "./formalities-loader";
 import { describeGap } from "./logistics-model";
 import {
   Pressable,
@@ -77,6 +79,10 @@ export interface TripDashboardScreenProps {
   /** Optional extras: hire car, eSIM. */
   extras?: ExtraSuggestion[];
   onOpenExtra?: (extra: ExtraSuggestion) => void;
+  /** Entry formalities of the group for each country. */
+  formalities?: TripFormalities | null;
+  onToggleFormality?: (key: string, done: boolean) => void;
+  onSetNationality?: () => void;
   /** Composes a rainy day with indoor places. */
   onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
@@ -247,6 +253,9 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onOpenGap={props.onOpenGap}
             extras={props.extras}
             onOpenExtra={props.onOpenExtra}
+            formalities={props.formalities}
+            onToggleFormality={props.onToggleFormality}
+            onSetNationality={props.onSetNationality}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             tripOver={isTripOver(trip, localToday())}
             stops={sortedStops}
@@ -312,6 +321,9 @@ function TodayPanel({
   onOpenGap,
   extras,
   onOpenExtra,
+  formalities,
+  onToggleFormality,
+  onSetNationality,
   onComposeDay,
   tripOver,
   stops,
@@ -339,6 +351,9 @@ function TodayPanel({
   onOpenGap?: (gap: LogisticsGap) => void;
   extras?: ExtraSuggestion[];
   onOpenExtra?: (extra: ExtraSuggestion) => void;
+  formalities?: TripFormalities | null;
+  onToggleFormality?: (key: string, done: boolean) => void;
+  onSetNationality?: () => void;
   onComposeDay: () => void;
   /** A finished Voyage shows neither its preparation nor day composition. */
   tripOver: boolean;
@@ -418,6 +433,16 @@ function TodayPanel({
               ))}
               {logistics.gaps.length > 4 ? <AppText variant="caption" color="muted">{`Et ${logistics.gaps.length - 4} autre${logistics.gaps.length > 5 ? "s" : ""} à prévoir`}</AppText> : null}
             </View>
+          ) : null}
+          {formalities && (formalities.formalities.length > 0 || formalities.nationalityMissing) ? (
+            <FormalitiesBlock
+              formalities={formalities.formalities}
+              checked={formalities.checked}
+              matrixDate={formalities.matrixDate}
+              nationalityMissing={formalities.nationalityMissing}
+              onToggle={onToggleFormality}
+              onSetNationality={onSetNationality ?? (() => undefined)}
+            />
           ) : null}
           {extras && extras.length > 0 ? (
             <View style={styles.logistics}>

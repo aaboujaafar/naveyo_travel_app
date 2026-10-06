@@ -84,8 +84,10 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
   return {
     async listMembers(tripId) {
       // Without the migration, reading names is refused: the members are still listed, unnamed.
-      const rows = await run(client.from("trip_members").select("account_id,role,account:accounts(display_name)").eq("trip_id", tripId))
-        .catch((error: unknown) => {
+      const rows = await firstWorking([
+        () => run(client.from("trip_members").select("account_id,role,account:accounts(display_name,nationality)").eq("trip_id", tripId)),
+        () => run(client.from("trip_members").select("account_id,role,account:accounts(display_name)").eq("trip_id", tripId)),
+      ]).catch((error: unknown) => {
           if (error instanceof ProfilesDatabaseError && error.code === PERMISSION_DENIED) {
             return run(client.from("trip_members").select("account_id,role").eq("trip_id", tripId));
           }
@@ -95,8 +97,15 @@ export const createSupabaseTripProfilesModule = (client: SupabaseClientLike): Tr
         const row = asRow(value);
         if (!row || typeof row.account_id !== "string" || (row.role !== "owner" && row.role !== "editor")) return [];
         // Without the co-member policy, Postgres hides other accounts and the join is null.
-        const name = asRow(row.account)?.display_name;
-        return [{ accountId: row.account_id as UUID, role: row.role, ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}) }];
+        const account = asRow(row.account);
+        const name = account?.display_name;
+        const nationality = account?.nationality;
+        return [{
+          accountId: row.account_id as UUID,
+          role: row.role,
+          ...(typeof name === "string" && name.trim() ? { displayName: name.trim() } : {}),
+          ...(typeof nationality === "string" && /^[A-Za-z]{2}$/.test(nationality.trim()) ? { nationality: nationality.trim().toUpperCase() } : {}),
+        }];
       });
     },
 

@@ -5,6 +5,8 @@ export interface MemberProfile {
   role: "owner" | "editor";
   /** Absent when the database does not share names between members yet. */
   displayName?: string;
+  /** ISO code, when the member gave it. */
+  nationality?: string;
 }
 
 /** A city travellers leave from, as chosen in the city search. */
