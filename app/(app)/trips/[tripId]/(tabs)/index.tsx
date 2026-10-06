@@ -1,5 +1,8 @@
 import { useFocusEffect, useRouter, type Href } from "expo-router";
-import type { StoredWaiver } from "../../../../../src/modules/logistics";
+import type { LogisticsGap, StoredWaiver } from "../../../../../src/modules/logistics";
+import { findCityCode } from "../../../../../src/adapters/travelpayouts/city-codes";
+import { PartnerSearchSheet, type PartnerSearchGroup } from "../../../../../src/screens/PartnerSearchSheet";
+import { journeyGroups, stayGroups } from "../../../../../src/screens/partner-search-model";
 import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
 import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
 import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
@@ -43,6 +46,22 @@ export default function TripDetailRoute() {
   );
   // The stays and transport questions: opened at a gap, or after creating the Voyage or an Étape.
   const [tunnelStart, setTunnelStart] = useState<string | null>(null);
+  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null } | null>(null);
+  const openSearch = async (gap: LogisticsGap) => {
+    setTunnelStart(null);
+    const party = await bootstrap?.modules.tripProfiles?.getParty(tripId as UUID).catch(() => null);
+    const people = { adults: party?.adults ?? Math.max(1, trip?.members.length ?? 1), childrenAges: party?.childrenAges ?? [] };
+    if (gap.kind === "stay") {
+      const { summary, groups } = stayGroups(gap, people, itineraryItems);
+      setSearch({ title: "Chercher un hébergement", summary, groups });
+      return;
+    }
+    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null });
+    // Flight searches need the cities' IATA codes; ground searches do not.
+    const [from, to] = await Promise.all([findCityCode(gap.from), findCityCode(gap.to)]);
+    const { summary, groups } = journeyGroups(gap, people, { ...(from ? { from } : {}), ...(to ? { to } : {}) });
+    setSearch({ title: "Chercher un billet", summary, groups });
+  };
   const [tunnelRequested, setTunnelRequested] = useState(false);
   if (tunnelRequested && logistics) {
     setTunnelRequested(false);
@@ -318,6 +337,7 @@ export default function TripDetailRoute() {
     <LogisticsTunnelSheet
       gaps={tunnelStart !== null && logistics ? logistics.gaps : null}
       startKey={tunnelStart ?? undefined}
+      onSearch={(gap) => void openSearch(gap)}
       onImport={() => {
         setTunnelStart(null);
         router.push(`/(app)/trips/${routeTripId}/reservations`);
@@ -329,6 +349,15 @@ export default function TripDetailRoute() {
         setWaivers(await module.list(tripId));
       }}
       onClose={() => setTunnelStart(null)}
+    />
+    <PartnerSearchSheet
+      visible={search !== null}
+      title={search?.title ?? ""}
+      summary={search?.summary ?? ""}
+      groups={search?.groups ?? null}
+      loading={search !== null && search.groups === null}
+      onOpened={() => undefined}
+      onClose={() => setSearch(null)}
     />
     </>
   );
