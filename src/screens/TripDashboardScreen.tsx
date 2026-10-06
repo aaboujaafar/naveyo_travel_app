@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
+import type { LogisticsGap, LogisticsReport } from "../modules/logistics";
+import { describeGap } from "./logistics-model";
 import {
   Pressable,
   RefreshControl,
@@ -67,6 +69,9 @@ export interface TripDashboardScreenProps {
   onOpenQuestions?: () => void;
   /** Emergency numbers and stay addresses, offline included. */
   onOpenEmergency?: () => void;
+  /** Nights and journeys still to book. */
+  logistics?: LogisticsReport | null;
+  onOpenGap?: (gap: LogisticsGap) => void;
   /** Composes a rainy day with indoor places. */
   onPlanB?: (date: string) => void;
   /** Shown once the Voyage is over. */
@@ -233,6 +238,8 @@ export function TripDashboardScreen(props: TripDashboardScreenProps) {
             onPlanB={props.onPlanB}
             onOpenQuestions={props.onOpenQuestions}
             onOpenEmergency={props.onOpenEmergency}
+            logistics={props.logistics}
+            onOpenGap={props.onOpenGap}
             onComposeDay={props.onComposeDay ?? props.onOpenAssistant}
             tripOver={isTripOver(trip, localToday())}
             stops={sortedStops}
@@ -294,6 +301,8 @@ function TodayPanel({
   onPlanB,
   onOpenQuestions,
   onOpenEmergency,
+  logistics,
+  onOpenGap,
   onComposeDay,
   tripOver,
   stops,
@@ -317,6 +326,8 @@ function TodayPanel({
   onPlanB?: (date: string) => void;
   onOpenQuestions?: () => void;
   onOpenEmergency?: () => void;
+  logistics?: LogisticsReport | null;
+  onOpenGap?: (gap: LogisticsGap) => void;
   onComposeDay: () => void;
   /** A finished Voyage shows neither its preparation nor day composition. */
   tripOver: boolean;
@@ -376,6 +387,27 @@ function TodayPanel({
           <View style={styles.preparationBar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             {steps.map((step) => <View key={step.key} style={[styles.preparationSegment, step.done && styles.preparationSegmentDone]} />)}
           </View>
+          {logistics && logistics.nights.total + logistics.legs.total > 0 ? (
+            <View style={styles.logistics}>
+              <View style={styles.preparationHeader}>
+                <AppText variant="label">Hébergements et trajets</AppText>
+                <AppText variant="label" color={logistics.readiness >= 1 ? "success" : "accent"}>{`${Math.round(logistics.readiness * 100)} %`}</AppText>
+              </View>
+              {logistics.gaps.length === 0 ? (
+                <AppText variant="caption" color="success">Toutes les nuits et tous les trajets sont couverts.</AppText>
+              ) : logistics.gaps.slice(0, 4).map((gap) => (
+                <Pressable key={gap.key} accessibilityRole="button" onPress={() => onOpenGap?.(gap)} style={({ pressed }) => [styles.preparationStep, pressed && styles.pressed]}>
+                  <View style={[styles.preparationCheck, styles.gapIcon]}><Icon name={gap.kind === "stay" ? "home" : "map"} size={14} color={colors.accentStrong} /></View>
+                  <View style={styles.flexOne}>
+                    <AppText variant="label">{describeGap(gap).title}</AppText>
+                    <AppText variant="caption" color="muted">{describeGap(gap).detail}</AppText>
+                  </View>
+                  <Icon name="arrow-right" size={16} color={colors.accentStrong} />
+                </Pressable>
+              ))}
+              {logistics.gaps.length > 4 ? <AppText variant="caption" color="muted">{`Et ${logistics.gaps.length - 4} autre${logistics.gaps.length > 5 ? "s" : ""} à prévoir`}</AppText> : null}
+            </View>
+          ) : null}
           {steps.map((step) => step.done ? (
             <View key={step.key} style={styles.preparationStep}>
               <View style={[styles.preparationCheck, styles.preparationCheckDone]}><Icon name="check" size={14} color={colors.white} /></View>
@@ -673,6 +705,8 @@ const styles = StyleSheet.create({
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   questionIcon: { backgroundColor: colors.tealSoft },
   emergencyIcon: { backgroundColor: colors.accentSoft },
+  logistics: { gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  gapIcon: { alignItems: "center", justifyContent: "center", borderColor: colors.accentStrong },
   planBChip: { marginTop: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.tealSoft },
   climateCard: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, borderWidth: componentMetrics.tripDashboard.thinBorderWidth, borderColor: colors.border, backgroundColor: colors.surface },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: spacing.xs },

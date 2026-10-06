@@ -1,4 +1,6 @@
 import { useFocusEffect, useRouter, type Href } from "expo-router";
+import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
+import { effectiveDeparture, type CityRef } from "../../../../../src/modules/trip-profiles";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -30,6 +32,11 @@ export default function TripDetailRoute() {
   const [stops, setStops] = useState<Stop[]>([]);
   const [itineraryItems, setItineraryItems] = useState<ItineraryItem[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [departure, setDeparture] = useState<CityRef | null>(null);
+  const logistics = useMemo(
+    () => (stops.length > 0 ? detectLogisticsGaps({ stops, reservations, departure }) : null),
+    [departure, reservations, stops],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
@@ -107,6 +114,11 @@ export default function TripDetailRoute() {
       modules.reservations.list(tripId).then(setReservations, () => {
         setError("Le Voyage est chargé, mais les Réservations sont temporairement indisponibles.");
       }),
+      // The departure city adds the outbound and return journeys to the logistics.
+      Promise.all([
+        modules.tripProfiles?.getDeparture(tripId).catch(() => null),
+        modules.tripProfiles?.myProfile().catch(() => null),
+      ]).then(([tripDeparture, profile]) => setDeparture(effectiveDeparture(tripDeparture, profile?.homeCity))),
       loadSummary(),
     ]);
 
@@ -266,6 +278,8 @@ export default function TripDetailRoute() {
       }}
       onOpenQuestions={() => router.push(`/(app)/trips/${routeTripId}/ask`)}
       onOpenEmergency={() => router.push(`/(app)/trips/${routeTripId}/emergency`)}
+      logistics={logistics}
+      onOpenGap={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
