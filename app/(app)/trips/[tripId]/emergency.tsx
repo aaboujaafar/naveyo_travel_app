@@ -20,8 +20,18 @@ export default function EmergencyRoute() {
     let active = true;
     void (async () => {
       try {
-        const [stops, reservations] = await Promise.all([modules.trips.listStops(tripId), modules.reservations.list(tripId).catch(() => [])]);
-        if (active) setCountries(buildEmergencySheet(stops, reservations));
+        const [stops, reservations, waivers] = await Promise.all([
+          modules.trips.listStops(tripId),
+          modules.reservations.list(tripId).catch(() => []),
+          modules.logisticsWaivers?.list(tripId).catch(() => []) ?? Promise.resolve([]),
+        ]);
+        const LABELS = { friends: "Chez des proches", camping: "Camping / van", other: "Hébergement" } as const;
+        const otherStays = waivers.flatMap(({ waiver }) => {
+          if (waiver.kind !== "stay" || !waiver.address) return [];
+          const stop = stops.find((item) => item.id === waiver.stopId);
+          return [{ stopId: waiver.stopId, label: `${LABELS[waiver.mode]}${stop ? ` à ${stop.name}` : ""}`, address: waiver.address }];
+        });
+        if (active) setCountries(buildEmergencySheet(stops, reservations, otherStays));
       } catch (cause) {
         // Without network, the last offline download has the Étapes and confirmed stays.
         const pack = await modules.offlineTripPack.get(tripId).catch(() => null);

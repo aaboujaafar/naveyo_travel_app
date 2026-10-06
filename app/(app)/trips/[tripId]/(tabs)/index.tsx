@@ -1,4 +1,7 @@
 import { useFocusEffect, useRouter, type Href } from "expo-router";
+import type { StoredWaiver } from "../../../../../src/modules/logistics";
+import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
+import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
 import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
 import { effectiveDeparture, type CityRef } from "../../../../../src/modules/trip-profiles";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
@@ -33,10 +36,18 @@ export default function TripDetailRoute() {
   const [itineraryItems, setItineraryItems] = useState<ItineraryItem[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [departure, setDeparture] = useState<CityRef | null>(null);
+  const [waivers, setWaivers] = useState<StoredWaiver[]>([]);
   const logistics = useMemo(
-    () => (stops.length > 0 ? detectLogisticsGaps({ stops, reservations, departure }) : null),
-    [departure, reservations, stops],
+    () => (stops.length > 0 ? detectLogisticsGaps({ stops, reservations, departure, waivers: waivers.map((item) => item.waiver) }) : null),
+    [departure, reservations, stops, waivers],
   );
+  // The stays and transport questions: opened at a gap, or after creating the Voyage or an Étape.
+  const [tunnelStart, setTunnelStart] = useState<string | null>(null);
+  const [tunnelRequested, setTunnelRequested] = useState(false);
+  if (tunnelRequested && logistics) {
+    setTunnelRequested(false);
+    if (logistics.gaps.length > 0) setTunnelStart(logistics.gaps[0]!.key);
+  }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
@@ -119,6 +130,8 @@ export default function TripDetailRoute() {
         modules.tripProfiles?.getDeparture(tripId).catch(() => null),
         modules.tripProfiles?.myProfile().catch(() => null),
       ]).then(([tripDeparture, profile]) => setDeparture(effectiveDeparture(tripDeparture, profile?.homeCity))),
+      // Optional: before its migration, nothing is waived.
+      (modules.logisticsWaivers?.list(tripId) ?? Promise.resolve([])).then(setWaivers, () => setWaivers([])),
       loadSummary(),
     ]);
 
@@ -224,12 +237,14 @@ export default function TripDetailRoute() {
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load]),
+      if (tripId && consumeLogisticsTunnel(tripId)) setTunnelRequested(true);
+    }, [load, tripId]),
   );
 
   const routeTripId = rawTripId ?? "";
 
   return (
+    <>
     <TripDashboardScreen
       trip={trip}
       stops={stops}
@@ -279,7 +294,7 @@ export default function TripDetailRoute() {
       onOpenQuestions={() => router.push(`/(app)/trips/${routeTripId}/ask`)}
       onOpenEmergency={() => router.push(`/(app)/trips/${routeTripId}/emergency`)}
       logistics={logistics}
-      onOpenGap={() => router.push(`/(app)/trips/${routeTripId}/reservations`)}
+      onOpenGap={(gap) => setTunnelStart(gap.key)}
       onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
@@ -300,6 +315,22 @@ export default function TripDetailRoute() {
       offlineSnapshot={offlineSnapshot}
       offlineReady={offlineReady}
     />
+    <LogisticsTunnelSheet
+      gaps={tunnelStart !== null && logistics ? logistics.gaps : null}
+      startKey={tunnelStart ?? undefined}
+      onImport={() => {
+        setTunnelStart(null);
+        router.push(`/(app)/trips/${routeTripId}/reservations`);
+      }}
+      onWaive={async (waiver) => {
+        const module = bootstrap?.modules.logisticsWaivers;
+        if (!module || !tripId) throw new Error("Indisponible pour le moment.");
+        await module.add(tripId, waiver);
+        setWaivers(await module.list(tripId));
+      }}
+      onClose={() => setTunnelStart(null)}
+    />
+    </>
   );
 }
 

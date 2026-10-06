@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { requestLogisticsTunnel } from "../../../src/screens/logistics-tunnel-store";
 import { useState } from "react";
 import { useTripsModule } from "../../../src/modules/trips";
 import type { Trip } from "../../../src/modules/_shared/model";
@@ -22,6 +23,8 @@ export default function NewTripScreen() {
         startsOn: values.startsOn,
         endsOn: values.endsOn,
       });
+      // The dashboard asks about stays and journeys on its first appearance.
+      requestLogisticsTunnel(trip.id);
       router.replace(`/(app)/trips/${trip.id}/invite`);
     } catch (cause: unknown) {
       setError(

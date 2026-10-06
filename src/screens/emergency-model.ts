@@ -93,7 +93,12 @@ export interface EmergencyCountry {
 }
 
 /** One section per country of the Voyage, in travel order. */
-export function buildEmergencySheet(stops: readonly Pick<Stop, "name" | "countryCode" | "startDate">[], reservations: readonly Reservation[]): EmergencyCountry[] {
+export function buildEmergencySheet(
+  stops: readonly (Pick<Stop, "name" | "countryCode" | "startDate"> & { id?: string })[],
+  reservations: readonly Reservation[],
+  /** Stays without a booking (« chez des proches », van…) that have an address. */
+  otherStays: readonly { stopId: string; label: string; address: string }[] = [],
+): EmergencyCountry[] {
   const ordered = [...stops].sort((left, right) => left.startDate.localeCompare(right.startDate));
   const countries = [...new Set(ordered.map((stop) => stop.countryCode.toUpperCase()))];
   const stays = reservations
@@ -109,11 +114,17 @@ export function buildEmergencySheet(stops: readonly Pick<Stop, "name" | "country
       countryCode,
       numbers: EMERGENCY_NUMBERS[countryCode] ?? null,
       stops: ordered.filter((stop) => stop.countryCode.toUpperCase() === countryCode).map((stop) => stop.name),
-      stays: countryStays.map((stay) => ({
-        name: stay.venue?.label && stay.venue.label !== stay.title ? `${stay.title} · ${stay.venue.label}` : stay.title,
-        ...(stay.venue?.address ? { address: stay.venue.address } : {}),
-        ...(stay.start?.local ? { from: stay.start.local.slice(0, 10) } : {}),
-      })),
+      stays: [
+        ...countryStays.map((stay) => ({
+          name: stay.venue?.label && stay.venue.label !== stay.title ? `${stay.title} · ${stay.venue.label}` : stay.title,
+          ...(stay.venue?.address ? { address: stay.venue.address } : {}),
+          ...(stay.start?.local ? { from: stay.start.local.slice(0, 10) } : {}),
+        })),
+        ...otherStays.flatMap((other) => {
+          const stop = ordered.find((item) => item.id === other.stopId);
+          return stop && stop.countryCode.toUpperCase() === countryCode ? [{ name: other.label, address: other.address, from: stop.startDate }] : [];
+        }),
+      ],
       taxiPhrase: TAXI_PHRASES[COUNTRY_LANGUAGES[countryCode] ?? "en"] ?? TAXI_PHRASES.en!,
     };
   });

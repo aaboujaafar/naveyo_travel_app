@@ -180,3 +180,14 @@ export function distance(left: Coordinates, right: Coordinates): number {
 function normalize(value: string): string {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
+
+export interface StoredWaiver {
+  id: string;
+  waiver: LogisticsWaiver;
+}
+
+export interface LogisticsWaiversModule {
+  list(tripId: string): Promise<StoredWaiver[]>;
+  add(tripId: string, waiver: LogisticsWaiver): Promise<void>;
+  remove(tripId: string, id: string): Promise<void>;
+}

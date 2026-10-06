@@ -24,5 +24,7 @@ describe("emergency sheet", () => {
     expect(sheet[0]!.stays).toEqual([{ name: "Hotel Avenida", address: "Av. da Liberdade 1", from: "2026-11-16" }]);
     expect(sheet[0]!.taxiPhrase).toBe("Por favor, leve-me a esta morada.");
     expect(sheet[2]!.taxiPhrase).toBe("Please take me to this address.");
+    const withFriends = buildEmergencySheet([{ id: "s1", name: "Porto", countryCode: "PT", startDate: "2026-11-19" }], [], [{ stopId: "s1", label: "Chez des proches à Porto", address: "Rua das Flores 10" }]);
+    expect(withFriends[0]!.stays).toEqual([{ name: "Chez des proches à Porto", address: "Rua das Flores 10", from: "2026-11-19" }]);
   });
 });
