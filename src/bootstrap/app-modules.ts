@@ -19,6 +19,7 @@ import { InMemoryTripPackFileStore } from "../adapters/sqlite/in-memory-file-sto
 import { fileTripPackStore } from "../adapters/file-system/trip-pack-store";
 import { createSupabaseTripProfilesModule } from "../adapters/supabase/trip-profiles";
 import { createSupabaseWishlistModule } from "../adapters/supabase/wishlist";
+import { createWikimediaTransitMapsModule } from "../adapters/wikimedia/transit-maps";
 import { OfflineTripPack } from "../modules/offline-trip-pack/module";
 import { createExpoLocationTrackingModule } from "../adapters/expo-location";
 import type { TripTrackingModule } from "../modules/trip-tracking";
@@ -48,6 +49,7 @@ export function createAppModules() {
   const packingList = createSupabasePackingListModule(client);
   const tripProfiles = createSupabaseTripProfilesModule(client);
   const wishlist = createSupabaseWishlistModule(client);
+  const transitMaps = createWikimediaTransitMapsModule();
   const weather = new Weather(createOpenMeteoWeatherProvider());
   const tripAssistant = createSupabaseTripAssistant(client);
   const dayPlanner = createSupabaseDayPlanner(client);
@@ -117,6 +119,7 @@ export function createAppModules() {
     packingList,
     tripProfiles,
     wishlist,
+    transitMaps,
   };
 }
 

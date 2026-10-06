@@ -44,6 +44,9 @@ export interface TripItineraryScreenProps {
   onDownloadOffline?: () => Promise<void>;
   /** Writes the programme and reservations into an iPhone calendar; resolves to the number of events. */
   onExportCalendar?: () => Promise<{ count: number; calendarName: string }>;
+  /** Public transport maps of the Stops, kept for offline use. */
+  onOpenTransitMaps?: () => void;
+  transitMapCount?: number;
   /** Opens Apple Plans on the destination, where its map can be saved offline. */
   onOpenAppleMaps?: () => void;
   /** Present when the itinerary can be edited (online, with an editor role). */
@@ -78,6 +81,8 @@ export function TripItineraryScreen({
   placeDetails,
   onDownloadOffline,
   onExportCalendar,
+  onOpenTransitMaps,
+  transitMapCount = 0,
   onOpenAppleMaps,
   onMoveItem,
   onRemoveItem,
@@ -344,6 +349,20 @@ export function TripItineraryScreen({
         </View>
 
         <OfflineCard offline={offline} onDownload={onDownloadOffline} onOpenAppleMaps={onOpenAppleMaps} />
+        {onOpenTransitMaps ? (
+          <Pressable accessibilityRole="button" onPress={onOpenTransitMaps} style={({ pressed }) => [styles.offlineCard, pressed && styles.pressed]}>
+            <View style={styles.offlineHeader}>
+              <Icon name="map" size={20} color={colors.tealStrong} />
+              <AppText variant="label" style={styles.flexOne}>Plans de transport</AppText>
+              <Icon name="arrow-right" size={16} color={colors.fg} />
+            </View>
+            <AppText variant="caption" color="muted">
+              {transitMapCount > 0
+                ? `${transitMapCount} plan${transitMapCount > 1 ? "s" : ""} de métro ou tram disponible${transitMapCount > 1 ? "s" : ""} sans réseau.`
+                : "Téléchargez le plan du métro ou du tram de vos Étapes pour le consulter sans réseau."}
+            </AppText>
+          </Pressable>
+        ) : null}
         {onExportCalendar ? <CalendarCard onExport={onExportCalendar} /> : null}
 
         <ComingSoonSection title="Famille en temps réel">

@@ -1,6 +1,6 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isTripOver, localToday } from "../../../../../../src/screens/trips-list-model";
 import { Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
@@ -28,6 +28,11 @@ export default function ItineraryRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tripOver, setTripOver] = useState(false);
+  const [transitMapCount, setTransitMapCount] = useState(0);
+  useFocusEffect(useCallback(() => {
+    if (!bootstrap?.modules.transitMaps || !tripId) return;
+    void bootstrap.modules.transitMaps.list(tripId).then((maps) => setTransitMapCount(maps.length), () => undefined);
+  }, [bootstrap, tripId]));
   useEffect(() => {
     if (!bootstrap || !tripId) return;
     let active = true;
@@ -145,6 +150,8 @@ export default function ItineraryRoute() {
         setOffline(await modules.offlineTripPack.load(tripId));
       }}
       canComposeDay={!tripOver}
+      transitMapCount={transitMapCount}
+      onOpenTransitMaps={bootstrap?.modules.transitMaps ? () => router.push(`/(app)/trips/${tripId}/transit`) : undefined}
       onOpenAssistant={(stopId) => {
         if (tripId) {
           router.push(`/trips/${tripId}/assistant?stopId=${stopId}&mode=day`);
