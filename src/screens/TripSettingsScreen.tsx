@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Trip } from "../modules/trips";
+import type { CityRef, TravelParty } from "../modules/trip-profiles";
+import { CityPickerSheet } from "./CityPickerSheet";
+import { TravelPartyCard } from "./TravelPartyCard";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import {
   AppText,
@@ -26,17 +29,21 @@ export interface TripSettingsScreenProps {
   onBack: () => void;
   onSave: (values: TripSettingsValues) => Promise<void>;
   onOpenInvitation: () => void;
+  /** Names shared by the members, keyed by account; the current account is flagged. */
+  memberNames?: Record<string, string>;
+  currentAccountId?: string | null;
+  party?: TravelParty | null;
+  partyStatus?: { saving: boolean; error: string | null; message: string | null };
+  onSaveParty?: (party: TravelParty) => Promise<void>;
+  /** The Voyage's departure city; `departureIsDefault` when it comes from the home city. */
+  departure?: CityRef | null;
+  departureIsDefault?: boolean;
+  onSaveDeparture?: (city: CityRef | null) => Promise<void>;
 }
 
-export function TripSettingsScreen({
-  trip,
-  saving,
-  message,
-  error,
-  onBack,
-  onSave,
-  onOpenInvitation,
-}: TripSettingsScreenProps) {
+export function TripSettingsScreen(props: TripSettingsScreenProps) {
+  const { trip, saving, message, error, onBack, onSave, onOpenInvitation } = props;
+  const [departurePicker, setDeparturePicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [attempted, setAttempted] = useState(false);
   const [values, setValues] = useState<TripSettingsValues>(() => ({
@@ -158,24 +165,57 @@ export function TripSettingsScreen({
             <Badge label={`${trip?.members.length ?? 0} compte(s)`} variant="teal" />
           </View>
           <View style={styles.formCard}>
-            {trip?.members.map((member, index) => (
+            {trip?.members.map((member, index) => {
+              const name = props.memberNames?.[member.accountId] ?? `Compte ${index + 1}`;
+              const isMe = props.currentAccountId === member.accountId;
+              return (
               <View key={member.accountId} style={styles.memberRow}>
                 <View style={styles.memberAvatar}>
-                  <AppText variant="label" color="accent">C{index + 1}</AppText>
+                  <AppText variant="label" color="accent">{name.slice(0, 1).toUpperCase()}</AppText>
                 </View>
                 <View style={styles.memberInfo}>
-                  <AppText variant="label">Compte {index + 1}</AppText>
+                  <AppText variant="label">{isMe ? `${name} (vous)` : name}</AppText>
                   <AppText variant="caption" color="muted">
                     {member.role === "owner" ? "Propriétaire" : "Éditeur"}
                   </AppText>
                 </View>
               </View>
-            ))}
+              );
+            })}
             <Button fullWidth variant="secondary" onPress={onOpenInvitation} disabled={!trip}>
               Inviter le second Compte
             </Button>
           </View>
         </View>
+
+        {props.onSaveParty ? (
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeader}>
+              <AppText variant="h3">Qui voyage ?</AppText>
+            </View>
+            {props.onSaveDeparture ? (
+              <Pressable accessibilityRole="button" onPress={() => setDeparturePicker(true)} style={({ pressed }) => [styles.formCard, styles.departureRow, pressed && styles.pressedRow]}>
+                <Icon name="map-pin" size={20} color={colors.tealStrong} />
+                <View style={styles.memberInfo}>
+                  <AppText variant="label">{props.departure ? `Départ de ${props.departure.name}` : "Ville de départ"}</AppText>
+                  <AppText variant="caption" color="muted">
+                    {props.departure ? (props.departureIsDefault ? "Votre ville, par défaut · toucher pour changer" : "Pour ce Voyage · toucher pour changer") : "Pour proposer l’aller et le retour"}
+                  </AppText>
+                </View>
+                <Icon name="arrow-right" size={16} color={colors.fg} />
+              </Pressable>
+            ) : null}
+            <TravelPartyCard
+              defaultAdults={Math.max(1, trip?.members.length ?? 1)}
+              key={props.party ? "loaded" : "empty"}
+              party={props.party ?? null}
+              saving={props.partyStatus?.saving ?? false}
+              error={props.partyStatus?.error}
+              message={props.partyStatus?.message}
+              onSave={props.onSaveParty}
+            />
+          </View>
+        ) : null}
 
         <ComingSoonSection title="Photo de couverture">
           <View style={styles.coverPreview}>
@@ -209,6 +249,17 @@ export function TripSettingsScreen({
           </AppText>
         </View>
       </ScrollView>
+      {props.onSaveDeparture && trip ? (
+        <CityPickerSheet
+          visible={departurePicker}
+          tripId={trip.id}
+          title="Ville de départ du Voyage"
+          hint="Pour proposer l’aller et le retour. Par défaut, c’est la ville de votre compte."
+          onPick={(city) => props.onSaveDeparture?.(city)}
+          onClear={props.departure && !props.departureIsDefault ? () => props.onSaveDeparture?.(null) : undefined}
+          onClose={() => setDeparturePicker(false)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -236,6 +287,8 @@ const styles = StyleSheet.create({
   memberRow: { minHeight: spacing["2xl"] + spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   memberAvatar: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
   memberInfo: { flex: 1, gap: spacing.xs },
+  departureRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.md },
+  pressedRow: { opacity: 0.7 },
   coverPreview: { minHeight: spacing["2xl"] * 3, alignItems: "center", justifyContent: "center", gap: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, backgroundColor: colors.surface },
   preferenceRow: { minHeight: spacing["2xl"] + spacing.xs, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   togglePreview: { width: spacing["2xl"], height: spacing.xl - spacing.xs, alignItems: "flex-end", justifyContent: "center", padding: spacing.xs, borderRadius: radius.full, backgroundColor: colors.accent },

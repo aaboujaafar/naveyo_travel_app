@@ -6,6 +6,7 @@ import type { UUID } from "../modules/_shared/model";
 import { colors, layout, radius, shadows, spacing } from "../theme";
 import { AppText, BottomSheet, Button, Icon, InlineMessage, Input, ProgressBar, Skeleton } from "../ui";
 import { RecordsTabs } from "./TripDocumentsScreen";
+import type { PackingSuggestion } from "./packing-suggestions";
 import {
   derivePackingProgress,
   filterPackingItems,
@@ -28,7 +29,8 @@ export interface TripPackingScreenProps {
   loading: boolean;
   saving?: boolean;
   error: string | null;
-  onBack: () => void;
+  /** Absent when the list is shown inside the Documents tab. */
+  onBack?: () => void;
   onOpenDocuments: () => void;
   onOpenReservations: () => void;
   onRetry: () => Promise<void>;
@@ -36,6 +38,9 @@ export interface TripPackingScreenProps {
   onAddItem: (input: Omit<AddPackingItemInput, "tripId">) => Promise<boolean | void>;
   onTogglePacked: (item: PackingItem, packed: boolean) => Promise<void>;
   onRemoveItem: (item: PackingItem) => Promise<void>;
+  /** Ideas computed from the Voyage, minus what is already on the list. */
+  suggestions?: readonly PackingSuggestion[];
+  onAddSuggestions?: (selection: PackingSuggestion[]) => Promise<boolean>;
 }
 
 export function TripPackingScreen(props: TripPackingScreenProps) {
@@ -47,6 +52,18 @@ export function TripPackingScreen(props: TripPackingScreenProps) {
   const [quantity, setQuantity] = useState("1");
   const [category, setCategory] = useState<PackingCategory>("other");
   const [stopId, setStopId] = useState<UUID | undefined>();
+  const [suggestionsVisible, setSuggestionsVisible] = useState(false);
+  const [rejected, setRejected] = useState<ReadonlySet<string>>(new Set());
+  const suggestions = props.suggestions ?? [];
+  const selectedSuggestions = suggestions.filter((suggestion) => !rejected.has(suggestion.label));
+
+  async function addSuggestions() {
+    if (!props.onAddSuggestions || selectedSuggestions.length === 0) return;
+    const saved = await props.onAddSuggestions(selectedSuggestions);
+    if (saved === false) return;
+    setRejected(new Set());
+    setSuggestionsVisible(false);
+  }
 
   const progress = useMemo(() => derivePackingProgress(props.items), [props.items]);
   const visibleItems = useMemo(
@@ -86,11 +103,13 @@ export function TripPackingScreen(props: TripPackingScreenProps) {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={props.onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <Icon name="arrow-left" size={20} />
-          </Pressable>
+          {props.onBack ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={props.onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+              <Icon name="arrow-left" size={20} />
+            </Pressable>
+          ) : null}
           <View style={styles.flexOne}>
-            <AppText variant="h2">Bagages</AppText>
+            <AppText variant={props.onBack ? "h2" : "h1"}>Bagages</AppText>
             <AppText variant="caption" color="muted">{props.tripName}</AppText>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Actualiser la liste de bagages" onPress={() => void props.onRetry()} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
@@ -115,12 +134,56 @@ export function TripPackingScreen(props: TripPackingScreenProps) {
           {packingCategories.map((value) => <FilterChip key={value} label={packingCategoryLabels[value]} active={categoryFilter === value} onPress={() => setCategoryFilter(value)} />)}
         </ScrollView>
 
+        {!props.loading && suggestions.length > 0 && props.onAddSuggestions ? (
+          <Pressable accessibilityRole="button" onPress={() => setSuggestionsVisible(true)} style={({ pressed }) => [styles.suggestionCard, pressed && styles.pressed]}>
+            <Icon name="sparkles" size={20} color={colors.tealStrong} />
+            <View style={styles.flexOne}>
+              <AppText variant="label">{props.items.length === 0 ? "Partir d’une liste suggérée" : "Compléter la liste"}</AppText>
+              <AppText variant="caption" color="muted">{`${suggestions.length} idée${suggestions.length > 1 ? "s" : ""} selon la durée, la saison et les pays du Voyage`}</AppText>
+            </View>
+            <Icon name="arrow-right" size={16} color={colors.muted} />
+          </Pressable>
+        ) : null}
+
         <View style={styles.list}>
           {props.loading ? <PackingLoading /> : visibleItems.length === 0 ? <InlineMessage title={props.items.length === 0 ? "Aucun élément à préparer" : "Aucun résultat"} message={props.items.length === 0 ? "Ajoutez les affaires nécessaires à votre Voyage." : "Modifiez les filtres pour afficher d’autres éléments."} /> : visibleItems.map((item) => <PackingRow key={item.id} item={item} stopName={props.stops?.find((stop) => stop.id === item.stopId)?.name} onToggle={(packed) => void props.onTogglePacked(item, packed)} onRemove={() => confirmRemove(item)} />)}
         </View>
       </ScrollView>
 
       <Pressable accessibilityRole="button" accessibilityLabel="Ajouter un élément à préparer" onPress={() => setSheetVisible(true)} style={({ pressed }) => [styles.fab, shadows.lg, pressed && styles.pressed]}><Icon name="plus" size={24} color={colors.white} /></Pressable>
+
+      <BottomSheet visible={suggestionsVisible} onClose={() => setSuggestionsVisible(false)} title="Liste suggérée" maxHeight={700}>
+        {props.error && suggestionsVisible ? <InlineMessage variant="error" title="Ajout impossible" message={props.error} /> : null}
+        <AppText variant="caption" color="muted">Décochez ce qui ne vous concerne pas.</AppText>
+        <View style={styles.suggestionList}>
+          {suggestions.map((suggestion) => {
+            const checked = !rejected.has(suggestion.label);
+            return (
+              <Pressable
+                key={suggestion.label}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                onPress={() => setRejected((current) => {
+                  const next = new Set(current);
+                  if (checked) next.add(suggestion.label);
+                  else next.delete(suggestion.label);
+                  return next;
+                })}
+                style={styles.suggestionRow}
+              >
+                <View style={[styles.suggestionCheck, checked && styles.suggestionCheckOn]}>{checked ? <Icon name="check" size={14} color={colors.white} /> : null}</View>
+                <View style={styles.flexOne}>
+                  <AppText variant="label">{suggestion.quantity > 1 ? `${suggestion.label} × ${suggestion.quantity}` : suggestion.label}</AppText>
+                  <AppText variant="caption" color="muted">{[labelPackingCategory(suggestion.category), suggestion.reason].filter(Boolean).join(" · ")}</AppText>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Button fullWidth loading={props.saving} disabled={selectedSuggestions.length === 0} onPress={() => void addSuggestions()}>
+          {`Ajouter ${selectedSuggestions.length} élément${selectedSuggestions.length > 1 ? "s" : ""}`}
+        </Button>
+      </BottomSheet>
 
       <BottomSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} title="Ajouter aux bagages" maxHeight={700}>
         {props.error && sheetVisible ? <InlineMessage variant="error" title="Ajout impossible" message={props.error} /> : null}
@@ -142,7 +205,7 @@ function PackingRow({ item, stopName, onToggle, onRemove }: { item: PackingItem;
       <View style={[styles.checkBox, item.packed && styles.checkBoxChecked]}>{item.packed ? <Icon name="check" size={16} color={colors.white} /> : null}</View>
       <View style={styles.itemBody}><AppText variant="label" numberOfLines={2} style={item.packed ? styles.struck : undefined}>{item.label}</AppText><AppText variant="caption" color="muted">{detail}</AppText></View>
     </Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Supprimer ${item.label}`} onPress={onRemove} hitSlop={8} style={styles.deleteButton}><Icon name="close" size={20} color={colors.danger} /></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Supprimer ${item.label}`} onPress={onRemove} hitSlop={8} style={styles.deleteButton}><Icon name="close" size={16} color={colors.muted} /></Pressable>
   </View>;
 }
 
@@ -162,5 +225,10 @@ function parseQuantity(value: string): number {
 function PackingLoading() { return <View style={styles.loading}><Skeleton height={72} /><Skeleton height={72} /><Skeleton height={72} /></View>; }
 
 const styles = StyleSheet.create({
+  suggestionCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tealSoft },
+  suggestionList: { gap: spacing.xs },
+  suggestionRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  suggestionCheck: { width: 22, height: 22, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  suggestionCheckOn: { backgroundColor: colors.teal, borderColor: colors.teal },
   screen: { flex: 1, backgroundColor: colors.bg }, scrollContent: { width: "100%", maxWidth: layout.maxMobileWidth, alignSelf: "center", paddingBottom: spacing["2xl"] * 3 }, header: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg }, backButton: { width: spacing["2xl"] - spacing.xs, height: spacing["2xl"] - spacing.xs, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }, message: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }, progressCard: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, gap: spacing.md }, progressHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, filters: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }, chip: { minHeight: spacing["2xl"] - spacing.xs, paddingHorizontal: spacing.md - spacing.xs, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, chipActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent }, list: { marginHorizontal: spacing.lg, marginTop: spacing.md, gap: spacing.sm }, itemCard: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md }, itemPacked: { backgroundColor: colors.tealSoft, borderColor: colors.teal }, itemToggle: { flex: 1, minWidth: 0, minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md }, checkBox: { width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }, checkBoxChecked: { backgroundColor: colors.teal, borderColor: colors.teal }, itemBody: { flex: 1, minWidth: 0, gap: spacing.xs }, struck: { textDecorationLine: "line-through", color: colors.muted }, deleteButton: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center" }, fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, width: spacing["2xl"] + spacing.sm, height: spacing["2xl"] + spacing.sm, borderRadius: radius.full, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center" }, choiceWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, flexOne: { flex: 1 }, pressed: { transform: [{ scale: 0.97 }] }, loading: { gap: spacing.sm },
 });

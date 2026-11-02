@@ -1,10 +1,27 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, type Href } from "expo-router";
+import type { LogisticsGap, StoredWaiver } from "../../../../../src/modules/logistics";
+import { findCityCode } from "../../../../../src/adapters/travelpayouts/city-codes";
+import { PartnerSearchSheet, type PartnerSearchGroup } from "../../../../../src/screens/PartnerSearchSheet";
+import { journeyGroups, stayGroups } from "../../../../../src/screens/partner-search-model";
+import { carLinks, esimLinks, suggestExtras, type JourneyEstimate } from "../../../../../src/modules/partners";
+import { shortDate } from "../../../../../src/screens/logistics-model";
+import { formatCountry } from "../../../../../src/screens/place-detail-model";
+import { isTripOver, localToday } from "../../../../../src/screens/trips-list-model";
+import { loadTripFormalities, type TripFormalities } from "../../../../../src/screens/formalities-loader";
+import { AppText, BottomSheet, Button } from "../../../../../src/ui";
+import { LogisticsTunnelSheet } from "../../../../../src/screens/LogisticsTunnelSheet";
+import { consumeLogisticsTunnel } from "../../../../../src/screens/logistics-tunnel-store";
+import { detectLogisticsGaps } from "../../../../../src/modules/logistics";
+import { effectiveDeparture, type CityRef } from "../../../../../src/modules/trip-profiles";
 import { useTripTabParams } from "../../../../../src/ui/TripRouteContext";
-import { useCallback, useState } from "react";
+import * as Location from "expo-location";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, Linking } from "react-native";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type {
   Coordinates,
   ItineraryItem,
+  Money,
   Reservation,
   Stop,
   Trip,
@@ -12,7 +29,9 @@ import type {
 } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripDashboardScreen } from "../../../../../src/screens/TripDashboardScreen";
-import type { DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
+import type { DashboardSummary, DashboardWeatherState } from "../../../../../src/screens/TripDashboardScreen";
+import { buildTodayPlan, localNow } from "../../../../../src/screens/today-model";
+import { planBAssistantPath } from "../../../../../src/screens/weather-plan-b";
 import { dashboardRouteCoordinates } from "../../../../../src/screens/trip-dashboard-model";
 
 export default function TripDetailRoute() {
@@ -25,11 +44,84 @@ export default function TripDetailRoute() {
   const [stops, setStops] = useState<Stop[]>([]);
   const [itineraryItems, setItineraryItems] = useState<ItineraryItem[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [departure, setDeparture] = useState<CityRef | null>(null);
+  const [waivers, setWaivers] = useState<StoredWaiver[]>([]);
+  const logistics = useMemo(
+    () => (stops.length > 0 ? detectLogisticsGaps({ stops, reservations, departure, waivers: waivers.map((item) => item.waiver) }) : null),
+    [departure, reservations, stops, waivers],
+  );
+  // The stays and transport questions: opened at a gap, or after creating the Voyage or an Étape.
+  const [tunnelStart, setTunnelStart] = useState<string | null>(null);
+  const [search, setSearch] = useState<{ title: string; summary: string; groups: PartnerSearchGroup[] | null; estimates?: JourneyEstimate[] } | null>(null);
+  // A hire car is suggested where no railway station is within 5 km (looked up once per Étape).
+  const [stationNearby, setStationNearby] = useState<Record<string, boolean | undefined>>({});
+  const tripIsOver = isTripOver(trip, localToday());
+  const stationLookups = useRef(new Set<string>());
+  useEffect(() => {
+    const places = bootstrap?.modules.places;
+    if (!places || !tripId || tripIsOver) return;
+    for (const stop of stops) {
+      if (!stop.coordinates || stationLookups.current.has(stop.id)) continue;
+      stationLookups.current.add(stop.id);
+      void places.nearby({ coordinates: stop.coordinates, tripId: tripId as UUID, type: "station", radiusMeters: 5_000, limit: 1 })
+        .then((found) => setStationNearby((current) => ({ ...current, [stop.id]: found.length > 0 })), () => undefined);
+    }
+  }, [bootstrap, stops, tripId, tripIsOver]);
+  const [formalities, setFormalities] = useState<TripFormalities | null>(null);
+  useEffect(() => {
+    if (!bootstrap || !tripId || stops.length === 0 || tripIsOver) return;
+    let active = true;
+    void loadTripFormalities(bootstrap.modules, tripId as UUID, stops).then((next) => {
+      if (active) setFormalities(next);
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, stops, tripId, tripIsOver]);
+  const extras = useMemo(() => (tripIsOver ? [] : suggestExtras(stops, stationNearby)), [stationNearby, stops, tripIsOver]);
+
+  // Back from a partner site: offer to import what was just booked (tracked on the phone only).
+  const [openedPartner, setOpenedPartner] = useState<{ label: string; at: number } | null>(null);
+  const [askBooked, setAskBooked] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openedPartner) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && Date.now() - openedPartner.at > 15_000) {
+        setAskBooked(openedPartner.label);
+        setOpenedPartner(null);
+      }
+    });
+    return () => subscription.remove();
+  }, [openedPartner]);
+  const openSearch = async (gap: LogisticsGap) => {
+    setTunnelStart(null);
+    const party = await bootstrap?.modules.tripProfiles?.getParty(tripId as UUID).catch(() => null);
+    const people = { adults: party?.adults ?? Math.max(1, trip?.members.length ?? 1), childrenAges: party?.childrenAges ?? [] };
+    if (gap.kind === "stay") {
+      const { summary, groups } = stayGroups(gap, people, itineraryItems);
+      setSearch({ title: "Chercher un hébergement", summary, groups });
+      return;
+    }
+    setSearch({ title: "Chercher un billet", summary: `${gap.from.name} → ${gap.to.name}`, groups: null });
+    // Flight searches need the cities' IATA codes; ground searches do not.
+    const [from, to] = await Promise.all([findCityCode(gap.from), findCityCode(gap.to)]);
+    const { summary, groups, estimates } = journeyGroups(gap, people, { ...(from ? { from } : {}), ...(to ? { to } : {}) });
+    setSearch({ title: "Chercher un billet", summary, groups, estimates });
+  };
+  const [tunnelRequested, setTunnelRequested] = useState(false);
+  if (tunnelRequested && logistics) {
+    setTunnelRequested(false);
+    if (logistics.gaps.length > 0) setTunnelStart(logistics.gaps[0]!.key);
+  }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<DashboardWeatherState>({ status: "loading" });
   const [weatherByStopId, setWeatherByStopId] = useState<Record<string, DashboardWeatherState>>({});
   const [routePolyline, setRoutePolyline] = useState<Coordinates[]>([]);
+  const [summary, setSummary] = useState<DashboardSummary>({});
+  const [offlineSnapshot, setOfflineSnapshot] = useState(false);
+  const [offlineReady, setOfflineReady] = useState<boolean | undefined>(undefined);
+  const [travelToNext, setTravelToNext] = useState<{ key: string; seconds: number } | null>(null);
 
   const load = useCallback(async () => {
     if (!trips || !bootstrap || !tripId) {
@@ -43,93 +135,181 @@ export default function TripDetailRoute() {
       setLoading(false);
       return;
     }
+    const { modules } = bootstrap;
+
+    // The last offline download paints the screen at once; the network then refreshes it.
+    const pack = await modules.offlineTripPack.get(tripId).catch(() => null);
+    setOfflineReady(pack !== null);
+    if (pack) {
+      setTrip((current) => current ?? pack.trip);
+      setStops((current) => (current.length > 0 ? current : pack.stops));
+      setItineraryItems((current) => (current.length > 0 ? current : pack.itinerary));
+      setReservations((current) => (current.length > 0 ? current : pack.reservations));
+      setLoading(false);
+    }
 
     setError(null);
+    let nextStops: Stop[];
     try {
-      const [nextTrip, nextStops] = await Promise.all([
+      const [nextTrip, loadedStops] = await Promise.all([
         trips.get(tripId),
         trips.listStops(tripId),
       ]);
+      nextStops = loadedStops;
       setTrip(nextTrip);
-      setStops(nextStops);
-      let loadedItinerary: ItineraryItem[] = [];
-      try {
-        loadedItinerary = await bootstrap.modules.itinerary.list(tripId);
+      setStops(loadedStops);
+      setOfflineSnapshot(false);
+    } catch (cause: unknown) {
+      setOfflineSnapshot(pack !== null);
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de charger le Voyage.",
+      );
+      setLoading(false);
+      return;
+    }
+    setLoading(false);
+
+    const itineraryTask = modules.itinerary.list(tripId).then(
+      async (loadedItinerary) => {
         setItineraryItems(loadedItinerary);
-        if (bootstrap.modules.routing) {
-          const routeCoordinates = dashboardRouteCoordinates(nextStops, loadedItinerary);
-          if (routeCoordinates.length >= 2) {
-            try {
-              const route = await bootstrap.modules.routing.calculate({
-                tripId,
-                coordinates: routeCoordinates,
-                mode: "drive",
-              });
-              setRoutePolyline(route?.geometry ?? []);
-            } catch {
-              setRoutePolyline([]);
-            }
-          } else {
-            setRoutePolyline([]);
-          }
-        } else {
-          setRoutePolyline([]);
-        }
-      } catch {
-        setItineraryItems([]);
+        await loadRoute(nextStops, loadedItinerary);
+        return loadedItinerary;
+      },
+      () => {
         setError(
           "Le Voyage et ses Étapes sont chargés, mais les lieux de la carte sont temporairement indisponibles.",
         );
+        return [] as ItineraryItem[];
+      },
+    );
+
+    await Promise.all([
+      itineraryTask.then((loadedItinerary) => loadWeather(nextStops, loadedItinerary)),
+      modules.reservations.list(tripId).then(setReservations, () => {
+        setError("Le Voyage est chargé, mais les Réservations sont temporairement indisponibles.");
+      }),
+      // The departure city adds the outbound and return journeys to the logistics.
+      Promise.all([
+        modules.tripProfiles?.getDeparture(tripId).catch(() => null),
+        modules.tripProfiles?.myProfile().catch(() => null),
+      ]).then(([tripDeparture, profile]) => setDeparture(effectiveDeparture(tripDeparture, profile?.homeCity))),
+      // Optional: before its migration, nothing is waived.
+      (modules.logisticsWaivers?.list(tripId) ?? Promise.resolve([])).then(setWaivers, () => setWaivers([])),
+      loadSummary(),
+    ]);
+
+    async function loadRoute(loadedStops: Stop[], loadedItinerary: ItineraryItem[]) {
+      if (!modules.routing || !tripId) return setRoutePolyline([]);
+      const routeCoordinates = dashboardRouteCoordinates(loadedStops, loadedItinerary);
+      if (routeCoordinates.length < 2) return setRoutePolyline([]);
+      try {
+        const route = await modules.routing.calculate({ tripId, coordinates: routeCoordinates, mode: "drive" });
+        setRoutePolyline(route?.geometry ?? []);
+      } catch {
+        setRoutePolyline([]);
       }
-      const weatherEntries = await Promise.all(nextStops.map(async (stop) => {
+    }
+
+    async function loadSummary() {
+      if (!tripId) return;
+      const [budget, packing] = await Promise.all([
+        modules.expenses.summarize(tripId).catch(() => null),
+        modules.packingList.list(tripId).catch(() => null),
+      ]);
+      setSummary({
+        budget: budget
+          ? {
+              spent: formatCompactMoney(budget.spent),
+              planned: budget.planned.minorUnits > 0 ? formatCompactMoney(budget.planned) : null,
+              progress: budget.progress,
+            }
+          : null,
+        packing: packing ? { packed: packing.filter((item) => item.packed).length, total: packing.length } : null,
+      });
+    }
+
+    async function loadWeather(loadedStops: Stop[], loadedItinerary: ItineraryItem[]) {
+      if (!tripId) return;
+      const weatherEntries = await Promise.all(loadedStops.map(async (stop) => {
         const itineraryItem = loadedItinerary.find((item) => item.stopId === stop.id && item.place?.coordinates);
         let coordinates = itineraryItem?.place?.coordinates ?? stop.coordinates;
         if (!coordinates) {
           try {
-            coordinates = (await bootstrap.modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
+            coordinates = (await modules.places.search({ query: stop.name, countryCode: stop.countryCode, stopId: stop.id, tripId })).at(0)?.coordinates;
           } catch {
             coordinates = undefined;
           }
         }
         if (!coordinates) return [stop.id, { status: "empty", message: "Étape sans coordonnées" } satisfies DashboardWeatherState] as const;
         try {
-          const forecast = await bootstrap.modules.weather.forecast({ coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate });
-          return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days: forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax })) }] as const;
+          const input = { coordinates, timeZone: stop.timeZone, startDate: stop.startDate, endDate: stop.endDate };
+          const forecast = await modules.weather.forecast(input);
+          const days = forecast.daily.filter((day) => day.date >= stop.startDate && day.date <= stop.endDate).map((day) => ({ date: day.date, label: formatWeatherDate(day.date, stop.timeZone), icon: weatherIcon(day.weatherCode), temperatureMin: day.temperatureMinC, temperatureMax: day.temperatureMaxC, precipitationProbabilityMax: day.precipitationProbabilityMax }));
+          // Outside the 16-day forecast window, last year's observations give an idea of the climate.
+          const climate = days.length === 0 ? await modules.weather.climate(input).catch(() => null) : null;
+          return [stop.id, { status: "ready", updatedAt: forecast.fetchedAt, days, ...(climate ? { climate } : {}) }] as const;
         } catch (cause) {
           return [stop.id, { status: "error", message: cause instanceof Error ? cause.message : "Météo indisponible" } satisfies DashboardWeatherState] as const;
         }
       }));
       const weatherMap = Object.fromEntries(weatherEntries) as Record<string, DashboardWeatherState>;
       setWeatherByStopId(weatherMap);
-      setWeather(nextStops[0] ? weatherMap[nextStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
-      try {
-        setReservations(await bootstrap.modules.reservations.list(tripId));
-      } catch {
-        setReservations([]);
-        setError(
-          "Le Voyage est chargé, mais les Réservations sont temporairement indisponibles.",
-        );
-      }
-    } catch (cause: unknown) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Impossible de charger le Voyage.",
-      );
-    } finally {
-      setLoading(false);
+      setWeather(loadedStops[0] ? weatherMap[loadedStops[0].id] ?? { status: "empty" } : { status: "empty", message: "Aucune Étape" });
     }
   }, [bootstrap, tripId, trips]);
+
+  // While the Voyage is under way, the dashboard follows the local day of the current Étape.
+  const today = useMemo(() => {
+    if (!trip) return null;
+    const timeZone = stops.find((stop) => {
+      const date = localNow(stop.timeZone).slice(0, 10);
+      return stop.startDate <= date && date <= stop.endDate;
+    })?.timeZone ?? stops[0]?.timeZone;
+    if (!timeZone) return null;
+    return buildTodayPlan({ trip, stops, items: itineraryItems, reservations, now: localNow(timeZone) });
+  }, [trip, stops, itineraryItems, reservations]);
+
+  const nextCoordinates = today?.next?.item.place?.coordinates;
+  const nextKey = nextCoordinates ? `${nextCoordinates.latitude},${nextCoordinates.longitude}` : null;
+  // A duration computed for a previous "next" activity is never shown for the new one.
+  const travelToNextSeconds = travelToNext && travelToNext.key === nextKey ? travelToNext.seconds : null;
+  useEffect(() => {
+    if (!nextCoordinates || !nextKey || !tripId || !bootstrap?.modules.routing) return;
+    let active = true;
+    void (async () => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (!permission.granted) return;
+        const position = await Location.getLastKnownPositionAsync();
+        if (!position || !active) return;
+        const route = await bootstrap.modules.routing?.calculate({
+          tripId,
+          mode: "walk",
+          coordinates: [{ latitude: position.coords.latitude, longitude: position.coords.longitude }, nextCoordinates],
+        });
+        if (active && route?.durationSeconds != null) setTravelToNext({ key: nextKey, seconds: route.durationSeconds });
+      } catch {
+        // The "Y aller" button still works without a duration.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, nextCoordinates, nextKey, tripId]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load]),
+      if (tripId && consumeLogisticsTunnel(tripId)) setTunnelRequested(true);
+    }, [load, tripId]),
   );
 
   const routeTripId = rawTripId ?? "";
 
   return (
+    <>
     <TripDashboardScreen
       trip={trip}
       stops={stops}
@@ -172,13 +352,90 @@ export default function TripDetailRoute() {
       onOpenDocuments={() =>
         router.push(`/trips/${routeTripId}/documents`)
       }
+      onPlanB={(date) => {
+        const stop = stops.find((candidate) => candidate.startDate <= date && date <= candidate.endDate) ?? stops[0];
+        if (stop) router.push(planBAssistantPath(routeTripId, stop.id, date) as Href);
+      }}
+      onOpenQuestions={() => router.push(`/(app)/trips/${routeTripId}/ask`)}
+      onOpenEmergency={() => router.push(`/(app)/trips/${routeTripId}/emergency`)}
+      logistics={logistics}
+      onOpenGap={(gap) => setTunnelStart(gap.key)}
+      extras={extras}
+      formalities={formalities}
+      onSetNationality={() => router.push("/(app)/account")}
+      onToggleFormality={formalities?.canCheck && bootstrap?.modules.tripChecks && tripId ? (key, done) => {
+        // Ticked at once on screen; reverted if the save fails.
+        setFormalities((current) => {
+          if (!current) return current;
+          const checked = new Set(current.checked);
+          if (done) checked.add(key); else checked.delete(key);
+          return { ...current, checked };
+        });
+        void bootstrap.modules.tripChecks?.set(tripId, key, done).catch(() => setFormalities((current) => {
+          if (!current) return current;
+          const checked = new Set(current.checked);
+          if (done) checked.delete(key); else checked.add(key);
+          return { ...current, checked };
+        }));
+      } : undefined}
+      onOpenExtra={(extra) => setSearch(extra.kind === "car"
+        ? { title: "Louer une voiture", summary: `${extra.stopName} · ${shortDate(extra.startDate)} → ${shortDate(extra.endDate)}`, groups: [{ title: "Location", links: carLinks() }] }
+        : { title: "eSIM pour le Voyage", summary: `${formatCountry(extra.countryCode) ?? extra.countryCode} · ${extra.stopNames.join(", ")}`, groups: [{ title: "Données mobiles", links: esimLinks() }] })}
+      onOpenRecap={() => router.push(`/(app)/trips/${routeTripId}/recap`)}
       onOpenPacking={() =>
         router.push(`/(app)/trips/${routeTripId}/packing`)
       }
       weather={weather}
       weatherByStopId={weatherByStopId}
       routePolyline={routePolyline}
+      today={today}
+      travelToNextSeconds={travelToNextSeconds}
+      onOpenDirections={(entry) => {
+        const coordinates = entry.item.place?.coordinates;
+        if (!coordinates) return;
+        void Linking.openURL(
+          `http://maps.apple.com/?daddr=${coordinates.latitude},${coordinates.longitude}&dirflg=w&q=${encodeURIComponent(entry.item.title)}`,
+        );
+      }}
+      summary={summary}
+      offlineSnapshot={offlineSnapshot}
+      offlineReady={offlineReady}
     />
+    <LogisticsTunnelSheet
+      gaps={tunnelStart !== null && logistics ? logistics.gaps : null}
+      startKey={tunnelStart ?? undefined}
+      onSearch={(gap) => void openSearch(gap)}
+      onImport={() => {
+        setTunnelStart(null);
+        router.push(`/(app)/trips/${routeTripId}/reservations`);
+      }}
+      onWaive={async (waiver) => {
+        const module = bootstrap?.modules.logisticsWaivers;
+        if (!module || !tripId) throw new Error("Indisponible pour le moment.");
+        await module.add(tripId, waiver);
+        setWaivers(await module.list(tripId));
+      }}
+      onClose={() => setTunnelStart(null)}
+    />
+    <PartnerSearchSheet
+      visible={search !== null}
+      title={search?.title ?? ""}
+      summary={search?.summary ?? ""}
+      groups={search?.groups ?? null}
+      estimates={search?.estimates}
+      loading={search !== null && search.groups === null}
+      onOpened={(link) => {
+        setSearch(null);
+        setOpenedPartner({ label: link.label, at: Date.now() });
+      }}
+      onClose={() => setSearch(null)}
+    />
+    <BottomSheet visible={askBooked !== null} onClose={() => setAskBooked(null)} title="Avez-vous réservé ?">
+      <AppText variant="bodySmall" color="muted">{`Si vous avez réservé sur ${askBooked ?? "le site partenaire"}, importez la confirmation : « Préparation » se met à jour et tout reste disponible sans réseau.`}</AppText>
+      <Button fullWidth onPress={() => { setAskBooked(null); router.push(`/(app)/trips/${routeTripId}/reservations`); }}>Oui, importer la confirmation</Button>
+      <Button fullWidth variant="secondary" onPress={() => setAskBooked(null)}>Pas encore</Button>
+    </BottomSheet>
+    </>
   );
 }
 
@@ -195,4 +452,12 @@ function weatherIcon(code: number): string {
 function formatWeatherDate(value: string, timeZone: string): string {
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("fr-FR", { weekday: "short", timeZone }).format(date);
+}
+
+function formatCompactMoney(money: Money): string {
+  try {
+    return new Intl.NumberFormat("fr-FR", { style: "currency", currency: money.currency, maximumFractionDigits: 0 }).format(money.minorUnits / 100);
+  } catch {
+    return `${Math.round(money.minorUnits / 100)} ${money.currency}`;
+  }
 }

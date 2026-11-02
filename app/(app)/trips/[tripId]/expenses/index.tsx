@@ -1,10 +1,16 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import * as ImagePicker from "expo-image-picker";
+import { useCallback, useMemo, useState } from "react";
 import { useNaveyoBootstrap } from "../../../../../src/bootstrap";
 import type { BudgetSummary, Expense } from "../../../../../src/modules/expenses";
 import type { ISO4217, Trip, UUID } from "../../../../../src/modules/_shared/model";
 import { useTripsModule } from "../../../../../src/modules/trips";
 import { TripBudgetScreen, type AddExpenseForm } from "../../../../../src/screens/TripBudgetScreen";
+import { budgetAlerts, computeSharing } from "../../../../../src/screens/budget-sharing-model";
+import { parseReceiptText } from "../../../../../src/screens/receipt-model";
+import { memberLabels, type MemberProfile } from "../../../../../src/modules/trip-profiles";
+import type { RecordedRepayment } from "../../../../../src/modules/repayments";
+import { localToday } from "../../../../../src/screens/trips-list-model";
 
 const fallbackCurrency = "EUR" as ISO4217;
 
@@ -17,9 +23,24 @@ export default function ExpensesRoute() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [repayments, setRepayments] = useState<RecordedRepayment[] | null>(null);
+  const [repaymentError, setRepaymentError] = useState<string | null>(null);
+  // Optional: before its migration the « Réglé » buttons stay hidden.
+  const loadRepayments = useCallback(async () => {
+    const module = bootstrap?.modules.repayments;
+    if (!module || !tripId) return;
+    try {
+      setRepayments(await module.list(tripId));
+      setRepaymentError(null);
+    } catch {
+      setRepayments(null);
+    }
+  }, [bootstrap, tripId]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<UUID | null>(null);
+  const [memberProfiles, setMemberProfiles] = useState<MemberProfile[] | null>(null);
 
   const load = useCallback(async () => {
     if (!tripId || !trips) {
@@ -29,7 +50,14 @@ export default function ExpensesRoute() {
     }
     setError(null);
     try {
-      setTrip(await trips.get(tripId));
+      const [nextTrip, account, profiles] = await Promise.all([
+        trips.get(tripId),
+        bootstrap?.modules.identity.currentAccount().catch(() => null) ?? Promise.resolve(null),
+        bootstrap?.modules.tripProfiles?.listMembers(tripId).catch(() => null) ?? Promise.resolve(null),
+      ]);
+      setTrip(nextTrip);
+      setAccountId(account?.id ?? null);
+      setMemberProfiles(profiles);
       if (!bootstrap) {
         setError("Le Module Dépenses n'est pas encore exposé par la composition de l'application.");
         return;
@@ -40,12 +68,13 @@ export default function ExpensesRoute() {
       ]);
       setSummary(nextSummary);
       setExpenses(nextExpenses);
+      await loadRepayments();
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Impossible de charger le Budget global.");
     } finally {
       setLoading(false);
     }
-  }, [bootstrap, tripId, trips]);
+  }, [bootstrap, loadRepayments, tripId, trips]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -87,8 +116,64 @@ export default function ExpensesRoute() {
     }
   }
 
+  // Members have no display name yet: "Vous" for this account, then the same numbering as the settings.
+  // Names come from the members' profiles; without them, the numbering of the settings is kept.
+  const members = useMemo(
+    () => memberLabels(memberProfiles ?? trip?.members.map((member) => ({ accountId: member.accountId, role: member.role })) ?? [], accountId),
+    [accountId, memberProfiles, trip],
+  );
+  const sharing = useMemo(
+    () => (members.length > 1 ? computeSharing(expenses, members.map((member) => member.id), repayments?.map((item) => ({ from: item.from, to: item.to, minorUnits: item.amount.minorUnits })) ?? []) : null),
+    [expenses, members, repayments],
+  );
+  const alerts = useMemo(
+    () => budgetAlerts({ summary, startsOn: trip?.startsOn, endsOn: trip?.endsOn, today: localToday() }),
+    [summary, trip],
+  );
+
   return (
     <TripBudgetScreen
+      onScanReceipt={bootstrap?.modules.reservationTextExtractor ? async (source) => {
+        const extractor = bootstrap.modules.reservationTextExtractor;
+        if (!extractor) return null;
+        if (source === "camera") {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) throw new Error("Autorisez l’appareil photo dans Réglages › Naveyo pour scanner un ticket.");
+        }
+        const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.9 };
+        const picked = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+        const uri = picked.canceled ? undefined : picked.assets[0]?.uri;
+        if (!uri) return null;
+        // Vision reads the text on the iPhone; nothing leaves the device.
+        const text = await extractor.extract(uri).catch((cause: unknown) => {
+          const reason = cause instanceof Error ? cause.message : String(cause);
+          // "No text" is an ordinary unreadable photo; anything else is worth showing.
+          if (/no text could be extracted/i.test(reason)) return "";
+          throw new Error(`Le ticket n’a pas pu être lu sur l’iPhone (${reason}).`);
+        });
+        return parseReceiptText(text, { defaultCurrency: trip?.referenceCurrency ?? fallbackCurrency });
+      } : undefined}
+      members={members}
+      sharing={sharing}
+      repayments={repayments?.map((item) => ({ id: item.id, from: item.from, to: item.to, minorUnits: item.amount.minorUnits }))}
+      repaymentError={repaymentError}
+      onSettle={repayments && bootstrap?.modules.repayments && tripId ? async (settlement) => {
+        try {
+          await bootstrap.modules.repayments?.record({ tripId, from: settlement.from, to: settlement.to, amount: { minorUnits: settlement.minorUnits, currency: trip?.referenceCurrency ?? fallbackCurrency } });
+          await loadRepayments();
+        } catch (cause) {
+          setRepaymentError(cause instanceof Error ? cause.message : "Enregistrement impossible.");
+        }
+      } : undefined}
+      onCancelRepayment={repayments && bootstrap?.modules.repayments && tripId ? async (repaymentId) => {
+        try {
+          await bootstrap.modules.repayments?.remove(tripId, repaymentId);
+          await loadRepayments();
+        } catch (cause) {
+          setRepaymentError(cause instanceof Error ? cause.message : "Annulation impossible.");
+        }
+      } : undefined}
+      alerts={alerts}
       tripName={trip?.name ?? "Voyage"}
       referenceCurrency={trip?.referenceCurrency ?? fallbackCurrency}
       summary={summary}

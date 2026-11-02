@@ -8,6 +8,7 @@ import type {
   UUID,
 } from "../../../../../src/modules/_shared/model";
 import { PlaceDetailScreen } from "../../../../../src/screens/PlaceDetailScreen";
+import { isWished, type Wish } from "../../../../../src/modules/wishlist";
 import { describePlacesError } from "../../../../../src/screens/places-error";
 import {
   buildPlaceScheduleDates,
@@ -28,6 +29,7 @@ export default function PlaceDetailRoute() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wishes, setWishes] = useState<Wish[] | null>(null);
 
   const load = useCallback(async () => {
     if (!bootstrap || !tripId || !placeId) {
@@ -48,6 +50,8 @@ export default function PlaceDetailRoute() {
       ]);
       setPlace(nextPlace);
       setStops(nextStops);
+      // The wish list is optional: before its migration the heart simply stays hidden.
+      setWishes(await bootstrap.modules.wishlist?.list(tripId).catch(() => null) ?? null);
     } catch (cause: unknown) {
       setError(describePlacesError(cause, "Impossible de charger le lieu."));
     } finally {
@@ -137,6 +141,15 @@ export default function PlaceDetailRoute() {
         if (url) void Linking.openURL(url);
       }}
       onAddToItinerary={addToItinerary}
+      wished={place && wishes ? isWished(wishes, place) : undefined}
+      onToggleWish={bootstrap?.modules.wishlist && wishes && place && tripId ? async () => {
+        const wishlist = bootstrap.modules.wishlist;
+        if (!wishlist) return;
+        const existing = wishes.find((wish) => wish.place.id === place.id || (place.providerPlaceId !== undefined && wish.place.providerPlaceId === place.providerPlaceId));
+        if (existing) await wishlist.remove(tripId, existing.id);
+        else await wishlist.add({ tripId, place, stopId: stops[0]?.id });
+        setWishes(await wishlist.list(tripId));
+      } : undefined}
     />
   );
 }

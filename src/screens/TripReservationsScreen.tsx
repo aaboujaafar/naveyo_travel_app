@@ -11,7 +11,8 @@ export interface TripReservationsScreenProps {
   items: Reservation[];
   loading: boolean;
   error: string | null;
-  onBack: () => void;
+  /** Absent when the list is shown inside the Documents tab. */
+  onBack?: () => void;
   onRetry: () => Promise<void>;
   onOpenDocuments: () => void;
   onOpenPacking: () => void;

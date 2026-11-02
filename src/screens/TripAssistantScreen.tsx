@@ -10,6 +10,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PlaceCandidate } from "../modules/_shared/model";
 import { DEFAULT_GEOAPIFY_ATTRIBUTION, placeAttribution } from "../modules/places";
+import { formatPlaceCategory } from "./place-detail-model";
+import type { RankedWish } from "../modules/wishlist";
 import type { SuggestionDraft, SuggestionWeatherContext } from "../modules/trip-assistant";
 import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import {
@@ -21,6 +23,8 @@ import {
 } from "../theme";
 import {
   AppText,
+  BottomSheet,
+  Button,
   Chip,
   Icon,
   IconButton,
@@ -49,7 +53,17 @@ export interface TripAssistantScreenProps {
   planningContext?: { weather: SuggestionWeatherContext[]; plannedCount: number };
   dayPlanSection?: React.ReactNode;
   /** Mode asked for by a link (e.g. the dashboard's AI day card). */
-  requestedMode?: "places" | "day";
+  requestedMode?: "places" | "day" | "wishes";
+  /** Shared wish list, ranked by votes; undefined hides the « Envies » tab. */
+  wishes?: RankedWish[] | null;
+  wishesError?: string | null;
+  onOpenWishes?: () => void;
+  onVoteWish?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
+  onOpenWish?: (wish: RankedWish) => void;
+  /** False once the Voyage is over: the « Journée IA » tab is hidden. */
+  canComposeDay?: boolean;
+  /** Opens the place behind a Google Maps or Apple Plans link; resolves to an error message, or null. */
+  onImportLink?: (link: string) => Promise<string | null>;
 }
 
 const categories: AssistantCategory[] = [
@@ -59,7 +73,7 @@ const categories: AssistantCategory[] = [
   "Activités",
 ];
 
-type ExploreMode = "places" | "day";
+type ExploreMode = "places" | "day" | "wishes";
 type ResultsView = "list" | "map";
 
 export function TripAssistantScreen({
@@ -75,9 +89,36 @@ export function TripAssistantScreen({
   planningContext,
   dayPlanSection,
   requestedMode,
+  wishes,
+  wishesError,
+  onOpenWishes,
+  onVoteWish,
+  onOpenWish,
+  onImportLink,
+  canComposeDay = true,
 }: TripAssistantScreenProps) {
+  const [linkVisible, setLinkVisible] = useState(false);
+  const [link, setLink] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const importLink = async () => {
+    if (!onImportLink || !link.trim()) return;
+    setImporting(true);
+    setLinkError(null);
+    try {
+      const failure = await onImportLink(link.trim());
+      if (failure) setLinkError(failure);
+      else {
+        setLink("");
+        setLinkVisible(false);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
+  const [chosenMode, setMode] = useState<ExploreMode>(requestedMode ?? "day");
+  const mode: ExploreMode = chosenMode === "day" && !canComposeDay ? "places" : chosenMode;
   // A new link asking for a mode wins over the tab's last state (adjusted during render).
   const [lastRequestedMode, setLastRequestedMode] = useState(requestedMode);
   if (requestedMode !== lastRequestedMode) {
@@ -113,6 +154,13 @@ export function TripAssistantScreen({
     void discover(next);
   };
 
+  // The default category is already selected, so opening Lieux shows its results at once.
+  const openMode = (next: ExploreMode) => {
+    setMode(next);
+    if (next === "places" && !searched) void discover();
+    if (next === "wishes") onOpenWishes?.();
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -137,8 +185,9 @@ export function TripAssistantScreen({
         </View>
 
         <View style={styles.segmented} accessibilityRole="tablist">
-          <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => setMode("day")} />
-          <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => setMode("places")} />
+          {canComposeDay ? <SegmentButton label="Journée IA" icon="sparkles" active={mode === "day"} onPress={() => openMode("day")} /> : null}
+          <SegmentButton label="Lieux" icon="search" active={mode === "places"} onPress={() => openMode("places")} />
+          {wishes !== undefined ? <SegmentButton label="Envies" icon="users" active={mode === "wishes"} onPress={() => openMode("wishes")} /> : null}
         </View>
 
         {mode === "day" ? (
@@ -158,6 +207,8 @@ export function TripAssistantScreen({
               </View>
             )}
           </>
+        ) : mode === "wishes" ? (
+          <WishesPanel wishes={wishes ?? null} error={wishesError ?? null} onVote={onVoteWish} onOpen={onOpenWish} />
         ) : (
           <>
             <View style={styles.searchBar}>
@@ -179,6 +230,13 @@ export function TripAssistantScreen({
                 style={styles.searchButton}
               />
             </View>
+
+            {onImportLink ? (
+              <Pressable accessibilityRole="button" onPress={() => { setLinkError(null); setLinkVisible(true); }} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+                <Icon name="copy" size={16} color={colors.tealStrong} />
+                <AppText variant="caption" color="teal">Importer un lien Google Maps ou Plans</AppText>
+              </Pressable>
+            ) : null}
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {categories.map((category) => <Chip key={category} label={category} active={values.category === category} onPress={() => chooseCategory(category)} />)}
@@ -210,7 +268,7 @@ export function TripAssistantScreen({
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}><Icon name="search" size={24} color={colors.tealStrong} /></View>
                 <AppText variant="label" align="center">Que cherchez-vous ?</AppText>
-                <AppText variant="bodySmall" color="muted" align="center">Choisissez une catégorie ou tapez une envie : les lieux proches de votre Étape s’affichent ici.</AppText>
+                <AppText variant="bodySmall" color="muted" align="center">Touchez une catégorie ou tapez une envie : les lieux proches de votre Étape s’affichent ici.</AppText>
               </View>
             ) : (
               <>
@@ -256,11 +314,65 @@ export function TripAssistantScreen({
           </>
         )}
       </ScrollView>
+
+      <BottomSheet visible={linkVisible} onClose={() => setLinkVisible(false)} title="Importer un lien">
+        <AppText variant="bodySmall" color="muted">Collez le lien d’un lieu partagé depuis Google Maps ou Plans : Naveyo le retrouve et ouvre sa fiche.</AppText>
+        <Input value={link} onChangeText={setLink} placeholder="https://maps.app.goo.gl/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={() => void importLink()} />
+        {linkError ? <InlineMessage variant="error" title="Import impossible" message={linkError} /> : null}
+        <Button fullWidth loading={importing} disabled={!link.trim()} onPress={() => void importLink()}>Retrouver le lieu</Button>
+      </BottomSheet>
     </View>
   );
 }
 
-function SegmentButton({ label, icon, active, onPress }: { label: string; icon: "search" | "sparkles"; active: boolean; onPress: () => void }) {
+function WishesPanel({ wishes, error, onVote, onOpen }: {
+  wishes: RankedWish[] | null;
+  error: string | null;
+  onVote?: (wishId: RankedWish["id"], vote: 1 | -1 | 0) => Promise<void>;
+  onOpen?: (wish: RankedWish) => void;
+}) {
+  if (error) return <View style={styles.horizontalSection}><InlineMessage title="Envies indisponibles" message={error} /></View>;
+  if (wishes === null) return <LoadingResults />;
+  if (wishes.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}><AppText variant="h3">♡</AppText></View>
+        <AppText variant="label" align="center">Aucune envie pour l’instant</AppText>
+        <AppText variant="bodySmall" color="muted" align="center">Touchez ♡ sur la fiche d’un lieu : les autres Membres votent ici, et les favoris remontent en tête.</AppText>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.resultsList}>
+      {wishes.map((wish) => (
+        <View key={wish.id} style={styles.resultCard}>
+          <Pressable accessibilityRole="button" onPress={onOpen ? () => onOpen(wish) : undefined} style={styles.resultBody}>
+            <AppText variant="label" numberOfLines={1}>{wish.place.name}</AppText>
+            <AppText variant="caption" color="muted" numberOfLines={1}>
+              {[formatPlaceCategory(wish.place.category), wish.score > 0 ? `${wish.likes} pour` : null, wish.dislikes > 0 ? `${wish.dislikes} contre` : null].filter(Boolean).join(" · ") || "Pas encore de vote"}
+            </AppText>
+          </Pressable>
+          {onVote ? (
+            <View style={styles.voteRow}>
+              <VoteChip label="👍" active={wish.myVote === 1} onPress={() => void onVote(wish.id, wish.myVote === 1 ? 0 : 1)} />
+              <VoteChip label="👎" active={wish.myVote === -1} onPress={() => void onVote(wish.id, wish.myVote === -1 ? 0 : -1)} />
+            </View>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function VoteChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={label === "👍" ? "Pour" : "Contre"} onPress={onPress} style={({ pressed }) => [styles.voteChip, active && styles.voteChipActive, pressed && styles.pressed]}>
+      <AppText variant="label">{label}</AppText>
+    </Pressable>
+  );
+}
+
+function SegmentButton({ label, icon, active, onPress }: { label: string; icon: "search" | "sparkles" | "users"; active: boolean; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.segment, active && styles.segmentActive]}>
       <Icon name={icon} size={16} color={active ? colors.fg : colors.muted} />
@@ -304,10 +416,16 @@ function SuggestionCard({ draft, onPlan }: { draft: SuggestionDraft; onPlan?: ()
 }
 
 function ResultCard({ place, onPress }: { place: PlaceCandidate; onPress?: () => void }) {
-  const meta = [place.distanceMeters != null ? formatDistance(place.distanceMeters) : null, place.address].filter(Boolean).join(" · ");
+  const meta = [formatPlaceCategory(place.category), place.distanceMeters != null ? formatDistance(place.distanceMeters) : null, place.address].filter(Boolean).join(" · ");
   return (
     <Pressable accessibilityRole="button" onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.resultCard, pressed && styles.pressed]}>
-      <Image source={placeImageSource(place)} style={styles.resultImage} resizeMode="cover" />
+      {place.imageUrl ? (
+        <Image source={{ uri: place.imageUrl }} style={styles.resultImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.resultImage, styles.resultPlaceholder, { backgroundColor: placeVisual(place).background }]}>
+          <AppText variant="h3">{placeVisual(place).emoji}</AppText>
+        </View>
+      )}
       <View style={styles.resultBody}>
         <AppText variant="label" numberOfLines={1}>{place.name}</AppText>
         {meta ? <AppText variant="caption" color="muted" numberOfLines={2}>{meta}</AppText> : null}
@@ -330,11 +448,19 @@ function ResultCard({ place, onPress }: { place: PlaceCandidate; onPress?: () =>
 
 function formatRadius(value: number): string { return value >= 1_000 ? `${value / 1_000} km` : `${value} m`; }
 function formatDistance(value: number): string { return value >= 1_000 ? `${(value / 1_000).toFixed(1)} km` : `${Math.round(value)} m`; }
-function placeImageSource(place: PlaceCandidate) {
-  if (place.imageUrl) return { uri: place.imageUrl };
+/** Without a real photo, a category pictogram beats repeating one stock photo on every row. */
+function placeVisual(place: PlaceCandidate): { emoji: string; background: string } {
   const category = place.category?.toLowerCase() ?? "";
-  if (category.includes("restaurant") || category.includes("catering")) return require("../../assets/restaurant-detail.png");
-  return category.includes("activity") || category.includes("sport") ? require("../../assets/photo-album-3.png") : require("../../assets/photo-album-2.png");
+  if (/cafe|coffee/.test(category)) return { emoji: "☕️", background: colors.goldSoft };
+  if (/bar|pub|biergarten/.test(category)) return { emoji: "🍷", background: colors.accentSoft };
+  if (/ice_cream|dessert|pastry|bakery/.test(category)) return { emoji: "🍦", background: colors.goldSoft };
+  if (/catering|restaurant|food/.test(category)) return { emoji: "🍽️", background: colors.accentSoft };
+  if (/accommodation|hotel|hostel/.test(category)) return { emoji: "🛏️", background: colors.tealSoft };
+  if (/museum|culture|heritage/.test(category)) return { emoji: "🏛️", background: colors.tealSoft };
+  if (/park|natural|leisure|beach/.test(category)) return { emoji: "🌳", background: colors.tealSoft };
+  if (/religion/.test(category)) return { emoji: "⛪️", background: colors.goldSoft };
+  if (/activity|sport|entertainment/.test(category)) return { emoji: "🎟️", background: colors.accentSoft };
+  return { emoji: "📍", background: colors.tealSoft };
 }
 
 function LoadingResults() {
@@ -389,6 +515,11 @@ const styles = StyleSheet.create({
   resultsList: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   resultCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   resultImage: { width: 72, height: 72, borderRadius: radius.sm, backgroundColor: colors.border },
+  resultPlaceholder: { alignItems: "center", justifyContent: "center" },
+  voteRow: { flexDirection: "row", gap: spacing.xs },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, alignSelf: "flex-start", marginHorizontal: spacing.lg, marginBottom: spacing.sm, paddingVertical: spacing.xs },
+  voteChip: { width: 40, height: 40, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  voteChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   resultBody: { flex: 1, gap: 2 },
   credit: { fontSize: 11 },
   mapPreview: { height: 360, marginHorizontal: spacing.lg, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.tealSoft },

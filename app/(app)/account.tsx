@@ -5,6 +5,7 @@ import { useNaveyoBootstrap } from "../../src/bootstrap";
 import type { OfflineTripPackLoad } from "../../src/modules/offline-trip-pack";
 import { useTripsModule, type Trip } from "../../src/modules/trips";
 import { AccountScreen } from "../../src/screens/AccountScreen";
+import type { CityRef } from "../../src/modules/trip-profiles";
 import { useShellSession } from "../../src/ui";
 import { currentTripForAccount } from "../../src/screens/account-screen-model";
 
@@ -19,6 +20,9 @@ export default function AccountRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [displayName, setDisplayName] = useState<string | undefined>();
+  const [homeCity, setHomeCity] = useState<CityRef | null>(null);
+  const [nationality, setNationality] = useState<string | undefined>();
 
   useEffect(() => {
     if (!tripsModule || !bootstrap) return;
@@ -53,6 +57,12 @@ export default function AccountRoute() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    void bootstrap.modules.tripProfiles?.myProfile().then((profile) => {
+      if (!active) return;
+      setDisplayName(profile?.displayName);
+      setHomeCity(profile?.homeCity ?? null);
+      setNationality(profile?.nationality);
+    }, () => undefined);
     return () => {
       active = false;
     };
@@ -89,6 +99,25 @@ export default function AccountRoute() {
       onOpenExpenses={(tripId) =>
         router.push(`/(app)/trips/${tripId}/expenses`)
       }
+      onOpenRecap={(tripId) =>
+        router.push(`/(app)/trips/${tripId}/recap`)
+      }
+      displayName={displayName}
+      onRename={bootstrap?.modules.tripProfiles ? async (name) => {
+        await bootstrap.modules.tripProfiles?.updateMyDisplayName(name);
+        setDisplayName(name.trim());
+      } : undefined}
+      homeCity={homeCity}
+      nationality={nationality}
+      onSaveNationality={bootstrap?.modules.tripProfiles ? async (code) => {
+        await bootstrap.modules.tripProfiles?.updateMyNationality(code);
+        setNationality(code ?? undefined);
+      } : undefined}
+      searchTripId={(currentTripForAccount(trips) ?? trips[0])?.id}
+      onSaveHomeCity={bootstrap?.modules.tripProfiles ? async (city) => {
+        await bootstrap.modules.tripProfiles?.updateMyHomeCity(city);
+        setHomeCity(city);
+      } : undefined}
       onSignOut={changeAccount}
     />
   );

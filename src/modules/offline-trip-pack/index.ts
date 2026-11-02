@@ -8,3 +8,4 @@ export type {
 } from "./model";
 export { CURRENT_TRIP_PACK_SCHEMA_VERSION } from "./model";
 export type { TripPack, TripPackManifest } from "./model";
+export { buildTripPack, downloadTripPack, type TripPackContent, type TripPackSources } from "./download";

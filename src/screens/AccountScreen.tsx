@@ -1,11 +1,17 @@
 import { useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import type { UUID } from "../modules/_shared/model";
+import type { CityRef } from "../modules/trip-profiles";
+import { CityPickerSheet } from "./CityPickerSheet";
+import { CountryPickerSheet } from "./CountryPickerSheet";
+import { formatCountry } from "./place-detail-model";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Account } from "../modules/identity";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import type { Trip } from "../modules/trips";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
-import { destinationImageLabel, destinationImageSource } from "../ui/destination-image";
+import { DestinationImage } from "../ui/DestinationImage";
+import { formatTripsListDateRange, localToday, tripTiming } from "./trips-list-model";
 import {
   AppText,
   Badge,
@@ -14,6 +20,7 @@ import {
   Icon,
   IconButton,
   InlineMessage,
+  Input,
   ProgressBar,
   Skeleton,
 } from "../ui";
@@ -21,6 +28,7 @@ import {
   accountDisplayName,
   accountInitials,
   currentTripForAccount,
+  pastTrips,
   tripDateLabel,
 } from "./account-screen-model";
 
@@ -38,6 +46,18 @@ export interface AccountScreenProps {
   onOpenTripSettings: (tripId: Trip["id"]) => void;
   onOpenInvitation: (tripId: Trip["id"]) => void;
   onOpenExpenses: (tripId: Trip["id"]) => void;
+  onOpenRecap?: (tripId: Trip["id"]) => void;
+  /** The name the other members see; falls back to the e-mail. */
+  displayName?: string;
+  onRename?: (displayName: string) => Promise<void>;
+  /** The city the traveller usually leaves from, offered by default for each Voyage. */
+  homeCity?: CityRef | null;
+  onSaveHomeCity?: (city: CityRef | null) => Promise<void>;
+  /** A Voyage of the account, needed to search cities. */
+  searchTripId?: UUID;
+  /** Decides the entry formalities of each country. */
+  nationality?: string;
+  onSaveNationality?: (countryCode: string | null) => Promise<void>;
   onSignOut: () => Promise<void>;
 }
 
@@ -55,11 +75,41 @@ export function AccountScreen({
   onOpenTripSettings,
   onOpenInvitation,
   onOpenExpenses,
+  onOpenRecap,
+  displayName,
+  onRename,
+  homeCity,
+  onSaveHomeCity,
+  searchTripId,
+  nationality,
+  onSaveNationality,
   onSignOut,
 }: AccountScreenProps) {
+  const [homePicker, setHomePicker] = useState(false);
+  const [nationalityPicker, setNationalityPicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const shownName = displayName ?? accountDisplayName(account);
+  const rename = async () => {
+    if (!onRename) return;
+    setRenaming(true);
+    setRenameError(null);
+    try {
+      await onRename(nameDraft);
+      setRenameVisible(false);
+    } catch (cause) {
+      setRenameError(cause instanceof Error ? cause.message : "Modification impossible.");
+    } finally {
+      setRenaming(false);
+    }
+  };
   const currentTrip = currentTripForAccount(trips);
+  const finishedTrips = pastTrips(trips);
+  const timing = currentTrip ? tripTiming(currentTrip, localToday()) : null;
   const headerInsetStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.lg) }),
     [insets.top],
@@ -101,7 +151,7 @@ export function AccountScreen({
           <View style={styles.profileAvatar}>
             <AppText variant="h1" color="onAccent">{accountInitials(account)}</AppText>
           </View>
-          <AppText variant="h2" align="center">{accountDisplayName(account)}</AppText>
+          <AppText variant="h2" align="center">{shownName}</AppText>
           <AppText variant="bodySmall" color="muted" align="center">
             {account?.email ?? "Adresse e-mail indisponible"}
           </AppText>
@@ -109,11 +159,21 @@ export function AccountScreen({
             <ProfileStat value={`${trips.length}`} label="voyages" />
             <ProfileStat value={`${countryCount}`} label="pays" />
           </View>
-          <ComingSoonFrame label="Modification du profil">
-            <Button variant="secondary" icon={<Icon name="settings" size={16} />} disabled onPress={() => undefined}>
-              Modifier le profil
+          {onRename ? (
+            <Button variant="secondary" icon={<Icon name="edit" size={16} />} onPress={() => { setNameDraft(shownName); setRenameError(null); setRenameVisible(true); }}>
+              Modifier mon prénom
             </Button>
-          </ComingSoonFrame>
+          ) : null}
+          {onSaveNationality ? (
+            <Button variant="secondary" icon={<Icon name="users" size={16} />} onPress={() => setNationalityPicker(true)}>
+              {nationality ? `Nationalité : ${formatCountry(nationality) ?? nationality}` : "Indiquer ma nationalité"}
+            </Button>
+          ) : null}
+          {onSaveHomeCity && searchTripId ? (
+            <Button variant="secondary" icon={<Icon name="map-pin" size={16} />} onPress={() => setHomePicker(true)}>
+              {homeCity ? `Ville de départ : ${homeCity.name}` : "Ajouter ma ville de départ"}
+            </Button>
+          ) : null}
         </View>
 
         {loading ? (
@@ -124,7 +184,7 @@ export function AccountScreen({
           </View>
         ) : currentTrip ? (
           <View style={styles.activeTripCard}>
-            <Image source={destinationImageSource(currentTrip.name, currentTrip.imageUrl)} style={styles.activeTripCover} resizeMode="cover" accessibilityLabel={destinationImageLabel(currentTrip.name, currentTrip.imageUrl)} />
+            <DestinationImage name={currentTrip.name} imageUrl={currentTrip.imageUrl} style={styles.activeTripCover} />
             <View style={styles.activeTripHeader}>
               <View style={styles.activeTripTitle}>
                 <AppText variant="h3">{currentTrip.name}</AppText>
@@ -132,7 +192,12 @@ export function AccountScreen({
               </View>
               <Badge label="Voyage privé" variant="accent" />
             </View>
-            <View style={styles.activeTripProgress}><ProgressBar progress={0} /></View>
+            {timing ? (
+              <View style={styles.activeTripProgress}>
+                <AppText variant="caption" color={timing.phase === "ongoing" ? "accent" : "muted"}>{timing.label}</AppText>
+                {timing.phase === "ongoing" ? <ProgressBar progress={timing.progress} color="accent" /> : null}
+              </View>
+            ) : null}
             <View style={styles.quickLinks}>
               <QuickLink icon="home" label="Dashboard" onPress={() => onOpenTrip(currentTrip.id)} />
               <QuickLink icon="image" label="Photos" comingSoon />
@@ -156,20 +221,28 @@ export function AccountScreen({
           </View>
         )}
 
-        <ComingSoonSection title="Mes voyages archivés">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.archivedTrips}>
-            {['Barcelone 2025', 'Rome 2024', 'Amsterdam 2024'].map((name) => (
-              <View key={name} style={styles.archivedTripCard}>
-                <View style={styles.archivedThumb}>
-                  <AppText variant="label" color="onAccent">{name}</AppText>
-                </View>
-                <View style={styles.archivedBody}>
-                  <AppText variant="caption" color="muted">Récap disponible après le Voyage</AppText>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </ComingSoonSection>
+        {finishedTrips.length > 0 ? (
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeader}><AppText variant="h3">Voyages passés</AppText></View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.archivedTrips}>
+              {finishedTrips.map((trip) => (
+                <Pressable
+                  key={trip.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Récap de ${trip.name}`}
+                  onPress={() => (onOpenRecap ?? onOpenTrip)(trip.id)}
+                  style={({ pressed }) => [styles.archivedTripCard, pressed && styles.pressedCard]}
+                >
+                  <DestinationImage name={trip.name} imageUrl={trip.imageUrl} style={styles.archivedThumb} />
+                  <View style={styles.archivedBody}>
+                    <AppText variant="label" numberOfLines={1}>{trip.name}</AppText>
+                    <AppText variant="caption" color="muted">{formatTripsListDateRange(trip)} · Voir le récap</AppText>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
@@ -223,15 +296,17 @@ export function AccountScreen({
               detail={offline?.state === "ready" ? "Disponible ✓" : "Non disponible"}
               ready={offline?.state === "ready"}
             />
-            <StorageRow
-              name="Documents attendus"
-              detail={`${offline?.manifest?.files.length ?? 0} fichier(s)`}
-              ready={offline?.state === "ready"}
-            />
+            {offline?.pack ? (
+              <StorageRow
+                name="Contenu"
+                detail={`${offline.pack.stops.length} étape(s) · ${offline.pack.itinerary.length} activité(s) · ${offline.pack.reservations.length} réservation(s)`}
+                ready
+              />
+            ) : null}
             <AppText variant="caption" color="muted" align="center">
               {offline?.manifest
-                ? `Dernière génération : ${offline.manifest.generatedAt}`
-                : "Aucun manifeste actif pour ce Voyage."}
+                ? `Téléchargé le ${new Date(offline.manifest.generatedAt).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`
+                : "Téléchargez le Voyage depuis l’onglet Carte pour le consulter sans réseau."}
             </AppText>
           </View>
         </View>
@@ -249,6 +324,9 @@ export function AccountScreen({
           <View style={styles.sectionHeader}><AppText variant="h3">À propos / Support</AppText></View>
           <View style={styles.sectionCard}>
             <PreferencePreview label="Version" value={`Naveyo ${version}`} />
+            <AppText variant="caption" color="muted">
+              Sources des données : formalités d’entrée indicatives d’après Passport Index data (imorte/passport-index-data, licence MIT) ; infos pratiques par pays et réseaux de transport d’après Wikidata (CC0) ; plans de transport de Wikimedia Commons (licence de chaque plan) ; lieux © OpenStreetMap et ses contributeurs.
+            </AppText>
             <ComingSoonFrame label="Centre d’aide et support">
               <PreferencePreview label="Centre d’aide" value="Ouvrir" />
               <PreferencePreview label="Nous contacter" value="Ouvrir" />
@@ -268,6 +346,35 @@ export function AccountScreen({
         <BottomNavItem icon="file-text" label="Journal" comingSoon />
         <BottomNavItem icon="layers" label="Récap" comingSoon />
       </View>
+
+      {onSaveNationality ? (
+        <CountryPickerSheet
+          visible={nationalityPicker}
+          title="Ma nationalité"
+          hint="Elle sert à indiquer les formalités d’entrée (visa, autorisation électronique) de chaque pays du Voyage."
+          onPick={(code) => onSaveNationality(code)}
+          onClear={nationality ? () => onSaveNationality(null) : undefined}
+          onClose={() => setNationalityPicker(false)}
+        />
+      ) : null}
+      {onSaveHomeCity && searchTripId ? (
+        <CityPickerSheet
+          visible={homePicker}
+          tripId={searchTripId}
+          title="Ma ville de départ"
+          hint="Proposée par défaut pour l’aller et le retour de chaque Voyage, et modifiable Voyage par Voyage."
+          onPick={(city) => onSaveHomeCity(city)}
+          onClear={homeCity ? () => onSaveHomeCity(null) : undefined}
+          onClose={() => setHomePicker(false)}
+        />
+      ) : null}
+
+      <BottomSheet visible={renameVisible} onClose={() => setRenameVisible(false)} title="Mon prénom">
+        <AppText variant="bodySmall" color="muted">C’est le nom que voient les autres Membres de vos Voyages, par exemple dans « Qui paie quoi ».</AppText>
+        <Input label="Prénom" value={nameDraft} onChangeText={setNameDraft} maxLength={120} autoCapitalize="words" returnKeyType="done" onSubmitEditing={() => void rename()} />
+        {renameError ? <InlineMessage variant="error" title="Modification impossible" message={renameError} /> : null}
+        <Button fullWidth loading={renaming} disabled={!nameDraft.trim()} onPress={() => void rename()}>Enregistrer</Button>
+      </BottomSheet>
 
       <BottomSheet visible={logoutVisible} onClose={() => setLogoutVisible(false)} title="Déconnexion">
         <AppText variant="bodySmall" color="muted" align="center">
@@ -338,7 +445,7 @@ const styles = StyleSheet.create({
   activeTripCover: { width: "100%", height: spacing["2xl"] * 3, backgroundColor: colors.tealSoft },
   activeTripHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md, paddingHorizontal: spacing.lg },
   activeTripTitle: { flex: 1, gap: spacing.xs },
-  activeTripProgress: { marginHorizontal: spacing.lg },
+  activeTripProgress: { marginHorizontal: spacing.lg, gap: spacing.xs },
   quickLinks: { flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg },
   quickLink: { flex: 1, minHeight: layout.minimumTouchTarget, alignItems: "center", justifyContent: "center", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.bg },
   sectionBlock: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
@@ -346,8 +453,9 @@ const styles = StyleSheet.create({
   sectionCard: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
   archivedTrips: { gap: spacing.md, paddingBottom: spacing.sm },
   archivedTripCard: { width: spacing["2xl"] * 4.5, overflow: "hidden", borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface },
-  archivedThumb: { minHeight: spacing["2xl"] * 2, justifyContent: "flex-end", padding: spacing.md, backgroundColor: colors.accent },
-  archivedBody: { padding: spacing.md },
+  archivedThumb: { width: "100%", height: spacing["2xl"] * 2, backgroundColor: colors.tealSoft },
+  archivedBody: { padding: spacing.md, gap: spacing.xs },
+  pressedCard: { transform: [{ scale: 0.98 }] },
   memberRow: { minHeight: spacing["2xl"] + spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   memberAvatar: { width: layout.minimumTouchTarget, height: layout.minimumTouchTarget, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
   memberInfo: { flex: 1, gap: spacing.xs },

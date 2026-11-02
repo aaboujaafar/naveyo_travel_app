@@ -17,6 +17,9 @@ describe("trip dashboard model", () => {
     expect(empty[0]?.label).toBe("Ajouter une première Étape");
     const started = buildPreparationSteps({ stops: 1, itineraryItems: 0, reservations: 2 });
     expect(started.filter((step) => step.done).map((step) => step.key)).toEqual(["stop", "reservation"]);
+    expect(buildPreparationSteps({ stops: 1, itineraryItems: 1, reservations: 1, offlineReady: false }).at(-1)).toEqual({
+      key: "offline", label: "Télécharger pour le hors-ligne", done: false,
+    });
   });
 
   it("formats date-only values without using the device timezone", () => {

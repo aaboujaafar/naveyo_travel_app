@@ -25,6 +25,16 @@ export interface ItineraryModule {
   list(tripId: UUID): Promise<ItineraryItem[]>;
   add(input: Omit<ItineraryItem, "id">): Promise<ItineraryItem>;
   addConfirmedPlace(input: ConfirmedPlaceInput): Promise<ItineraryItem>;
+  /** Moves an activity to another day (and the Étape of that day); its clock time is kept. */
+  move?(input: MoveItineraryItemInput): Promise<void>;
+  remove?(tripId: UUID, itemId: UUID): Promise<void>;
+}
+
+export interface MoveItineraryItemInput {
+  tripId: UUID;
+  itemId: UUID;
+  stopId: UUID;
+  date: string;
 }
 
 export function sortItineraryItems(

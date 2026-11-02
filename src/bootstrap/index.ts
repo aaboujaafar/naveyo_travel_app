@@ -22,6 +22,12 @@ import type { UUID } from '../modules/_shared/model'
 import type { WeatherModule } from '../modules/weather'
 import type { RoutingModule } from '../modules/routing'
 import type { PackingListModule } from '../modules/packing-list/interface'
+import type { TripProfilesModule } from '../modules/trip-profiles'
+import type { WishlistModule } from '../modules/wishlist'
+import type { TransitMapsModule } from '../modules/transit-maps'
+import type { RepaymentsModule } from '../modules/repayments'
+import type { LogisticsWaiversModule } from '../modules/logistics'
+import type { TripChecksModule } from '../modules/trip-checks'
 
 /**
  * The application boundary consumed by routes and UI composition.
@@ -51,6 +57,12 @@ export interface NaveyoModules {
   weather: WeatherModule
   routing?: RoutingModule
   packingList: PackingListModule
+  tripProfiles?: TripProfilesModule
+  wishlist?: WishlistModule
+  transitMaps?: TransitMapsModule
+  repayments?: RepaymentsModule
+  logisticsWaivers?: LogisticsWaiversModule
+  tripChecks?: TripChecksModule
   /** Native analyzer is optional while OCR-001 is not available in a build. */
   reservationAnalyzer?: DocumentAnalyzer
 }

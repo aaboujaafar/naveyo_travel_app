@@ -65,7 +65,7 @@ export function formatStopDates(stop: Stop): string {
   return formatTripDateRange(stop.startDate, stop.endDate);
 }
 
-export type PreparationStepKey = "stop" | "places" | "reservation";
+export type PreparationStepKey = "stop" | "places" | "reservation" | "offline";
 
 export interface PreparationStep {
   key: PreparationStepKey;
@@ -78,12 +78,18 @@ export function buildPreparationSteps(counts: {
   stops: number;
   itineraryItems: number;
   reservations: number;
+  /** Omitted when the offline state is unknown, so the step is not shown. */
+  offlineReady?: boolean;
 }): PreparationStep[] {
-  return [
+  const steps: PreparationStep[] = [
     { key: "stop", label: counts.stops > 0 ? "Première Étape ajoutée" : "Ajouter une première Étape", done: counts.stops > 0 },
     { key: "places", label: counts.itineraryItems > 0 ? "Lieux ajoutés à l’itinéraire" : "Choisir des lieux à visiter", done: counts.itineraryItems > 0 },
     { key: "reservation", label: counts.reservations > 0 ? "Réservation importée" : "Importer une réservation", done: counts.reservations > 0 },
   ];
+  if (counts.offlineReady !== undefined) {
+    steps.push({ key: "offline", label: counts.offlineReady ? "Voyage disponible hors ligne" : "Télécharger pour le hors-ligne", done: counts.offlineReady });
+  }
+  return steps;
 }
 
 /** "16 – 20 nov. · 5 jours" for a stop card, without the technical time zone. */

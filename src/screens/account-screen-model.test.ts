@@ -4,6 +4,7 @@ import {
   accountDisplayName,
   accountInitials,
   currentTripForAccount,
+  pastTrips,
   tripDateLabel,
 } from "./account-screen-model";
 
@@ -26,13 +27,16 @@ describe("account screen presentation model", () => {
     expect(accountDisplayName(account)).toBe("Antoine Martin");
   });
 
-  it("preserves the Voyage order supplied by the Module", () => {
-    expect(
-      currentTripForAccount([
-        trip("Rome", "2027-06-01"),
-        trip("Lisbonne", "2026-09-01"),
-      ])?.name,
-    ).toBe("Rome");
+  it("prefers the Voyage under way, then the next departure", () => {
+    const trips = [trip("Rome", "2027-06-01"), trip("Lisbonne", "2026-09-01"), trip("Porto", "2026-11-16")];
+    expect(currentTripForAccount(trips, "2026-10-02")?.name).toBe("Porto");
+    expect(currentTripForAccount(trips, "2026-09-01")?.name).toBe("Lisbonne");
+    expect(currentTripForAccount([trip("Sans date")], "2026-10-02")?.name).toBe("Sans date");
+  });
+
+  it("lists finished Voyages, most recent first", () => {
+    const trips = [trip("Rome", "2027-06-01"), trip("Lisbonne", "2026-09-01"), trip("Berlin", "2025-04-01")];
+    expect(pastTrips(trips, "2026-10-02").map((item) => item.name)).toEqual(["Lisbonne", "Berlin"]);
   });
 
   it("does not infer missing dates", () => {

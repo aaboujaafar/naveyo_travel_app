@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  Animated,
   Image,
   Pressable,
   ScrollView,
@@ -33,11 +34,12 @@ import {
   type ToastData,
 } from "../ui";
 import {
+  formatCountry,
   formatPlaceCategory,
   formatPlaceSource,
   type PlaceScheduleDate,
 } from "./place-detail-model";
-import { placeAttribution } from "../modules/places";
+import { placeAttribution, weeklyOpeningHours } from "../modules/places";
 
 export interface PlaceDetailScreenProps {
   place: PlaceCandidate | null;
@@ -52,6 +54,9 @@ export interface PlaceDetailScreenProps {
   onOpenWaze?: () => void;
   onOpenPhotoCredit?: () => void;
   onAddToItinerary: (selection: PlaceScheduleDate) => Promise<void>;
+  /** Undefined while the wish list is unavailable: the heart is then hidden. */
+  wished?: boolean;
+  onToggleWish?: () => Promise<void>;
 }
 
 export interface PlaceMapPresentation {
@@ -109,7 +114,27 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
     props.scheduleDates[0] ?? null,
   );
   const [toast, setToast] = useState<ToastData | null>(null);
-  const photoSources = getPhotoSources(props.place?.imageUrl);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [wishing, setWishing] = useState(false);
+  async function toggleWish() {
+    if (!props.onToggleWish) return;
+    setWishing(true);
+    const wasWished = props.wished;
+    try {
+      await props.onToggleWish();
+      setToast({
+        id: `wish-${Date.now()}`,
+        title: wasWished ? "Retiré des envies" : "Ajouté aux envies",
+        message: wasWished ? "Le lieu n’est plus proposé au vote." : "Les autres Membres peuvent voter dans Explorer › Envies.",
+        variant: "success",
+      });
+    } catch (cause) {
+      setToast({ id: `wish-error-${Date.now()}`, title: "Envies indisponibles", message: cause instanceof Error ? cause.message : "Réessayez plus tard.", variant: "danger" });
+    } finally {
+      setWishing(false);
+    }
+  }
+  const photoSources = getPhotoSources(props.place?.imageUrl, props.place?.category);
   const heroNavStyle = useMemo(
     () => ({ paddingTop: Math.max(insets.top, spacing.md) }),
     [insets.top],
@@ -139,6 +164,18 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   const place = props.place;
   const mapPresentation = buildPlaceMapPresentation(place);
   const category = formatPlaceCategory(place.category);
+  const country = formatCountry(place.countryCode);
+  const weeklyHours = weeklyOpeningHours(place.openingHours);
+  const summary = [category, place.distanceMeters != null ? `à ${formatDistance(place.distanceMeters)}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  // Pulling down past the top stretches the photo instead of revealing an empty band.
+  const heroStretch = {
+    transform: [
+      { translateY: scrollY.interpolate({ inputRange: [-HERO_HEIGHT, 0], outputRange: [-HERO_HEIGHT / 2, 0], extrapolateRight: "clamp" }) },
+      { scale: scrollY.interpolate({ inputRange: [-HERO_HEIGHT, 0], outputRange: [2, 1], extrapolateRight: "clamp" }) },
+    ],
+  };
   const selected =
     selectedDate ?? props.scheduleDates[0] ?? null;
 
@@ -160,17 +197,21 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
 
   return (
     <View style={styles.screen} testID="place-detail-screen">
-      <ScrollView
+      <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
         <View style={styles.hero}>
-          <Image
-            source={photoSources[0]}
-            resizeMode="cover"
-            style={styles.heroImage}
-            accessibilityLabel="Photo illustrative du lieu"
-          />
+          <Animated.View style={[styles.heroMedia, heroStretch]}>
+            <Image
+              source={photoSources[0]}
+              resizeMode="cover"
+              style={styles.heroImage}
+              accessibilityLabel="Photo illustrative du lieu"
+            />
+          </Animated.View>
           <Svg style={styles.heroOverlay} width="100%" height="100%">
             <Defs>
               <LinearGradient id="place-overlay" x1="0" y1="0" x2="0" y2="1">
@@ -218,15 +259,11 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
               <AppText variant="h2" style={styles.title}>{place.name}</AppText>
               <FutureValue label="★ —" />
             </View>
-            <View style={styles.metaRow}>
-              {place.address ? <Meta icon="map-pin" label={place.address} /> : null}
-              {category ? <AppText variant="caption" color="muted">{category}</AppText> : null}
-              {place.countryCode ? <AppText variant="caption" color="muted">{place.countryCode}</AppText> : null}
-              {place.distanceMeters != null ? <AppText variant="caption" color="muted">{formatDistance(place.distanceMeters)}</AppText> : null}
-            </View>
+            {summary ? <AppText variant="bodySmall" color="muted">{summary}</AppText> : null}
+            {place.address ? <Meta icon="map-pin" label={place.address} /> : null}
             <View style={styles.tags}>
               {category ? <Badge label={category} variant="accent" /> : null}
-              <Badge label={formatPlaceSource(place.provider)} variant="teal" />
+              {place.provider === "geoapify" ? <Badge label={formatPlaceSource(place.provider)} variant="teal" /> : null}
             </View>
             <ComingSoonFrame label="Description fournisseur">
               <AppText variant="bodySmall" color="muted">
@@ -284,11 +321,6 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
               />
             </View>
           )}
-          <InfoRow
-            icon="map-pin"
-            label="Coordonnées"
-            value={mapPresentation.coordinateLabel ?? "Non fournies"}
-          />
           <LinkAction
             icon="map"
             label="Ouvrir dans la carte"
@@ -297,18 +329,19 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
           />
         </Section>
 
-        <ComingSoonFrame label="Horaires détaillés">
-          <Section title="Horaires détaillés">
-            <View style={styles.infoRow}>
-              <Icon name="clock" size={20} color={colors.muted} />
-              <View style={styles.flexOne}>
-                <AppText variant="caption" color="muted">{"Aujourd'hui"}</AppText>
-                <AppText variant="label">Horaires non fournis</AppText>
-              </View>
-              <Icon name="chevron-down" size={20} color={colors.muted} />
+        {weeklyHours ? (
+          <Section title="Horaires">
+            <View style={styles.hoursCard}>
+              {weeklyHours.map((day) => (
+                <View key={day.label} style={styles.hoursRow}>
+                  <AppText variant="bodySmall" color="muted">{day.label}</AppText>
+                  <AppText variant="label" color={day.hours === "Fermé" ? "accent" : "fg"}>{day.hours}</AppText>
+                </View>
+              ))}
+              <AppText variant="caption" color="muted">Horaires OpenStreetMap, à confirmer sur place.</AppText>
             </View>
           </Section>
-        </ComingSoonFrame>
+        ) : null}
 
         <ComingSoonFrame label="Menu et spécialités">
           <Section title="Menu / Spécialités">
@@ -352,19 +385,9 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
           {place.address ? (
             <InfoRow icon="map-pin" label="Adresse" value={place.address} />
           ) : null}
-          {place.countryCode ? (
-            <InfoRow icon="info" label="Pays" value={place.countryCode} />
+          {country ? (
+            <InfoRow icon="map" label="Pays" value={country} />
           ) : null}
-            <InfoRow
-              icon="info"
-              label="Source"
-              value={formatPlaceSource(place.provider)}
-            />
-          <InfoRow
-            icon="info"
-            label="Attribution"
-            value={placeAttribution(place.provider, place.attribution) ?? "Lieu ajouté manuellement"}
-          />
           {!place.address && !place.countryCode ? (
             <InlineMessage title="Informations limitées" message="Le fournisseur n'a transmis ni adresse ni pays." />
           ) : null}
@@ -432,9 +455,31 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
             </View>
           </Section>
         </ComingSoonFrame>
-      </ScrollView>
+
+        <View style={styles.sourceFooter}>
+          <AppText variant="caption" color="muted">
+            {[
+              formatPlaceSource(place.provider),
+              mapPresentation.coordinateLabel,
+              placeAttribution(place.provider, place.attribution),
+            ].filter(Boolean).join(" · ")}
+          </AppText>
+        </View>
+      </Animated.ScrollView>
 
       <View style={[styles.footer, footerStyle]}>
+        {props.onToggleWish && props.wished !== undefined ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={props.wished ? "Retirer des envies" : "Ajouter aux envies"}
+            accessibilityState={{ selected: props.wished }}
+            disabled={wishing}
+            onPress={() => void toggleWish()}
+            style={({ pressed }) => [styles.wishButton, props.wished && styles.wishButtonOn, pressed && styles.pressed]}
+          >
+            <AppText variant="h3" color={props.wished ? "onAccent" : "accent"}>{props.wished ? "♥" : "♡"}</AppText>
+          </Pressable>
+        ) : null}
         <Button
           fullWidth
           style={styles.footerPrimary}
@@ -484,9 +529,13 @@ export function PlaceDetailScreen(props: PlaceDetailScreenProps) {
   );
 }
 
-function getPhotoSources(imageUrl?: string) {
+function getPhotoSources(imageUrl?: string, category?: string) {
+  // The restaurant illustration would be misleading for a museum or a park.
+  const fallback = /catering|restaurant/.test(category ?? "")
+    ? require("../../assets/restaurant-detail.png")
+    : require("../../assets/photo-album-2.png");
   return [
-    imageUrl ? { uri: imageUrl } : require("../../assets/restaurant-detail.png"),
+    imageUrl ? { uri: imageUrl } : fallback,
     require("../../assets/photo-album-3.png"),
     require("../../assets/photo-album-2.png"),
   ] as const;
@@ -525,7 +574,7 @@ function AccessPill({ icon, label }: { icon: string; label: string }) {
   return <View style={styles.accessPill}><AppText variant="label">{icon}</AppText><AppText variant="caption" color="muted">{label}</AppText></View>;
 }
 
-function InfoRow({ icon, label, value }: { icon: "map-pin" | "info"; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: "map-pin" | "map"; label: string; value: string }) {
   return <View style={styles.infoRow}><Icon name={icon} size={20} color={colors.muted} /><View style={styles.flexOne}><AppText variant="caption" color="muted">{label}</AppText><AppText variant="label">{value}</AppText></View></View>;
 }
 
@@ -542,14 +591,20 @@ function formatDistance(value: number): string {
 }
 
 function PlaceDetailLoading() {
-  return <View style={styles.loadingScreen}><Skeleton height={spacing.xl * 8 + spacing.xs} borderRadius={0} /><View style={styles.loadingBody}><Skeleton width="65%" height={spacing.xl} /><Skeleton height={spacing["2xl"] * 2} /><Skeleton height={spacing["2xl"] * 3} /></View></View>;
+  return <View style={styles.loadingScreen}><Skeleton height={HERO_HEIGHT} borderRadius={0} /><View style={styles.loadingBody}><Skeleton width="65%" height={spacing.xl} /><Skeleton height={spacing["2xl"] * 2} /><Skeleton height={spacing["2xl"] * 3} /></View></View>;
 }
+
+const HERO_HEIGHT = spacing.xl * 8 + spacing.xs;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   scrollContent: { width: "100%", maxWidth: layout.maxMobileWidth, alignSelf: "center", paddingBottom: spacing["2xl"] * 3 },
-  hero: { height: spacing.xl * 8 + spacing.xs, position: "relative", overflow: "hidden" },
+  hero: { height: HERO_HEIGHT, position: "relative" },
+  heroMedia: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   heroImage: { width: "100%", height: "100%" },
+  hoursCard: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface, borderWidth: componentMetrics.placeDetail.thinBorderWidth, borderColor: colors.border, borderRadius: radius.sm },
+  hoursRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  sourceFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   heroOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   heroNav: { position: "absolute", left: spacing.md, right: spacing.md, flexDirection: "row", justifyContent: "space-between", zIndex: zIndex.sticky },
   heroActions: { flexDirection: "row", gap: spacing.sm },
@@ -563,7 +618,6 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
   title: { flex: 1 },
   futureValue: { alignItems: "flex-end", gap: spacing.xs },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   metaItem: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs, maxWidth: "100%" },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   aiInsight: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md, backgroundColor: colors.tealSoft, borderRadius: radius.sm },
@@ -593,6 +647,8 @@ const styles = StyleSheet.create({
   disabledAction: { opacity: 0.6 },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, maxWidth: layout.maxMobileWidth, alignSelf: "center", flexDirection: "row", gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: componentMetrics.placeDetail.thinBorderWidth, borderTopColor: colors.border, zIndex: zIndex.sticky },
   footerPrimary: { flex: 1 },
+  wishButton: { width: layout.minimumTouchTarget + spacing.sm, height: layout.minimumTouchTarget + spacing.sm, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.accent, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  wishButtonOn: { backgroundColor: colors.accentStrong, borderColor: colors.accentStrong },
   futureReserve: { position: "relative" },
   reserveBadge: { position: "absolute", top: -spacing.sm, right: -spacing.sm, transform: [{ scale: 0.72 }] },
   dateGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

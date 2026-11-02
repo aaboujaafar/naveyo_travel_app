@@ -1,6 +1,9 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTripTabParams } from "../../../../../../src/ui/TripRouteContext";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { isTripOver, localToday } from "../../../../../../src/screens/trips-list-model";
+import { rankWishes, type Wish } from "../../../../../../src/modules/wishlist";
+import { bestNameMatch, isShortMapsLink, parseMapsLink } from "../../../../../../src/screens/maps-link-model";
 import { describePlacesError } from "../../../../../../src/screens/places-error";
 import { useNaveyoBootstrap } from "../../../../../../src/bootstrap";
 import type { ItineraryItem, PlaceCandidate, Stop, UUID } from "../../../../../../src/modules/_shared/model";
@@ -21,6 +24,7 @@ import { useTripsModule } from "../../../../../../src/modules/trips";
 import { TripAssistantScreen } from "../../../../../../src/screens/TripAssistantScreen";
 import { DayPlanSection } from "../../../../../../src/screens/DayPlanSection";
 import { stopDates } from "../../../../../../src/screens/day-plan-model";
+import { updateDayPlanPreferences } from "../../../../../../src/screens/day-plan-preferences-model";
 import {
   assistantCategoryPlaceType,
   buildAssistantPreferences,
@@ -29,10 +33,14 @@ import {
 
 export default function TripAssistantRoute() {
   const router = useRouter();
-  const { tripId, stopId: requestedStopId, mode: requestedMode } = useTripTabParams<{
+  const { tripId, stopId: requestedStopId, mode: requestedMode, date: requestedDate, indoor } = useTripTabParams<{
     tripId: string;
     stopId?: string;
     mode?: string;
+    /** "YYYY-MM-DD": the day to compose, e.g. from a weather Plan B. */
+    date?: string;
+    /** "1" restricts the composed day to indoor places. */
+    indoor?: string;
   }>();
   const assistant = useTripAssistant();
   const bootstrap = useNaveyoBootstrap();
@@ -59,6 +67,74 @@ export default function TripAssistantRoute() {
     pace: "balanced",
   });
 
+  // A Plan B link asks for indoor places once; the traveller can change it afterwards (adjusted during render).
+  const planBKey = indoor === "1" ? requestedDate ?? "today" : undefined;
+  const [appliedPlanB, setAppliedPlanB] = useState<string | undefined>();
+  if (planBKey !== undefined && planBKey !== appliedPlanB) {
+    setAppliedPlanB(planBKey);
+    setDayPlanPreferences((current) => updateDayPlanPreferences(current, { constraints: { indoorOutdoor: "indoor" } }));
+  }
+
+  // The travelling party set in the Voyage settings presets the day planner (children, step-free access).
+  useEffect(() => {
+    const profiles = bootstrap?.modules.tripProfiles;
+    if (!profiles || !tripId) return;
+    let active = true;
+    void profiles.getParty(tripId as UUID).then((party) => {
+      if (!active || !party) return;
+      const children = party.childrenAges.length > 0;
+      const accessibility = party.stroller || party.reducedMobility;
+      if (!children && !accessibility) return;
+      setDayPlanPreferences((current) => updateDayPlanPreferences(current, {
+        constraints: {
+          ...(current.constraints?.children === undefined ? { children } : {}),
+          ...(current.constraints?.accessibility === undefined ? { accessibility } : {}),
+        },
+      }));
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [bootstrap, tripId]);
+
+  const [tripOver, setTripOver] = useState(false);
+  useEffect(() => {
+    if (!trips || !tripId) return;
+    let active = true;
+    void trips.get(tripId as UUID).then((trip) => {
+      if (active) setTripOver(isTripOver(trip, localToday()));
+    }, () => undefined);
+    return () => {
+      active = false;
+    };
+  }, [trips, tripId]);
+
+  const [wishes, setWishes] = useState<Wish[] | null>(null);
+  const [wishesError, setWishesError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<UUID | null>(null);
+  const rankedWishes = useMemo(() => (wishes ? rankWishes(wishes, accountId) : null), [accountId, wishes]);
+  const loadWishes = useCallback(async () => {
+    const wishlist = bootstrap?.modules.wishlist;
+    if (!wishlist || !tripId) return;
+    try {
+      const [next, account] = await Promise.all([
+        wishlist.list(tripId as UUID),
+        bootstrap.modules.identity.currentAccount().catch(() => null),
+      ]);
+      setWishes(next);
+      setAccountId(account?.id ?? null);
+      setWishesError(null);
+    } catch (cause) {
+      setWishesError(cause instanceof Error ? cause.message : "Envies indisponibles.");
+    }
+  }, [bootstrap, tripId]);
+
+  // A link straight to the « Envies » tab, or coming back from a place just wished: refresh the list.
+  const wishesLoaded = wishes !== null;
+  useFocusEffect(useCallback(() => {
+    if (requestedMode === "wishes" || wishesLoaded) void loadWishes();
+  }, [loadWishes, requestedMode, wishesLoaded]));
+
   const displayedPlannedItems = plannedItems.filter((item) => item.stopId === stop?.id);
 
   const handleDayPlanPreferencesChange = (preferences: DayPlanPreferences) => {
@@ -78,7 +154,9 @@ export default function TripAssistantRoute() {
           const selected = stops.find((candidate) => candidate.id === requestedStopId) ?? stops[0] ?? null;
           setStop(selected);
           if (selected) {
-            setSelectedDayPlanDate(selected.startDate);
+            setSelectedDayPlanDate(
+              requestedDate && selected.startDate <= requestedDate && requestedDate <= selected.endDate ? requestedDate : selected.startDate,
+            );
             setDayPlan(null);
             setDayPlanError(null);
           }
@@ -109,7 +187,7 @@ export default function TripAssistantRoute() {
     return () => {
       active = false;
     };
-  }, [bootstrap, requestedStopId, tripId, trips]);
+  }, [bootstrap, requestedDate, requestedStopId, tripId, trips]);
 
   const discover = async (values: AssistantSearchValues) => {
     if (!tripId || !stopId) {
@@ -128,6 +206,7 @@ export default function TripAssistantRoute() {
       setNearbyCandidates(candidates);
       const assistantQuery = values.query.trim() || values.category;
       if (assistant && assistantQuery.length >= 2) {
+        // The places are already listed: an unavailable AI only hides its suggestions.
         const result = await assistant.suggestPlaces({
           tripId: tripId as UUID,
           stopId: stopId as UUID,
@@ -139,7 +218,7 @@ export default function TripAssistantRoute() {
           timeZone: stop?.timeZone,
           weather,
           existingItinerary: displayedPlannedItems.map((item): SuggestionItineraryContext => ({ date: item.date, title: item.title, localTime: item.time?.local })),
-        });
+        }).catch(() => []);
         setDrafts(result);
       } else setDrafts([]);
     } catch (cause: unknown) {
@@ -218,7 +297,55 @@ export default function TripAssistantRoute() {
   return (
     <TripAssistantScreen
       stopName={stop?.name}
-      requestedMode={requestedMode === "day" || requestedMode === "places" ? requestedMode : undefined}
+      requestedMode={requestedMode === "day" || requestedMode === "places" || requestedMode === "wishes" ? requestedMode : undefined}
+      wishes={bootstrap?.modules.wishlist ? rankedWishes : undefined}
+      wishesError={wishesError}
+      onOpenWishes={() => void loadWishes()}
+      onVoteWish={async (wishId, vote) => {
+        try {
+          await bootstrap?.modules.wishlist?.vote(wishId, vote);
+          await loadWishes();
+        } catch (cause) {
+          setWishesError(cause instanceof Error ? cause.message : "Vote impossible.");
+        }
+      }}
+      canComposeDay={!tripOver}
+      onImportLink={async (link) => {
+        const places = bootstrap?.modules.places;
+        if (!places || !tripId) return "La recherche de lieux est indisponible.";
+        let target = link;
+        if (isShortMapsLink(link)) {
+          // Short links only reveal the place once the redirection is followed.
+          try {
+            target = (await fetch(link, { method: "GET", redirect: "follow" })).url || link;
+          } catch {
+            return "Le lien court ne peut pas être ouvert sans réseau.";
+          }
+        }
+        const parsed = parseMapsLink(target);
+        if (!parsed) return "Ce lien n’est pas un lien de lieu Google Maps ou Plans.";
+        try {
+          const found = parsed.name
+            ? await places.search({ query: parsed.name, tripId: tripId as UUID, ...(parsed.coordinates ? { near: { ...parsed.coordinates, radiusMeters: 2_000 } } : { countryCode: stop?.countryCode }) })
+            : [];
+          let match = bestNameMatch(found, parsed.name);
+          if (!match && parsed.coordinates && places.nearby) {
+            const around = await places.nearby({ coordinates: parsed.coordinates, tripId: tripId as UUID, radiusMeters: 120, limit: 10 });
+            match = parsed.name ? bestNameMatch(around, parsed.name) ?? around[0] : around[0];
+          }
+          if (!match) return parsed.name ? `« ${parsed.name} » n’a pas été retrouvé. Cherchez-le par son nom.` : "Aucun lieu trouvé à ces coordonnées.";
+          places.remember?.([match]);
+          router.push(`/(app)/trips/${tripId}/places/${match.id}`);
+          return null;
+        } catch (cause) {
+          return cause instanceof Error ? cause.message : "Recherche impossible.";
+        }
+      }}
+      onOpenWish={(wish) => {
+        // The detail screen reads places from the module: hand it the saved snapshot first.
+        bootstrap?.modules.places.remember?.([wish.place]);
+        router.push(`/(app)/trips/${tripId}/places/${wish.place.id}`);
+      }}
       drafts={drafts}
       nearbyCandidates={nearbyCandidates}
       loading={loading}

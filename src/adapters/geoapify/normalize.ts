@@ -22,6 +22,24 @@ const text = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
+// Families that say what a place is, most telling first. Geoapify also lists
+// attributes ("fee", "wheelchair", "no_dogs"…) that must never become the label.
+const PLACE_FAMILIES = [
+  "catering", "accommodation", "entertainment", "tourism", "heritage", "religion", "leisure", "natural", "beach",
+  "activity", "sport", "commercial", "public_transport", "airport", "rental", "healthcare", "education", "service",
+  "camping", "ski", "parking", "office", "populated_place", "building",
+];
+
+/** The deepest category of the most telling family, e.g. `catering.restaurant.portuguese`. */
+function mostSpecificCategory(values: unknown[]): string | undefined {
+  const categories = values.map(text).filter((value): value is string => value !== undefined);
+  const family = PLACE_FAMILIES.find((candidate) => categories.some((value) => value === candidate || value.startsWith(`${candidate}.`)));
+  if (!family) return undefined;
+  return categories
+    .filter((value) => value === family || value.startsWith(`${family}.`))
+    .reduce((best, value) => (value.split(".").length > best.split(".").length ? value : best));
+}
+
 const stableId = (providerId: string): UUID => {
   let first = 2166136261;
   let second = 2246822519;
@@ -68,9 +86,11 @@ export function normalizeGeoapifyResponse(
     )
       throw new Error("Incomplete Geoapify place");
     const category = Array.isArray(properties.categories)
-      ? text(properties.categories[0])
+      ? mostSpecificCategory(properties.categories)
       : text(properties.category);
     const datasource = properties.datasource as Record<string, unknown> | undefined;
+    // OpenStreetMap hours ("Tu-Su 10:00-18:00"), kept as text and read by the places module.
+    const openingHoursText = text(properties.opening_hours) ?? text((datasource?.raw as Record<string, unknown> | undefined)?.opening_hours);
     const imageUrl = text(properties.image) ?? text(properties.photo) ?? text(datasource?.image);
     const imageCredit = (() => {
       const value = properties.image_credit;
@@ -89,6 +109,7 @@ export function normalizeGeoapifyResponse(
       ...(imageUrl ? { imageUrl } : {}),
       ...(imageCredit ? { imageCredit } : {}),
       category,
+      ...(openingHoursText ? { openingHours: { sourceText: openingHoursText } } : {}),
       address: text(properties.formatted),
       countryCode: text(properties.country_code)?.toUpperCase(),
       coordinates: parseCoordinates({ latitude, longitude }),

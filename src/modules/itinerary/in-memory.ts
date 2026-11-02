@@ -1,5 +1,5 @@
 import type { ItineraryItem, PlaceCandidate, UUID } from "../_shared/model";
-import type { ConfirmedPlaceInput, ItineraryModule } from "./interface";
+import type { ConfirmedPlaceInput, ItineraryModule, MoveItineraryItemInput } from "./interface";
 
 export class InMemoryItineraryModule implements ItineraryModule {
   private readonly items: ItineraryItem[];
@@ -33,6 +33,21 @@ export class InMemoryItineraryModule implements ItineraryModule {
       ...rest,
       place: placeReference(place),
     });
+  }
+
+  async move(input: MoveItineraryItemInput): Promise<void> {
+    if (!this.online) throw new Error("ITINERARY_MUTATIONS_DISABLED_OFFLINE");
+    const index = this.items.findIndex((item) => item.tripId === input.tripId && item.id === input.itemId);
+    if (index < 0) throw new Error("Itinerary item not found");
+    const item = this.items[index]!;
+    const time = item.time ? { ...item.time, local: `${input.date}T${item.time.local.slice(-5)}` } : undefined;
+    this.items[index] = { ...item, stopId: input.stopId, date: input.date, ...(time ? { time } : {}) };
+  }
+
+  async remove(tripId: UUID, itemId: UUID): Promise<void> {
+    if (!this.online) throw new Error("ITINERARY_MUTATIONS_DISABLED_OFFLINE");
+    const index = this.items.findIndex((item) => item.tripId === tripId && item.id === itemId);
+    if (index >= 0) this.items.splice(index, 1);
   }
 
   private nextId(): UUID {

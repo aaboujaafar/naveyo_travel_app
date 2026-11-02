@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Stop, UUID } from "../modules/_shared/model";
 import {
   buildPlaceScheduleDates,
+  formatCountry,
   formatPlaceCategory,
   formatPlaceSource,
 } from "./place-detail-model";
@@ -42,9 +43,20 @@ describe("place detail model", () => {
     ]);
   });
 
+  it("translates provider categories, keeping the most specific known label", () => {
+    expect(formatPlaceCategory("catering")).toBe("Restaurant");
+    expect(formatPlaceCategory("catering.cafe.coffee_shop")).toBe("Café");
+    expect(formatPlaceCategory("entertainment.museum")).toBe("Musée");
+  });
+
   it("formats only values supplied by the place provider", () => {
-    expect(formatPlaceCategory("local_cafe")).toBe("Local Cafe");
+    expect(formatPlaceCategory("local_cafe")).toBeNull();
+    expect(formatPlaceCategory("tourism.sights.memorial")).toBe("Monument");
+    expect(formatPlaceCategory("building.historic")).toBe("Site historique");
     expect(formatPlaceCategory(undefined)).toBeNull();
+    expect(formatCountry("pt")).toBe("🇵🇹 Portugal");
+    expect(formatCountry("ZZ")).toBe("🇿🇿 ZZ");
+    expect(formatCountry(undefined)).toBeNull();
     expect(formatPlaceSource("geoapify")).toBe("Lieu vérifié");
     expect(formatPlaceSource("manual")).toBe("Lieu saisi manuellement");
   });

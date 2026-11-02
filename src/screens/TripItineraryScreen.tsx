@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MapAdapter } from "../adapters/map/interface";
 import { ExpoMapsAdapter } from "../adapters/map/expo-maps-adapter";
@@ -7,15 +7,18 @@ import { ExpoMapsView } from "../adapters/map/expo-maps-view";
 import type {
   Coordinates,
   ItineraryItem,
+  OpeningHours,
   Stop,
   TrackPoint,
 } from "../modules/_shared/model";
 import { buildItineraryDays } from "../modules/itinerary";
+import { describeOpeningDay, openingIntervals, openingStatusOn, weekday } from "../modules/places/opening-hours";
 import type { OfflineTripPackLoad } from "../modules/offline-trip-pack";
 import { colors, layout, radius, shadows, spacing, zIndex } from "../theme";
 import {
   AppText,
   Badge,
+  BottomSheet,
   Button,
   Chip,
   Icon,
@@ -35,15 +38,35 @@ export interface TripItineraryScreenProps {
   stops: Stop[];
   items: ItineraryItem[];
   trackPoints: TrackPoint[];
+  /** Provider facts of each planned place, keyed by place id: label and opening hours. */
+  placeDetails?: Record<string, PlaceDetails>;
   offline: OfflineTripPackLoad | null;
+  onDownloadOffline?: () => Promise<void>;
+  /** Writes the programme and reservations into an iPhone calendar; resolves to the number of events. */
+  onExportCalendar?: () => Promise<{ count: number; calendarName: string }>;
+  /** Public transport maps of the Stops, kept for offline use. */
+  onOpenTransitMaps?: () => void;
+  transitMapCount?: number;
+  /** Opens Apple Plans on the destination, where its map can be saved offline. */
+  onOpenAppleMaps?: () => void;
+  /** Present when the itinerary can be edited (online, with an editor role). */
+  onMoveItem?: (item: ItineraryItem, target: { stopId: Stop["id"]; date: string }) => Promise<void>;
+  onRemoveItem?: (item: ItineraryItem) => Promise<void>;
   loading: boolean;
   error?: string | null;
   /** Absent when the screen is a tab: the tab bar is the way out. */
   onBack?: () => void;
   onOpenAssistant: (stopId: Stop["id"]) => void;
+  /** False once the Voyage is over: there is no day left to compose. */
+  canComposeDay?: boolean;
   onOpenTracking: () => void;
   onCalculateRoute?: (coordinates: Coordinates[]) => Promise<Coordinates[] | null>;
   mapAdapter?: MapAdapter;
+}
+
+export interface PlaceDetails {
+  category?: string;
+  openingHours?: OpeningHours;
 }
 
 type MapFilter = "Tous" | "Restos" | "Visites" | "Hôtels" | "Transport";
@@ -55,10 +78,19 @@ export function TripItineraryScreen({
   items,
   trackPoints,
   offline,
+  placeDetails,
+  onDownloadOffline,
+  onExportCalendar,
+  onOpenTransitMaps,
+  transitMapCount = 0,
+  onOpenAppleMaps,
+  onMoveItem,
+  onRemoveItem,
   loading,
   error,
   onBack,
   onOpenAssistant,
+  canComposeDay = true,
   onOpenTracking,
   onCalculateRoute,
   mapAdapter,
@@ -68,15 +100,33 @@ export function TripItineraryScreen({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<MapFilter>("Tous");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [movingItem, setMovingItem] = useState<ItineraryItem | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const runEdit = async (edit: () => Promise<void>) => {
+    setEditError(null);
+    try {
+      await edit();
+      setMovingItem(null);
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "Modification impossible. Réessayez avec une connexion.");
+    }
+  };
+  const confirmRemove = (item: ItineraryItem) => {
+    if (!onRemoveItem) return;
+    Alert.alert("Retirer cette activité ?", `${item.title} sera retiré du programme pour tous les Membres du Voyage.`, [
+      { text: "Annuler", style: "cancel" },
+      { text: "Retirer", style: "destructive", onPress: () => void runEdit(() => onRemoveItem(item)) },
+    ]);
+  };
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const activeDay =
     days.find((day) => day.date === selectedDate) ?? days[0] ?? null;
   const visibleItems = useMemo(
     () =>
       activeDay
-        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter))
+        ? activeDay.items.filter((item) => matchesFilter(item, selectedFilter, placeDetails))
         : [],
-    [activeDay, selectedFilter],
+    [activeDay, placeDetails, selectedFilter],
   );
   const routeInput = useMemo(
     () => itineraryRouteCoordinates(activeDay?.items ?? [], activeDay?.stop),
@@ -245,6 +295,9 @@ export function TripItineraryScreen({
             <Badge label={`${visibleItems.length} prévu${visibleItems.length > 1 ? "s" : ""}`} variant="teal" />
           </View>
 
+          {editError && movingItem === null ? (
+            <InlineMessage variant="error" title="Modification impossible" message={editError} />
+          ) : null}
           {activeDay && visibleItems.length > 0 ? (
             <View style={styles.timeline}>
               <View style={styles.timelineLine} />
@@ -252,6 +305,9 @@ export function TripItineraryScreen({
                 <TimelineItem
                   key={item.id}
                   item={item}
+                  details={item.place?.placeId ? placeDetails?.[item.place.placeId] : undefined}
+                  onMove={onMoveItem ? () => setMovingItem(item) : undefined}
+                  onRemove={onRemoveItem ? () => confirmRemove(item) : undefined}
                   expanded={expandedItemId === item.id}
                   onPress={() => {
                     setSelectedPointId(
@@ -271,9 +327,9 @@ export function TripItineraryScreen({
               <Icon name="calendar" size={24} color={colors.muted} />
               <AppText variant="label">Aucun élément prévu</AppText>
               <AppText variant="caption" color="muted" align="center">
-                Laissez l’IA composer cette journée, ou ajoutez un lieu depuis Explorer.
+                {canComposeDay ? "Laissez l’IA composer cette journée, ou ajoutez un lieu depuis Explorer." : "Rien n’a été prévu ce jour-là."}
               </AppText>
-              {activeDay ? (
+              {activeDay && canComposeDay ? (
                 <Button
                   onPress={() => onOpenAssistant(activeDay.stop.id)}
                   icon={<Icon name="sparkles" size={16} color={colors.white} />}
@@ -292,7 +348,22 @@ export function TripItineraryScreen({
           </ComingSoonFrame>
         </View>
 
-        <OfflineCard offline={offline} />
+        <OfflineCard offline={offline} onDownload={onDownloadOffline} onOpenAppleMaps={onOpenAppleMaps} />
+        {onOpenTransitMaps ? (
+          <Pressable accessibilityRole="button" onPress={onOpenTransitMaps} style={({ pressed }) => [styles.offlineCard, pressed && styles.pressed]}>
+            <View style={styles.offlineHeader}>
+              <Icon name="map" size={20} color={colors.tealStrong} />
+              <AppText variant="label" style={styles.flexOne}>Plans de transport</AppText>
+              <Icon name="arrow-right" size={16} color={colors.fg} />
+            </View>
+            <AppText variant="caption" color="muted">
+              {transitMapCount > 0
+                ? `${transitMapCount} plan${transitMapCount > 1 ? "s" : ""} de métro ou tram disponible${transitMapCount > 1 ? "s" : ""} sans réseau.`
+                : "Téléchargez le plan du métro ou du tram de vos Étapes pour le consulter sans réseau."}
+            </AppText>
+          </Pressable>
+        ) : null}
+        {onExportCalendar ? <CalendarCard onExport={onExportCalendar} /> : null}
 
         <ComingSoonSection title="Famille en temps réel">
           <View style={styles.familyRow}>
@@ -313,7 +384,9 @@ export function TripItineraryScreen({
           <View style={styles.trackingInfo}>
             <AppText variant="label">Trace de trajet</AppText>
             <AppText variant="caption" color="muted">
-              {trackPoints.length} point{trackPoints.length > 1 ? "s" : ""} enregistré{trackPoints.length > 1 ? "s" : ""} par cet appareil
+              {trackPoints.length === 0
+                ? "Aucun point enregistré sur cet iPhone"
+                : `${trackPoints.length} point${trackPoints.length > 1 ? "s" : ""} enregistré${trackPoints.length > 1 ? "s" : ""} sur cet iPhone`}
             </AppText>
           </View>
           <Button size="sm" onPress={onOpenTracking}>Ouvrir</Button>
@@ -326,20 +399,52 @@ export function TripItineraryScreen({
         </View>
       </ScrollView>
 
+      <BottomSheet visible={movingItem !== null} onClose={() => setMovingItem(null)} title="Changer de jour" maxHeight={640}>
+        {movingItem ? <AppText variant="bodySmall" color="muted">{`${movingItem.title} garde son heure et rejoint le jour choisi.`}</AppText> : null}
+        {editError ? <InlineMessage variant="error" title="Modification impossible" message={editError} /> : null}
+        <View style={styles.dayChoices}>
+          {days.map((day, index) => {
+            const current = movingItem?.date === day.date && movingItem.stopId === day.stop.id;
+            return (
+              <Button
+                key={`${day.stop.id}-${day.date}`}
+                variant={current ? "primary" : "secondary"}
+                disabled={current}
+                onPress={() => {
+                  const item = movingItem;
+                  if (item && onMoveItem) void runEdit(() => onMoveItem(item, { stopId: day.stop.id, date: day.date }));
+                }}
+              >
+                {`Jour ${index + 1} · ${formatLocalItineraryDate(day.date)} · ${day.stop.name}`}
+              </Button>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </View>
   );
 }
 
 function TimelineItem({
+  details,
+  onMove,
+  onRemove,
   item,
   expanded,
   onPress,
 }: {
+  details?: PlaceDetails;
+  onMove?: () => void;
+  onRemove?: () => void;
   item: ItineraryItem;
   expanded: boolean;
   onPress: () => void;
 }) {
-  const category = itineraryCategory(item);
+  const category = itineraryCategory(item, details?.category);
+  const opening = openingStatusOn(details?.openingHours, item.date, formatLocalTime(item.time?.local) ?? undefined);
+  const dayIndex = weekday(item.date);
+  const intervals = openingIntervals(details?.openingHours);
+  const todayHours = intervals && dayIndex !== null ? describeOpeningDay(intervals, dayIndex) : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -349,12 +454,18 @@ function TimelineItem({
     >
       <View style={styles.timelineDot} />
       <AppText variant="caption" color="muted" style={styles.timelineTime}>
-        {item.time?.local ?? "Sans heure"}
+        {formatLocalTime(item.time?.local) ?? "Sans heure"}
       </AppText>
       <AppText variant="label" style={styles.timelineName}>{item.title}</AppText>
       <View style={styles.timelineMeta}>
         <Badge label={category} variant={category === "Resto" ? "accent" : "teal"} />
-        <Badge label="Prévu" variant="gold" />
+        {opening === "closed-day" ? (
+          <Badge label="Fermé ce jour-là" variant="danger" />
+        ) : opening === "closed-time" ? (
+          <Badge label="Fermé à cette heure" variant="danger" />
+        ) : (
+          <Badge label="Prévu" variant="gold" />
+        )}
       </View>
       {expanded ? (
         <View style={styles.timelineDetail}>
@@ -363,42 +474,122 @@ function TimelineItem({
           </AppText>
           {item.time ? (
             <AppText variant="caption" color="muted">
-              Heure locale {item.time.local} · {item.time.timeZone}
+              Heure locale {formatLocalTime(item.time.local) ?? item.time.local} · {item.time.timeZone}
+            </AppText>
+          ) : null}
+          {todayHours ? (
+            <AppText variant="caption" color={opening === "closed-day" || opening === "closed-time" ? "accent" : "muted"}>
+              {`Horaires ce jour-là : ${todayHours}`}
             </AppText>
           ) : null}
           {item.notes ? <AppText variant="caption" color="muted">{item.notes}</AppText> : null}
+          {onMove || onRemove ? (
+            <View style={styles.itemActions}>
+              {onMove ? <Button size="sm" variant="secondary" onPress={onMove}>Changer de jour</Button> : null}
+              {onRemove ? <Button size="sm" variant="ghost" onPress={onRemove}>Retirer</Button> : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </Pressable>
   );
 }
 
-function OfflineCard({ offline }: { offline: OfflineTripPackLoad | null }) {
+function OfflineCard({ offline, onDownload, onOpenAppleMaps }: { offline: OfflineTripPackLoad | null; onDownload?: () => Promise<void>; onOpenAppleMaps?: () => void }) {
   const ready = offline?.state === "ready";
+  const [downloading, setDownloading] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const download = async () => {
+    if (!onDownload) return;
+    setDownloading(true);
+    setFailure(null);
+    try {
+      await onDownload();
+    } catch (cause) {
+      setFailure(cause instanceof Error ? cause.message : "Téléchargement impossible. Réessayez avec une connexion.");
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <View style={styles.offlineCard}>
       <View style={styles.offlineHeader}>
         <View style={[styles.offlineCheck, !ready && styles.offlineCheckInactive]}>
           <Icon name={ready ? "check" : "info"} size={14} color={ready ? colors.success : colors.gold} />
         </View>
-        <AppText variant="label">
-          {ready ? "Paquet de voyage disponible" : "Paquet hors ligne indisponible"}
-        </AppText>
+        <AppText variant="label" style={styles.flexOne}>Voyage hors ligne</AppText>
+        <Badge label={ready ? "Prêt" : "Non téléchargé"} variant={ready ? "success" : "gold"} />
       </View>
       <AppText variant="caption" color="muted">
         {ready && offline?.manifest
-          ? `Généré le ${offline.manifest.generatedAt} · révision ${offline.manifest.serverRevision}`
-          : offline?.reason ?? "Téléchargez le Voyage avant de partir."}
+          ? `Téléchargé ${formatGeneratedAt(offline.manifest.generatedAt)}. Étapes, programme, réservations et dépenses restent consultables sans réseau.`
+          : "Téléchargez le Voyage avant de partir : étapes, programme, réservations et dépenses resteront consultables sans réseau."}
       </AppText>
-      <View style={styles.offlineStatusRow}>
-        <AppText variant="label">Consultation hors ligne</AppText>
-        <Badge label={ready ? "Prête" : "Non prête"} variant={ready ? "success" : "gold"} />
-      </View>
       <AppText variant="caption" color="muted">
-        Le fond MapKit n’est jamais garanti hors connexion ; les lieux, coordonnées et traces restent listés.
+        Le fond de carte peut rester vide sans connexion ; les lieux et leurs adresses restent listés.
       </AppText>
+      {onOpenAppleMaps ? (
+        <Pressable accessibilityRole="button" onPress={onOpenAppleMaps} style={({ pressed }) => [styles.mapsTip, pressed && styles.pressed]}>
+          <Icon name="map" size={20} color={colors.tealStrong} />
+          <View style={styles.flexOne}>
+            <AppText variant="label" color="teal">Garder la carte dans Plans</AppText>
+            <AppText variant="caption" color="muted">Dans Plans : votre photo › Cartes hors ligne › Télécharger une carte, puis cadrez la destination.</AppText>
+          </View>
+          <Icon name="arrow-right" size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
+      {failure ? <InlineMessage variant="error" title="Téléchargement impossible" message={failure} /> : null}
+      {onDownload ? (
+        <Button
+          variant={ready ? "secondary" : "primary"}
+          fullWidth
+          loading={downloading}
+          onPress={() => void download()}
+          icon={<Icon name={ready ? "refresh" : "arrow-right"} size={20} color={ready ? colors.fg : colors.white} />}
+        >
+          {ready ? "Mettre à jour" : "Télécharger pour le hors-ligne"}
+        </Button>
+      ) : null}
     </View>
   );
+}
+
+function CalendarCard({ onExport }: { onExport: () => Promise<{ count: number; calendarName: string }> }) {
+  const [exporting, setExporting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const exportNow = async () => {
+    setExporting(true);
+    setResult(null);
+    try {
+      const { count, calendarName } = await onExport();
+      setResult({ ok: true, message: `${count} événement${count > 1 ? "s" : ""} dans le calendrier « ${calendarName} », avec rappels.` });
+    } catch (cause) {
+      setResult({ ok: false, message: cause instanceof Error ? cause.message : "Export impossible." });
+    } finally {
+      setExporting(false);
+    }
+  };
+  return (
+    <View style={styles.offlineCard}>
+      <View style={styles.offlineHeader}>
+        <Icon name="calendar" size={20} color={colors.accentStrong} />
+        <AppText variant="label" style={styles.flexOne}>Calendrier de l’iPhone</AppText>
+      </View>
+      <AppText variant="caption" color="muted">
+        Le programme et les réservations dans un calendrier dédié, avec un rappel 30 min avant chaque activité et 1 h avant un vol, un train ou un ferry.
+      </AppText>
+      {result ? <InlineMessage variant={result.ok ? "success" : "error"} title={result.ok ? "Calendrier à jour" : "Export impossible"} message={result.message} /> : null}
+      <Button variant="secondary" fullWidth loading={exporting} onPress={() => void exportNow()} icon={<Icon name="calendar" size={20} color={colors.fg} />}>
+        {result?.ok ? "Mettre à jour le Calendrier" : "Ajouter au Calendrier"}
+      </Button>
+    </View>
+  );
+}
+
+function formatGeneratedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "récemment";
+  return `le ${date.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function ComingSoonFrame({ label, children }: { label: string; children: React.ReactNode }) {
@@ -422,7 +613,18 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function itineraryCategory(item: ItineraryItem): "Resto" | "Transport" | "Visite" | "Hôtel" {
+function formatLocalTime(value?: string): string | null {
+  const match = value ? /(\d{2}):(\d{2})/.exec(value) : null;
+  return match ? `${match[1]}:${match[2]}` : null;
+}
+
+function itineraryCategory(item: ItineraryItem, placeCategory?: string): "Resto" | "Transport" | "Visite" | "Hôtel" {
+  // The provider category of the place is more reliable than words in the title.
+  if (placeCategory) {
+    if (/^catering/.test(placeCategory)) return "Resto";
+    if (/^accommodation/.test(placeCategory)) return "Hôtel";
+    if (/^(public_transport|airport|commercial\.port)/.test(placeCategory)) return "Transport";
+  }
   const category = item.place?.kind === "origin" || item.place?.kind === "destination"
     ? "transport"
     : item.title.toLocaleLowerCase("fr");
@@ -432,7 +634,7 @@ function itineraryCategory(item: ItineraryItem): "Resto" | "Transport" | "Visite
   return "Visite";
 }
 
-function matchesFilter(item: ItineraryItem, filter: MapFilter): boolean {
+function matchesFilter(item: ItineraryItem, filter: MapFilter, placeDetails?: Record<string, PlaceDetails>): boolean {
   if (filter === "Tous") return true;
   const expected: Record<Exclude<MapFilter, "Tous">, ReturnType<typeof itineraryCategory>> = {
     Restos: "Resto",
@@ -440,7 +642,7 @@ function matchesFilter(item: ItineraryItem, filter: MapFilter): boolean {
     Hôtels: "Hôtel",
     Transport: "Transport",
   };
-  return itineraryCategory(item) === expected[filter];
+  return itineraryCategory(item, item.place?.placeId ? placeDetails?.[item.place.placeId]?.category : undefined) === expected[filter];
 }
 
 const styles = StyleSheet.create({
@@ -472,6 +674,10 @@ const styles = StyleSheet.create({
   comingSoonContent: { opacity: 0.46 },
   comingSoonBadge: { position: "absolute", top: spacing.sm, right: spacing.sm, zIndex: zIndex.sticky },
   addStopPreview: { minHeight: layout.minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md, marginLeft: spacing["2xl"], borderRadius: radius.full, borderWidth: 1, borderStyle: "dashed", borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  flexOne: { flex: 1 },
+  mapsTip: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.tealSoft },
+  itemActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  dayChoices: { gap: spacing.sm },
   offlineCard: { marginHorizontal: spacing.lg, marginBottom: spacing.xl, gap: spacing.sm, padding: spacing.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },
   offlineHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offlineCheck: { width: spacing.lg, height: spacing.lg, borderRadius: radius.full, alignItems: "center", justifyContent: "center", backgroundColor: colors.tealSoft },
