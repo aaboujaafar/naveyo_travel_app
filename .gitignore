@@ -18,3 +18,7 @@ android/
 
 expo-env.d.ts
 # @end expo-cli
+# Local clutter
+.DS_Store
+bun.lock
+brag-output*/

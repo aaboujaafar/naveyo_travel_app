@@ -23,7 +23,7 @@
   </tr>
 </table>
 
-<sub>Captures du simulateur iOS avec un voyage de test à Lisbonne. Certains écrans viennent de branches de travail pas encore fusionnées dans `main`.</sub>
+<sub>Captures du simulateur iOS avec un voyage de test à Lisbonne.</sub>
 
 ## Fonctionnalités
 
@@ -97,7 +97,7 @@ Les appels passent par des Edge Functions Supabase ([`supabase/functions`](supab
 
 - **App** : Expo (React Native) avec Expo Router, TypeScript, MapKit via `expo-maps`, module natif Swift pour l'analyse de documents et une Share Extension iOS.
 - **Backend** : Supabase (Postgres avec RLS, Storage privé, Edge Functions en Deno).
-- **Données externes** : Geoapify (géocodage, lieux), Google Places en option, Open-Meteo (météo), Unsplash (photos).
+- **Données externes** : Geoapify (géocodage, lieux), Google Places en option, Open-Meteo (météo), Wikimedia et Unsplash (photos).
 - **Architecture** : modules métier indépendants ([`src/modules`](src/modules)) branchés sur des adapters ([`src/adapters`](src/adapters)), ce qui permet de tester la logique sans dépendre des services réels.
 
 ## Lancer le projet
